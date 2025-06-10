@@ -1,33 +1,260 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { authService, AuthUser } from '../../lib/firebase/auth';
+import { 
+  LayoutDashboard,
+  DollarSign,
+  Package,
+  Users,
+  FileText,
+  TrendingUp,
+  Shield,
+  Truck,
+  Calculator,
+  BarChart3,
+  Settings,
+  Building2,
+  Receipt,
+  AlertTriangle,
+  UserCheck,
+  ClipboardList
+} from 'lucide-react';
 
 interface SidebarProps {
   activeItem?: string;
   onItemClick?: (item: string) => void;
 }
 
-const navigationItems = [
-  { id: 'dashboard', icon: '⊞', label: 'Dashboard' },
-  { id: 'transactions', icon: '💳', label: 'Transactions' },
-  { id: 'analytics', icon: '📊', label: 'Analytics' },
-  { id: 'cash-allocation', icon: '💰', label: 'Cash Allocation' },
-  { id: 'suppliers', icon: '🏢', label: 'Suppliers' },
-  { id: 'employees', icon: '👥', label: 'Employees' },
-  { id: 'inventory', icon: '📦', label: 'Inventory' },
-  { id: 'reports', icon: '📋', label: 'Reports' },
-  { id: 'settings', icon: '⚙️', label: 'Settings' },
+interface NavigationItem {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  path: string;
+  roles: string[];
+}
+
+const navigationItems: NavigationItem[] = [
+  // Dashboard - Available to all roles
+  { 
+    id: 'dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'Dashboard', 
+    path: '/dashboard',
+    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor']
+  },
+  
+  // Admin specific
+  { 
+    id: 'system-overview', 
+    icon: <Shield className="w-5 h-5" />, 
+    label: 'System Overview', 
+    path: '/dashboard/admin',
+    roles: ['Admin']
+  },
+  { 
+    id: 'user-management', 
+    icon: <UserCheck className="w-5 h-5" />, 
+    label: 'User Management', 
+    path: '/admin/users',
+    roles: ['Admin']
+  },
+  
+  // Manager specific
+  { 
+    id: 'performance', 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    label: 'Performance', 
+    path: '/dashboard/manager',
+    roles: ['Manager', 'Admin']
+  },
+  { 
+    id: 'branches', 
+    icon: <Building2 className="w-5 h-5" />, 
+    label: 'Branches', 
+    path: '/manager/branches',
+    roles: ['Manager', 'Admin']
+  },
+  
+  // Accountant specific
+  { 
+    id: 'cash-allocation', 
+    icon: <Calculator className="w-5 h-5" />, 
+    label: 'Cash Allocation', 
+    path: '/dashboard/accountant',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'expenses', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'Expenses', 
+    path: '/accountant/expenses',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'financial-reports', 
+    icon: <BarChart3 className="w-5 h-5" />, 
+    label: 'Financial Reports', 
+    path: '/accountant/reports',
+    roles: ['Accountant', 'Manager', 'Admin']
+  },
+  
+  // Purchase Manager specific
+  { 
+    id: 'suppliers', 
+    icon: <Building2 className="w-5 h-5" />, 
+    label: 'Suppliers', 
+    path: '/dashboard/purchase-manager',
+    roles: ['Purchase Manager', 'Admin']
+  },
+  { 
+    id: 'fund-acknowledgments', 
+    icon: <DollarSign className="w-5 h-5" />, 
+    label: 'Fund Acknowledgments', 
+    path: '/purchase-manager/funds',
+    roles: ['Purchase Manager', 'Admin']
+  },
+  { 
+    id: 'restock-items', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Restock Items', 
+    path: '/purchase-manager/restock',
+    roles: ['Purchase Manager', 'Stock Manager', 'Admin']
+  },
+  
+  // HR specific
+  { 
+    id: 'employees', 
+    icon: <Users className="w-5 h-5" />, 
+    label: 'Employees', 
+    path: '/dashboard/hr',
+    roles: ['HR', 'Manager', 'Admin']
+  },
+  { 
+    id: 'attendance', 
+    icon: <ClipboardList className="w-5 h-5" />, 
+    label: 'Attendance', 
+    path: '/hr/attendance',
+    roles: ['HR', 'Manager', 'Admin']
+  },
+  { 
+    id: 'leave-requests', 
+    icon: <FileText className="w-5 h-5" />, 
+    label: 'Leave Requests', 
+    path: '/hr/leave',
+    roles: ['HR', 'Manager', 'Admin']
+  },
+  
+  // Stock Manager specific
+  { 
+    id: 'inventory', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Inventory', 
+    path: '/dashboard/stock-manager',
+    roles: ['Stock Manager', 'Admin']
+  },
+  { 
+    id: 'damage-reports', 
+    icon: <AlertTriangle className="w-5 h-5" />, 
+    label: 'Damage Reports', 
+    path: '/stock-manager/damages',
+    roles: ['Stock Manager', 'Manager', 'Admin']
+  },
+  
+  // Receiver specific
+  { 
+    id: 'deliveries', 
+    icon: <Truck className="w-5 h-5" />, 
+    label: 'Deliveries', 
+    path: '/dashboard/receiver',
+    roles: ['Receiver', 'Admin']
+  },
+  { 
+    id: 'return-notes', 
+    icon: <FileText className="w-5 h-5" />, 
+    label: 'Return Notes', 
+    path: '/receiver/returns',
+    roles: ['Receiver', 'Admin']
+  },
+  
+  // Auditor specific
+  { 
+    id: 'audit-trail', 
+    icon: <Shield className="w-5 h-5" />, 
+    label: 'Audit Trail', 
+    path: '/dashboard/auditor',
+    roles: ['Auditor', 'Admin']
+  },
+  { 
+    id: 'discrepancies', 
+    icon: <AlertTriangle className="w-5 h-5" />, 
+    label: 'Discrepancies', 
+    path: '/auditor/discrepancies',
+    roles: ['Auditor', 'Manager', 'Admin']
+  },
+  
+  // Settings - Available to all roles
+  { 
+    id: 'settings', 
+    icon: <Settings className="w-5 h-5" />, 
+    label: 'Settings', 
+    path: '/settings',
+    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor']
+  }
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeItem = 'dashboard', onItemClick }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+
+    const unsubscribe = authService.onAuthStateChange((user) => {
+      setCurrentUser(user);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const getUserRole = (): string => {
+    return currentUser?.employee?.roles?.[0]?.jobTitle || 'User';
+  };
+
+  const getFilteredNavigationItems = (): NavigationItem[] => {
+    const userRole = getUserRole();
+    return navigationItems.filter(item => 
+      item.roles.includes(userRole) || item.roles.includes('*')
+    );
+  };
+
+  const handleItemClick = (item: NavigationItem) => {
+    if (onItemClick) {
+      onItemClick(item.id);
+    } else {
+      router.push(item.path);
+    }
+  };
+
+  const isActiveItem = (item: NavigationItem): boolean => {
+    if (activeItem) {
+      return activeItem === item.id;
+    }
+    return pathname === item.path || pathname.startsWith(item.path + '/');
+  };
+
+  const filteredItems = getFilteredNavigationItems();
 
   return (
     <div className={`${isExpanded ? 'w-64' : 'w-20'} bg-white border-r border-gray-100 flex flex-col py-6 transition-all duration-300 ease-in-out relative`}>
       {/* Logo and Toggle */}
       <div className="flex items-center px-6 mb-8">
         <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-xl">A</span>
+          <span className="text-white font-bold text-xl">E</span>
         </div>
         {isExpanded && (
           <div className="ml-3 overflow-hidden">
@@ -47,16 +274,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem = 'dashboard', onIt
         </button>
       </div>
 
+      {/* Role Badge */}
+      {isExpanded && (
+        <div className="px-6 mb-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">
+              {getUserRole()}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Items */}
-      <nav className="flex flex-col gap-2 flex-1 px-3">
-        {navigationItems.map((item) => (
+      <nav className="flex flex-col gap-1 flex-1 px-3">
+        {filteredItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onItemClick?.(item.id)}
-            className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center text-xl transition-all duration-200 group relative ${
-              activeItem === item.id
-                ? 'bg-emerald-100 text-emerald-600'
-                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            onClick={() => handleItemClick(item)}
+            className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative ${
+              isActiveItem(item)
+                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
             }`}
             title={!isExpanded ? item.label : undefined}
           >
@@ -66,7 +304,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem = 'dashboard', onIt
             
             {/* Label - only show when expanded */}
             {isExpanded && (
-              <span className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden">
+              <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
                 {item.label}
               </span>
             )}
@@ -84,18 +322,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem = 'dashboard', onIt
       {/* User Profile */}
       <div className="mt-auto px-3">
         <button className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} w-full h-12 rounded-xl flex items-center hover:bg-gray-100 transition-all duration-200 group`}>
-          <div className="w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
-            <img
-              src="/api/placeholder/32/32"
-              alt="Profile"
-              className="w-full h-full object-cover"
-            />
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <span className="text-emerald-600 font-semibold text-sm">
+              {currentUser?.employee?.firstName?.charAt(0) || 'U'}
+            </span>
           </div>
           
           {isExpanded && (
             <div className="ml-3 text-left overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 whitespace-nowrap">John Doe</p>
-              <p className="text-xs text-gray-500 whitespace-nowrap">Administrator</p>
+              <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
+                {currentUser?.employee?.firstName} {currentUser?.employee?.lastName}
+              </p>
+              <p className="text-xs text-gray-500 whitespace-nowrap">
+                {getUserRole()}
+              </p>
             </div>
           )}
         </button>

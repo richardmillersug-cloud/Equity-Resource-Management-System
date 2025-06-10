@@ -1,363 +1,310 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ==================== HELPER FUNCTIONS ====================
+    // =====================================================
+    // UTILITY FUNCTIONS
+    // =====================================================
     
     // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Get user's employee document
-    function getUserEmployee() {
-      return get(/databases/$(database)/documents/employees/$(request.auth.uid));
+    // Get user's role from employee document
+    function getUserRole() {
+      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.roles[0].jobTitle;
     }
     
     // Check if user has specific role
     function hasRole(role) {
-      let employee = getUserEmployee();
-      return employee.data.roles != null && 
-             employee.data.roles.hasAny([role]);
+      return isAuthenticated() && getUserRole() == role;
     }
     
     // Check if user has any of the specified roles
     function hasAnyRole(roles) {
-      let employee = getUserEmployee();
-      return employee.data.roles != null && 
-             employee.data.roles.hasAny(roles);
+      return isAuthenticated() && getUserRole() in roles;
     }
     
-    // Check if user is active employee
-    function isActiveEmployee() {
-      let employee = getUserEmployee();
-      return employee.data.employmentStatus == 'Active';
+    // Check if user is admin
+    function isAdmin() {
+      return hasRole('Admin');
     }
     
-    // Check if user owns the resource
-    function isOwner(employeeId) {
-      return request.auth.uid == employeeId;
+    // Check if user owns the document (userId field matches auth.uid)
+    function isOwner() {
+      return isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
-    // Check if user is in same branch
-    function isSameBranch(branchId) {
-      let employee = getUserEmployee();
-      return employee.data.branchId == branchId;
+    // Check if user is the employee referenced in the document
+    function isEmployee() {
+      return isAuthenticated() && resource.data.employeeId == request.auth.uid;
     }
     
-    // ==================== BRANCH RULES ====================
+    // =====================================================
+    // BRANCHES COLLECTION
+    // =====================================================
     
     match /branches/{branchId} {
-      allow read: if isAuthenticated() && isActiveEmployee();
-      allow write: if isAuthenticated() && hasAnyRole(['admin', 'managing_director']);
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
     
-    // ==================== EMPLOYEE RULES ====================
+    // =====================================================
+    // EMPLOYEES COLLECTION
+    // =====================================================
     
     match /employees/{employeeId} {
       allow read: if isAuthenticated() && (
-        isOwner(employeeId) || 
-        hasAnyRole(['admin', 'hr', 'managing_director']) ||
-        isSameBranch(resource.data.branchId)
+        employeeId == request.auth.uid || // Own record
+        hasAnyRole(['Admin', 'HR', 'Manager']) // HR/Admin/Manager can read all
       );
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-      
+      allow create: if hasAnyRole(['Admin', 'HR']);
       allow update: if isAuthenticated() && (
-        (isOwner(employeeId) && onlyUpdatingOwnProfile()) ||
-        hasAnyRole(['admin', 'hr'])
+        employeeId == request.auth.uid || // Can update own record
+        hasAnyRole(['Admin', 'HR']) // HR/Admin can update all
       );
-      
-      allow delete: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-      
-      function onlyUpdatingOwnProfile() {
-        let allowedFields = ['phone', 'address', 'nextOfKinName', 'nextOfKinNIN', 'nextOfKinPhoneNumber'];
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
-      }
+      allow delete: if hasRole('Admin');
     }
     
-    // ==================== FINANCIAL MANAGEMENT RULES ====================
+    // =====================================================
+    // CASH ALLOCATIONS (Rule 1.1 - Only Accountants)
+    // =====================================================
     
     match /cashAllocations/{allocationId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'purchasing_manager', 'managing_director']) ||
-        isOwner(resource.data.accountantId) ||
-        isOwner(resource.data.purchasingManagerId)
-      );
-      
-      allow create: if isAuthenticated() && 
-        hasAnyRole(['accountant', 'accountant_operations']) &&
-        validateCashAllocation();
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['accountant', 'accountant_operations']) ||
-        (hasRole('purchasing_manager') && isOwner(resource.data.purchasingManagerId))
-      );
-      
-      allow delete: if isAuthenticated() && hasAnyRole(['admin', 'accountant']);
-      
-      function validateCashAllocation() {
-        let data = request.resource.data;
-        return data.cashCloseTotal > 0 &&
-               data.savings >= 0 &&
-               data.specialFunds >= 0 &&
-               data.purchasingManager >= 0 &&
-               (data.savings + data.specialFunds + data.purchasingManager) <= data.cashCloseTotal;
-      }
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
+      allow create: if hasRole('Accountant');
+      allow update: if hasRole('Accountant') && resource.data.accountantId == request.auth.uid;
+      allow delete: if hasRole('Admin');
     }
+    
+    // =====================================================
+    // FUND ACKNOWLEDGMENTS (Rule 2.1 - Purchase Managers only their funds)
+    // =====================================================
     
     match /fundAcknowledgments/{acknowledgmentId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'purchasing_manager']) ||
-        isOwner(resource.data.purchasingManagerId) ||
-        isOwner(resource.data.accountantId)
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchase Manager']) && (
+        hasRole('Admin') || 
+        hasRole('Accountant') ||
+        (hasRole('Purchase Manager') && resource.data.purchasingManagerId == request.auth.uid)
       );
-      
-      allow create: if isAuthenticated() && validateFundAcknowledgment();
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['accountant', 'accountant_operations']) ||
-        isOwner(resource.data.purchasingManagerId)
-      );
-      
-      function validateFundAcknowledgment() {
-        let data = request.resource.data;
-        return data.actualAmountReceived > 0 &&
-               data.fundType in ['purchasing', 'special', 'twelvePercent'];
-      }
+      allow create: if hasRole('Purchase Manager');
+      allow update: if hasRole('Purchase Manager') && resource.data.purchasingManagerId == request.auth.uid;
+      allow delete: if hasRole('Admin');
     }
     
-    match /expenses/{expenseId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'managing_director']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && validateExpense();
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations']) ||
-        (isOwner(resource.data.employeeId) && resource.data.status == 'pending')
-      );
-      
-      function validateExpense() {
-        let data = request.resource.data;
-        return data.amount > 0 &&
-               data.expenseType in ['GENERAL', 'URA', 'EMERGENCIES', 'DAY_TO_DAY'];
-      }
-    }
-    
-    match /cashCloses/{cashCloseId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'managing_director']) ||
-        isOwner(resource.data.employeeId) ||
-        isSameBranch(resource.data.branchId)
-      );
-      
-      allow create: if isAuthenticated() && validateCashClose();
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'accountant', 'accountant_operations']);
-      
-      function validateCashClose() {
-        let data = request.resource.data;
-        let paymentTotal = data.cashPresent + data.airtel + data.stanbicBank + 
-                          data.mtn + data.equityBank + data.absaBank + data.pesaPal;
-        return data.actualAmount > 0 &&
-               data.expectedAmount > 0 &&
-               math.abs(paymentTotal - data.actualAmount) < 0.01;
-      }
-    }
-    
-    match /cashInjections/{injectionId} {
-      allow read: if isAuthenticated() && hasAnyRole(['admin', 'accountant', 'accountant_operations', 'managing_director']);
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'accountant', 'accountant_operations']);
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'accountant']);
-    }
-    
-    // ==================== SUPPLY CHAIN RULES ====================
-    
-    match /suppliers/{supplierId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'purchasing_manager', 'accountant', 'accountant_operations', 'managing_director']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && 
-        hasAnyRole(['admin', 'purchasing_manager']) &&
-        validateSupplier();
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['admin', 'purchasing_manager']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow delete: if isAuthenticated() && hasAnyRole(['admin', 'purchasing_manager']);
-      
-      function validateSupplier() {
-        let data = request.resource.data;
-        return data.tinNumber.size() == 10 &&
-               data.supplierName.size() > 0;
-      }
-    }
-    
-    match /invoices/{invoiceId} {
-      allow read: if isAuthenticated() && hasAnyRole([
-        'admin', 'accountant', 'accountant_operations', 'purchasing_manager', 
-        'receiver', 'managing_director'
-      ]);
-      
-      allow create: if isAuthenticated() && 
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'purchasing_manager', 'receiver']) &&
-        validateInvoice();
-      
-      allow update: if isAuthenticated() && hasAnyRole([
-        'admin', 'accountant', 'accountant_operations', 'purchasing_manager'
-      ]);
-      
-      function validateInvoice() {
-        let data = request.resource.data;
-        return data.amount > 0 &&
-               data.quantity > 0 &&
-               data.fdn.size() > 0 &&
-               data.title.size() > 0;
-      }
-    }
-    
-    match /payments/{paymentId} {
-      allow read: if isAuthenticated() && hasAnyRole([
-        'admin', 'accountant', 'accountant_operations', 'purchasing_manager', 'managing_director'
-      ]);
-      
-      allow create: if isAuthenticated() && 
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'purchasing_manager']) &&
-        validatePayment();
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'accountant', 'accountant_operations']);
-      
-      function validatePayment() {
-        let data = request.resource.data;
-        return data.amount > 0 &&
-               data.transactionId.size() > 0 &&
-               data.paymentMethod in ['Cash', 'Airtel', 'MTN', 'StanbicBank', 'EquityBank', 'AbsaBank', 'PesaPal'];
-      }
-    }
-    
-    match /restockItems/{restockId} {
-      allow read: if isAuthenticated() && hasAnyRole([
-        'admin', 'stock_manager', 'purchasing_manager', 'supervisor'
-      ]);
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'stock_manager', 'purchasing_manager']);
-      
-      allow update: if isAuthenticated() && hasAnyRole([
-        'admin', 'stock_manager', 'purchasing_manager', 'supervisor'
-      ]);
-    }
-    
-    match /returnNotes/{returnId} {
-      allow read: if isAuthenticated() && hasAnyRole([
-        'admin', 'purchasing_manager', 'stock_manager', 'receiver'
-      ]);
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'purchasing_manager', 'receiver']);
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'purchasing_manager']);
-    }
-    
-    match /damages/{damageId} {
-      allow read: if isAuthenticated() && hasAnyRole([
-        'admin', 'stock_manager', 'supervisor', 'managing_director'
-      ]);
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'stock_manager', 'supervisor']);
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'stock_manager']);
-    }
-    
-    // ==================== HUMAN RESOURCES RULES ====================
-    
-    match /attendance/{attendanceId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'supervisor', 'managing_director']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'supervisor']) ||
-        isOwner(request.resource.data.employeeId)
-      );
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'hr', 'supervisor']);
-    }
-    
-    match /barcodes/{barcodeId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'supervisor']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-    }
-    
-    match /leaveRequests/{leaveId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'supervisor', 'managing_director']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr']) ||
-        isOwner(request.resource.data.employeeId)
-      );
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'supervisor']) ||
-        (isOwner(resource.data.employeeId) && resource.data.status == 'Pending')
-      );
-    }
-    
-    match /payroll/{payrollId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'hr', 'managing_director']) ||
-        isOwner(resource.data.employeeId)
-      );
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-      
-      allow update: if isAuthenticated() && hasAnyRole(['admin', 'hr']);
-      
-      allow delete: if isAuthenticated() && hasRole('admin');
-    }
-    
-    // ==================== AUDIT LOGS ====================
-    
-    match /auditLogs/{logId} {
-      allow read: if isAuthenticated() && hasAnyRole(['admin', 'managing_director']);
-      allow create: if isAuthenticated(); // All authenticated users can create audit logs
-      // No update or delete - audit logs are immutable
-    }
-    
-    // ==================== SPECIAL FUNDS TRACKER ====================
+    // =====================================================
+    // SPECIAL FUNDS TRACKER (Rule 2.2)
+    // =====================================================
     
     match /specialFundsTracker/{trackerId} {
-      allow read: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations', 'managing_director']) ||
-        isOwner(resource.data.accountantId)
-      );
-      
-      allow create: if isAuthenticated() && hasAnyRole(['admin', 'accountant', 'accountant_operations']);
-      
-      allow update: if isAuthenticated() && (
-        hasAnyRole(['admin', 'accountant', 'accountant_operations']) ||
-        isOwner(resource.data.accountantId)
-      );
+      allow read: if hasAnyRole(['Admin', 'Accountant']);
+      allow write: if hasRole('Accountant');
     }
     
-    // ==================== DEFAULT DENY ====================
+    // =====================================================
+    // EXPENSES (Rule 4.1, 4.2, 4.3)
+    // =====================================================
     
-    // Deny all other requests
+    match /expenses/{expenseId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
+      allow create: if hasAnyRole(['Accountant', 'Manager']) && 
+        request.resource.data.amount > 0; // Rule 4.3: Amount must be > 0
+      allow update: if hasAnyRole(['Admin', 'Accountant']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // SUPPLIERS (Rule 5.2 - Purchase Managers manage their suppliers)
+    // =====================================================
+    
+    match /suppliers/{supplierId} {
+      allow read: if hasAnyRole(['Admin', 'Purchase Manager', 'Stock Manager', 'Receiver']);
+      allow create: if hasRole('Purchase Manager');
+      allow update: if hasRole('Purchase Manager') && (
+        hasRole('Admin') || 
+        resource.data.employeeId == request.auth.uid
+      );
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // INVOICES
+    // =====================================================
+    
+    match /invoices/{invoiceId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchase Manager', 'Receiver']);
+      allow create: if hasRole('Purchase Manager', 'Receiver']);
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Receiver']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // PAYMENTS
+    // =====================================================
+    
+    match /payments/{paymentId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
+      allow write: if hasAnyRole(['Admin', 'Accountant']);
+    }
+    
+    // =====================================================
+    // RESTOCK ITEMS (Rule 7.1, 7.2)
+    // =====================================================
+    
+    match /restockItems/{itemId} {
+      allow read: if hasAnyRole(['Admin', 'Purchase Manager', 'Stock Manager']);
+      allow create: if hasRole('Purchase Manager', 'Stock Manager']);
+      allow update: if hasRole('Purchase Manager', 'Stock Manager']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // RETURN NOTES (Rule 7.3)
+    // =====================================================
+    
+    match /returnNotes/{returnId} {
+      allow read: if hasAnyRole(['Admin', 'Receiver', 'Stock Manager']);
+      allow create: if hasRole('Receiver');
+      allow update: if hasAnyRole(['Admin', 'Receiver']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // DAMAGES (Rule 7.4)
+    // =====================================================
+    
+    match /damages/{damageId} {
+      allow read: if hasAnyRole(['Admin', 'Stock Manager', 'Manager']);
+      allow create: if hasRole('Stock Manager');
+      allow update: if hasAnyRole(['Admin', 'Stock Manager']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // ATTENDANCE (Rule 10.1-10.4)
+    // =====================================================
+    
+    match /attendances/{attendanceId} {
+      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow create: if hasAnyRole(['HR', 'Supervisor']) || 
+        (isAuthenticated() && request.resource.data.employeeId == request.auth.uid);
+      allow update: if hasAnyRole(['Admin', 'HR']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // LEAVE REQUESTS
+    // =====================================================
+    
+    match /leaveRequests/{requestId} {
+      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+        request.resource.data.employeeId == request.auth.uid;
+      allow update: if hasAnyRole(['Admin', 'HR']) || 
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // CASH CLOSES
+    // =====================================================
+    
+    match /cashCloses/{cashCloseId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
+      allow create: if hasAnyRole(['Accountant', 'Supervisor']);
+      allow update: if hasAnyRole(['Admin', 'Accountant']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // AUDIT LOGS (Rule 13.1, 13.2, 13.3)
+    // =====================================================
+    
+    match /auditLogs/{logId} {
+      allow read: if hasAnyRole(['Admin', 'Auditor']);
+      allow create: if isAuthenticated(); // System can create audit logs
+      allow update: if false; // Audit logs are immutable
+      allow delete: if hasRole('Admin'); // Only admin can delete (for cleanup)
+    }
+    
+    // =====================================================
+    // PURCHASE ORDERS
+    // =====================================================
+    
+    match /purchaseOrders/{orderId} {
+      allow read: if hasAnyRole(['Admin', 'Purchase Manager', 'Receiver']);
+      allow create: if hasRole('Purchase Manager');
+      allow update: if hasAnyRole(['Admin', 'Purchase Manager', 'Receiver']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // PAYROLL
+    // =====================================================
+    
+    match /payroll/{payrollId} {
+      allow read: if hasAnyRole(['Admin', 'HR']) || 
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow write: if hasAnyRole(['Admin', 'HR']);
+    }
+    
+    // =====================================================
+    // SYSTEM SETTINGS
+    // =====================================================
+    
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // USER SESSIONS (for tracking active users)
+    // =====================================================
+    
+    match /userSessions/{sessionId} {
+      allow read: if hasRole('Admin') || sessionId == request.auth.uid;
+      allow write: if isAuthenticated() && sessionId == request.auth.uid;
+    }
+    
+    // =====================================================
+    // NOTIFICATIONS
+    // =====================================================
+    
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // =====================================================
+    // REPORTS (Generated reports storage)
+    // =====================================================
+    
+    match /reports/{reportId} {
+      allow read: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'HR', 'Auditor']);
+      allow create: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'HR']);
+      allow update: if hasAnyRole(['Admin', 'Manager']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // BACKUP METADATA
+    // =====================================================
+    
+    match /backups/{backupId} {
+      allow read: if hasRole('Admin');
+      allow write: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // DEFAULT DENY ALL OTHER COLLECTIONS
+    // =====================================================
+    
     match /{document=**} {
       allow read, write: if false;
     }
