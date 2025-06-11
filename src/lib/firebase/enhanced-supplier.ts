@@ -107,16 +107,20 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
 
   // Get active suppliers
   async getActiveSuppliers(): Promise<EnhancedSupplier[]> {
-    return this.getAll([
+    const suppliers = await this.getAll([
       { field: 'status', operator: '==', value: 'Active' }
-    ], { orderBy: 'supplierName', orderDirection: 'asc' });
+    ]);
+    // Sort on the client side to avoid composite index requirement
+    return suppliers.sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }
 
   // Get suppliers by status
   async getSuppliersByStatus(status: 'Active' | 'Inactive' | 'Pending'): Promise<EnhancedSupplier[]> {
-    return this.getAll([
+    const suppliers = await this.getAll([
       { field: 'status', operator: '==', value: status }
-    ], { orderBy: 'supplierName', orderDirection: 'asc' });
+    ]);
+    // Sort on the client side to avoid composite index requirement
+    return suppliers.sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }
 
   // Update supplier status

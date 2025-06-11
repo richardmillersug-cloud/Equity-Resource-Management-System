@@ -185,7 +185,7 @@ const navigationItems: NavigationItem[] = [
     id: 'return-notes', 
     icon: <FileText className="w-5 h-5" />, 
     label: 'Return Notes', 
-    path: '/receiver/returns',
+    path: '/dashboard/receiver/returns',
     roles: ['Receiver', 'Admin']
   },
   { 
@@ -243,10 +243,10 @@ const navigationItems: NavigationItem[] = [
     roles: ['Receiver', 'Admin']
   },
   { 
-    id: 'restock-items', 
+    id: 'restocking', 
     icon: <Package className="w-5 h-5" />, 
-    label: 'Restock Items', 
-    path: '/receiver/restock',
+    label: 'Restocking', 
+    path: '/dashboard/receiver/restocking',
     roles: ['Receiver', 'Admin']
   },
   
