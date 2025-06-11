@@ -62,6 +62,7 @@ export default function AddInvoicePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [suppliers, setSuppliers] = useState<EnhancedSupplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<EnhancedSupplier | null>(null);
   const [userRole, setUserRole] = useState<string>('');
@@ -89,7 +90,7 @@ export default function AddInvoicePage() {
       { installmentNumber: 1, dueDate: '', amount: 0, status: 'Pending' }
     ],
     shippingAddress: '',
-    shippingDate: '',
+    shippingDate: new Date().toISOString().split('T')[0],
     dueDate: '',
     notes: ''
   });
@@ -240,13 +241,50 @@ export default function AddInvoicePage() {
   };
 
   const convertNumberToWords = (amount: number): string => {
-    if (amount === 0) return 'Zero Shillings Only';
+    const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+    const teens = ['TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const scales = ['', 'THOUSAND', 'MILLION', 'BILLION'];
+
+    if (amount === 0) return 'ZERO SHILLINGS ONLY';
+
+    const convertGroup = (num: number): string => {
+      let result = '';
+      
+      if (num >= 100) {
+        result += ones[Math.floor(num / 100)] + ' HUNDRED ';
+        num %= 100;
+      }
+      
+      if (num >= 20) {
+        result += tens[Math.floor(num / 10)] + ' ';
+        num %= 10;
+      } else if (num >= 10) {
+        result += teens[num - 10] + ' ';
+        return result;
+      }
+      
+      if (num > 0) {
+        result += ones[num] + ' ';
+      }
+      
+      return result;
+    };
+
+    let words = '';
+    let scaleIndex = 0;
     
-    if (amount < 1000000) {
-      return `${Math.floor(amount / 1000)} Thousand ${amount % 1000} Shillings Only`;
-    } else {
-      return `${Math.floor(amount / 1000000)} Million ${Math.floor((amount % 1000000) / 1000)} Thousand ${amount % 1000} Shillings Only`;
+    while (amount > 0) {
+      const group = amount % 1000;
+      if (group !== 0) {
+        const groupWords = convertGroup(group);
+        words = groupWords + (scales[scaleIndex] ? scales[scaleIndex] + ' ' : '') + words;
+      }
+      amount = Math.floor(amount / 1000);
+      scaleIndex++;
     }
+    
+    return words.trim() + ' SHILLINGS ONLY';
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -387,6 +425,7 @@ export default function AddInvoicePage() {
     setLoading(true);
 
     try {
+      // Create base invoice data with required fields
       const invoiceInput: CreateInvoiceInput = {
         invoiceNumber: formData.invoiceNumber,
         date: new Date(formData.date),
@@ -398,19 +437,8 @@ export default function AddInvoicePage() {
         fdn: formData.fdn,
         status: 'Pending',
         goodsReceivedAsInvoiced: formData.goodsReceivedAsInvoiced,
-        missingItems: formData.missingItems || undefined,
-        missingReason: formData.missingReason || undefined,
         hasTransportPayment: formData.hasTransportPayment,
-        transportAmount: formData.hasTransportPayment ? formData.transportAmount : undefined,
         hasDamages: formData.hasDamages,
-        damages: formData.hasDamages ? formData.damages.map(damage => ({
-          itemDescription: damage.itemDescription,
-          quantityDamaged: damage.quantityDamaged,
-          estimatedValue: damage.estimatedValue,
-          damageReason: damage.damageReason,
-          reportedBy: 'EMP001',
-          status: 'Reported' as const
-        })) : undefined,
         amountInWords: formData.amountInWords,
         amountInDigits: formData.amountInDigits,
         paymentPlan: userRole === 'Purchase Manager' ? formData.paymentPlan.map(plan => ({
@@ -424,13 +452,51 @@ export default function AddInvoicePage() {
           amount: formData.amount,
           status: 'Pending'
         }],
-        shippingAddress: formData.shippingAddress || undefined,
-        shippingDate: formData.shippingDate ? new Date(formData.shippingDate) : undefined,
-        dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-        notes: formData.notes || undefined,
         employeeId: 'EMP001'
       };
 
+      // Add optional fields only if they have values
+      if (formData.missingItems && formData.missingItems.trim()) {
+        invoiceInput.missingItems = formData.missingItems.trim();
+      }
+
+      if (formData.missingReason && formData.missingReason.trim()) {
+        invoiceInput.missingReason = formData.missingReason.trim();
+      }
+
+      if (formData.hasTransportPayment && formData.transportAmount > 0) {
+        invoiceInput.transportAmount = formData.transportAmount;
+      }
+
+      if (formData.hasDamages && formData.damages.length > 0) {
+        invoiceInput.damages = formData.damages.map(damage => ({
+          itemDescription: damage.itemDescription,
+          quantityDamaged: damage.quantityDamaged,
+          estimatedValue: damage.estimatedValue,
+          damageReason: damage.damageReason,
+          reportedBy: 'EMP001',
+          status: 'Reported' as const
+        }));
+      }
+
+      if (formData.shippingAddress && formData.shippingAddress.trim()) {
+        invoiceInput.shippingAddress = formData.shippingAddress.trim();
+      }
+
+      if (formData.shippingDate) {
+        invoiceInput.shippingDate = new Date(formData.shippingDate);
+      }
+
+      if (formData.dueDate) {
+        invoiceInput.dueDate = new Date(formData.dueDate);
+      }
+
+      if (formData.notes && formData.notes.trim()) {
+        invoiceInput.notes = formData.notes.trim();
+      }
+
+      console.log('Sending invoice data to Firebase:', invoiceInput);
+      
       const invoiceId = await enhancedInvoiceService.createInvoice(invoiceInput);
       
       console.log('Invoice created successfully with ID:', invoiceId);
@@ -442,8 +508,27 @@ export default function AddInvoicePage() {
       }, 2000);
       
     } catch (error) {
-      console.error('Error creating invoice:', error);
-      alert('Error creating invoice. Please try again.');
+      console.error('Detailed error creating invoice:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Error creating invoice. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('permission-denied')) {
+          errorMessage = 'Permission denied. Please check your Firebase security rules.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else if (error.message.includes('invalid data') || error.message.includes('undefined')) {
+          errorMessage = 'Invalid data detected. Please check all form fields and try again.';
+        } else if (error.message.includes('quota')) {
+          errorMessage = 'Database quota exceeded. Please try again later.';
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
+      alert(errorMessage);
+      setShowError(true);
     } finally {
       setLoading(false);
     }
@@ -480,16 +565,6 @@ export default function AddInvoicePage() {
               <div>
                 <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-gray-900">Add New Invoice</h1>
-            <button
-              type="button"
-              onClick={() => {
-                console.log('Manual refresh button clicked');
-                loadSuppliers();
-              }}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-            >
-              🔄 Refresh Suppliers
-            </button>
           </div>
                 <p className="text-gray-600">Create a new invoice for received goods</p>
               </div>
@@ -497,23 +572,7 @@ export default function AddInvoicePage() {
           </div>
         </div>
 
-        {/* Firebase Connection Status */}
-        {!loadingSuppliers && suppliers.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-green-700">
-                ✅ Connected to Firebase - {suppliers.length} suppliers loaded from database
-              </p>
-              <button
-                type="button"
-                onClick={loadSuppliers}
-                className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Error State */}
         {!loadingSuppliers && suppliers.length === 0 && (
@@ -589,26 +648,40 @@ export default function AddInvoicePage() {
                     ({suppliers.length} from database)
                   </span>
                 </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <select
-                    name="supplierId"
-                    value={formData.supplierId}
-                    onChange={handleInputChange}
-                    disabled={loadingSuppliers}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                      errors.supplierId ? 'border-red-300' : 'border-gray-300'
-                    } ${loadingSuppliers ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-                  >
-                    <option value="">
-                      {loadingSuppliers ? 'Loading from database...' : 'Select Supplier from Database'}
-                    </option>
-                    {suppliers.map(supplier => (
-                      <option key={supplier.id} value={supplier.id}>
-                        🏭 {supplier.supplierName} - TIN: {supplier.tinNumber}
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <select
+                      name="supplierId"
+                      value={formData.supplierId}
+                      onChange={handleInputChange}
+                      disabled={loadingSuppliers}
+                      className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                        errors.supplierId ? 'border-red-300' : 'border-gray-300'
+                      } ${loadingSuppliers ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                    >
+                      <option value="">
+                        {loadingSuppliers ? 'Loading from database...' : 'Select supplier'}
                       </option>
-                    ))}
-                  </select>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>
+                          🏭 {supplier.supplierName} - TIN: {supplier.tinNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('Refresh suppliers button clicked');
+                      loadSuppliers();
+                    }}
+                    disabled={loadingSuppliers}
+                    className="px-2 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh suppliers list"
+                  >
+                    🔄
+                  </button>
                 </div>
                 {errors.supplierId && (
                   <p className="mt-1 text-sm text-red-600">{errors.supplierId}</p>
@@ -1199,6 +1272,7 @@ export default function AddInvoicePage() {
                   />
                 </div>
 
+                {userRole === 'Purchase Manager' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Due Date
@@ -1211,6 +1285,17 @@ export default function AddInvoicePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
+                ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 text-blue-600 mr-2" />
+                    <h4 className="text-sm font-medium text-blue-900">Due Date</h4>
+                  </div>
+                  <p className="text-blue-700 text-sm mt-1">
+                    Due dates are managed by the Purchase Manager. Contact your Purchase Manager to set payment due dates.
+                  </p>
+                </div>
+                )}
               </div>
             </div>
 

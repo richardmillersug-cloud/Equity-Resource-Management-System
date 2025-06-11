@@ -316,11 +316,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       }
       setOpenDropdowns(newOpenDropdowns);
     } else if (item.path) {
-      if (onItemClick) {
-        onItemClick(item.id);
-      } else {
-        router.push(item.path);
-      }
+    if (onItemClick) {
+      onItemClick(item.id);
+    } else {
+      router.push(item.path);
+    }
     }
   };
 
@@ -333,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       return activeItem === item.id;
     }
     if (item.path) {
-      return pathname === item.path || pathname.startsWith(item.path + '/');
+    return pathname === item.path || pathname.startsWith(item.path + '/');
     }
     // For dropdown items, check if any submenu is active
     if (item.submenu) {
@@ -386,25 +386,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       <nav className="flex flex-col gap-1 flex-1 px-3">
         {filteredItems.map((item) => (
           <div key={item.id}>
-            <button
-              onClick={() => handleItemClick(item)}
+          <button
+            onClick={() => handleItemClick(item)}
               className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative w-full ${
-                isActiveItem(item)
-                  ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
-              }`}
-              title={!isExpanded ? item.label : undefined}
-            >
-              <span className={`${isExpanded ? 'mr-3' : ''} flex-shrink-0`}>
-                {item.icon}
-              </span>
-              
-              {/* Label - only show when expanded */}
-              {isExpanded && (
+              isActiveItem(item)
+                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
+            }`}
+            title={!isExpanded ? item.label : undefined}
+          >
+            <span className={`${isExpanded ? 'mr-3' : ''} flex-shrink-0`}>
+              {item.icon}
+            </span>
+            
+            {/* Label - only show when expanded */}
+            {isExpanded && (
                 <span className="text-sm font-medium whitespace-nowrap overflow-hidden flex-1 text-left">
-                  {item.label}
-                </span>
-              )}
+                {item.label}
+              </span>
+            )}
 
               {/* Dropdown arrow - only show when expanded and has submenu */}
               {isExpanded && item.submenu && (
@@ -414,14 +414,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                   }`} 
                 />
               )}
-              
-              {/* Tooltip - only show when collapsed */}
-              {!isExpanded && (
-                <div className="absolute left-16 bg-gray-900 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                  {item.label}
-                </div>
-              )}
-            </button>
+            
+            {/* Tooltip - only show when collapsed */}
+            {!isExpanded && (
+              <div className="absolute left-16 bg-gray-900 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                {item.label}
+              </div>
+            )}
+          </button>
 
             {/* Submenu - only show when expanded and dropdown is open */}
             {isExpanded && item.submenu && openDropdowns.has(item.id) && (

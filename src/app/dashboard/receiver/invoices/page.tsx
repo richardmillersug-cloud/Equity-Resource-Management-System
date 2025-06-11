@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
+import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
+import { QRCodeService } from '../../../../lib/utils/qr-code';
+import { Timestamp } from 'firebase/firestore';
 import { 
   FileText, 
   Plus, 
@@ -20,7 +23,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  Save
 } from 'lucide-react';
 
 interface InvoiceStats {
@@ -43,6 +48,11 @@ export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Invoice | null>(null);
+  const [selectedInvoiceForQR, setSelectedInvoiceForQR] = useState<Invoice | null>(null);
+  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] = useState<Invoice | null>(null);
+  const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<Invoice | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
   useEffect(() => {
     loadInvoices();
@@ -109,16 +119,70 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleDelete = async (invoiceId: string) => {
-    if (confirm('Are you sure you want to delete this invoice?')) {
-      try {
-        await enhancedInvoiceService.delete(invoiceId);
-        await loadInvoices();
-        await loadStats();
-      } catch (error) {
-        console.error('Error deleting invoice:', error);
-        alert('Error deleting invoice');
+  const handleUpdateInvoice = async (invoiceId: string, updates: Partial<Invoice>) => {
+    try {
+      setLoading(true);
+      // For receivers, all edits automatically set status to Pending for approval
+      const updatesWithPendingStatus = {
+        ...updates,
+        status: 'Pending' as Invoice['status'], // Always set to Pending for receiver edits
+        updatedAt: Timestamp.now()
+      };
+      
+      await enhancedInvoiceService.update(invoiceId, updatesWithPendingStatus);
+      await loadInvoices();
+      await loadStats();
+      setSelectedInvoiceForEdit(null);
+      
+      // Show success message with pending approval notice
+      alert('Invoice updated successfully! Changes are pending approval from the purchasing manager.');
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to update invoice: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateQR = async (invoice: Invoice) => {
+    try {
+      setSelectedInvoiceForQR(invoice);
+      
+      // First try to use the stored QR code
+      if (invoice.qrCodeURL) {
+        console.log('Using stored QR code from invoice');
+        setQrCodeUrl(invoice.qrCodeURL);
+      } else {
+        console.log('No stored QR code, generating new one');
+        const qrUrl = await QRCodeService.generateShareableQRCode({
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          supplierName: invoice.supplierName,
+          amount: invoice.amount,
+          date: formatDate(invoice.date)
+        });
+        setQrCodeUrl(qrUrl);
       }
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Error generating QR code');
+    }
+  };
+
+  const handleCloseQRModal = () => {
+    setSelectedInvoiceForQR(null);
+    setQrCodeUrl('');
+  };
+
+  const handleDownloadQR = () => {
+    if (qrCodeUrl && selectedInvoiceForQR) {
+      const link = document.createElement('a');
+      link.href = qrCodeUrl;
+      link.download = `QR_Invoice_${selectedInvoiceForQR.invoiceNumber}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -289,6 +353,25 @@ export default function InvoicesPage() {
             </div>
 
             <div className="flex items-center space-x-2">
+              <button 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await enhancedInvoiceService.generateMissingQRCodes();
+                    await loadInvoices();
+                    alert('QR codes generated for invoices that were missing them!');
+                  } catch (error) {
+                    console.error('Error generating QR codes:', error);
+                    alert('Error generating QR codes');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                title="Generate Missing QR Codes"
+              >
+                <QrCode className="w-5 h-5" />
+              </button>
               <button className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
                 <Download className="w-5 h-5" />
               </button>
@@ -383,22 +466,32 @@ export default function InvoicesPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => {/* View invoice details */}}
+                            onClick={() => setSelectedInvoiceForDetails(invoice)}
                             className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="View Details"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {/* Edit invoice */}}
-                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            onClick={() => setSelectedInvoiceForPrint(invoice)}
+                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Print Invoice"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Printer className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(invoice.id)}
-                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={() => handleGenerateQR(invoice)}
+                            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Generate QR Code"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedInvoiceForEdit(invoice)}
+                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit Invoice"
+                          >
+                            <Edit className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -420,6 +513,495 @@ export default function InvoicesPage() {
               <span className="text-sm font-medium text-gray-900">
                 Total Value: {formatAmount(filteredInvoices.reduce((sum, invoice) => sum + invoice.amount, 0))}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Print Modal */}
+        {selectedInvoiceForPrint && (
+          <InvoicePrintView 
+            invoice={selectedInvoiceForPrint}
+            onClose={() => setSelectedInvoiceForPrint(null)}
+          />
+        )}
+
+        {/* QR Code Modal */}
+        {selectedInvoiceForQR && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">QR Code for Invoice</h2>
+                  <button
+                    onClick={handleCloseQRModal}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="text-center">
+                  <div className="mb-4">
+                    <h3 className="font-medium text-gray-900">{selectedInvoiceForQR.invoiceNumber}</h3>
+                    <p className="text-sm text-gray-600">{selectedInvoiceForQR.supplierName}</p>
+                    <p className="text-sm text-purple-600 font-medium">{formatAmount(selectedInvoiceForQR.amount)}</p>
+                  </div>
+                  
+                  {qrCodeUrl ? (
+                    <div className="mb-6">
+                      <img src={qrCodeUrl} alt="QR Code" className="mx-auto w-48 h-48 border border-gray-200 rounded-lg" />
+                      <p className="text-xs text-gray-500 mt-2">Scan to view invoice details</p>
+                    </div>
+                  ) : (
+                    <div className="mb-6 flex items-center justify-center w-48 h-48 mx-auto border border-gray-200 rounded-lg">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    </div>
+                  )}
+                  
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleDownloadQR}
+                      disabled={!qrCodeUrl}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download</span>
+                    </button>
+                    <button
+                      onClick={handleCloseQRModal}
+                      className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice Details Modal */}
+        {selectedInvoiceForDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Invoice Details</h2>
+                  <button
+                    onClick={() => setSelectedInvoiceForDetails(null)}
+                    className="text-gray-400 hover:text-gray-600 p-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                {/* Invoice Header */}
+                <div className="bg-purple-50 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-purple-900">{selectedInvoiceForDetails.invoiceNumber}</h3>
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(selectedInvoiceForDetails.status)}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedInvoiceForDetails.status)}`}>
+                        {selectedInvoiceForDetails.status}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-purple-700 text-sm">FDN: {selectedInvoiceForDetails.fdn}</p>
+                </div>
+
+                {/* Invoice Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                      <p className="text-gray-900">{selectedInvoiceForDetails.supplierName}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                      <p className="text-2xl font-bold text-purple-600">{formatAmount(selectedInvoiceForDetails.amount)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                      <p className="text-gray-900">{selectedInvoiceForDetails.quantity}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                      <p className="text-gray-900">{formatDate(selectedInvoiceForDetails.date)}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <p className="text-gray-900">{selectedInvoiceForDetails.description}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Goods Received</label>
+                      <p className={`font-medium ${selectedInvoiceForDetails.goodsReceivedAsInvoiced ? 'text-green-600' : 'text-red-600'}`}>
+                        {selectedInvoiceForDetails.goodsReceivedAsInvoiced ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Transport Payment</label>
+                      <p className={`font-medium ${selectedInvoiceForDetails.hasTransportPayment ? 'text-green-600' : 'text-red-600'}`}>
+                        {selectedInvoiceForDetails.hasTransportPayment ? 'Yes' : 'No'}
+                        {selectedInvoiceForDetails.transportAmount && ` - ${formatAmount(selectedInvoiceForDetails.transportAmount)}`}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Damages</label>
+                      <p className={`font-medium ${selectedInvoiceForDetails.hasDamages ? 'text-red-600' : 'text-green-600'}`}>
+                        {selectedInvoiceForDetails.hasDamages ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                {(selectedInvoiceForDetails.missingItems || selectedInvoiceForDetails.notes) && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h4 className="font-medium text-gray-900 mb-3">Additional Information</h4>
+                    {selectedInvoiceForDetails.missingItems && (
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Missing Items</label>
+                        <p className="text-gray-900 text-sm">{selectedInvoiceForDetails.missingItems}</p>
+                      </div>
+                    )}
+                    {selectedInvoiceForDetails.missingReason && (
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Missing Reason</label>
+                        <p className="text-gray-900 text-sm">{selectedInvoiceForDetails.missingReason}</p>
+                      </div>
+                    )}
+                    {selectedInvoiceForDetails.notes && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <p className="text-gray-900 text-sm">{selectedInvoiceForDetails.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setSelectedInvoiceForPrint(selectedInvoiceForDetails);
+                      setSelectedInvoiceForDetails(null);
+                    }}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Print Invoice</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleGenerateQR(selectedInvoiceForDetails);
+                      setSelectedInvoiceForDetails(null);
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Generate QR</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedInvoiceForDetails(null)}
+                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Invoice Modal */}
+        {selectedInvoiceForEdit && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                                 <div className="flex items-center justify-between mb-4">
+                   <h2 className="text-2xl font-bold text-gray-900">Edit Invoice</h2>
+                   <button
+                     onClick={() => setSelectedInvoiceForEdit(null)}
+                     className="text-gray-400 hover:text-gray-600 p-2"
+                   >
+                     ✕
+                   </button>
+                 </div>
+                 
+                 {/* Approval Notice */}
+                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                   <div className="flex items-start">
+                     <AlertTriangle className="w-5 h-5 text-amber-600 mr-3 mt-0.5 flex-shrink-0" />
+                     <div>
+                       <h3 className="text-sm font-medium text-amber-800">Approval Required</h3>
+                       <p className="text-sm text-amber-700 mt-1">
+                         All edits made by receivers require approval from the purchasing manager. 
+                         This invoice will automatically be set to "Pending" status after saving changes.
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+                
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                                     const updates: any = {
+                     amount: parseFloat(formData.get('amount') as string),
+                     quantity: parseInt(formData.get('quantity') as string),
+                     description: formData.get('description') as string,
+                     goodsReceivedAsInvoiced: formData.get('goodsReceived') === 'true',
+                     hasTransportPayment: formData.get('transportPayment') === 'true',
+                     hasDamages: formData.get('damages') === 'true'
+                     // Note: Status will be automatically set to 'Pending' in handleUpdateInvoice
+                   };
+
+                   // Only add optional fields if they have values
+                   const transportAmount = formData.get('transportAmount') as string;
+                   if (transportAmount && transportAmount.trim() !== '') {
+                     updates.transportAmount = parseFloat(transportAmount);
+                   }
+
+                   const missingItems = formData.get('missingItems') as string;
+                   if (missingItems && missingItems.trim() !== '') {
+                     updates.missingItems = missingItems.trim();
+                   }
+
+                   const missingReason = formData.get('missingReason') as string;
+                   if (missingReason && missingReason.trim() !== '') {
+                     updates.missingReason = missingReason.trim();
+                   }
+
+                   const notes = formData.get('notes') as string;
+                   if (notes && notes.trim() !== '') {
+                     updates.notes = notes.trim();
+                   }
+                  handleUpdateInvoice(selectedInvoiceForEdit.id, updates);
+                }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+                        <input
+                          type="text"
+                          value={selectedInvoiceForEdit.invoiceNumber}
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                        <input
+                          type="text"
+                          value={selectedInvoiceForEdit.supplierName}
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Amount (UGX)</label>
+                        <input
+                          type="number"
+                          name="amount"
+                          defaultValue={selectedInvoiceForEdit.amount}
+                          required
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                        <input
+                          type="number"
+                          name="quantity"
+                          defaultValue={selectedInvoiceForEdit.quantity}
+                          required
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      
+                                             <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1">Current Status</label>
+                         <input
+                           type="text"
+                           value={selectedInvoiceForEdit.status}
+                           disabled
+                           className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                         />
+                         <p className="text-xs text-amber-600 mt-1">
+                           ⚠️ All edits will set status to "Pending" for manager approval
+                         </p>
+                       </div>
+                    </div>
+                    
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                          name="description"
+                          defaultValue={selectedInvoiceForEdit.description}
+                          required
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Goods Received as Invoiced?</label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="goodsReceived"
+                              value="true"
+                              defaultChecked={selectedInvoiceForEdit.goodsReceivedAsInvoiced}
+                              className="mr-2"
+                            />
+                            Yes
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="goodsReceived"
+                              value="false"
+                              defaultChecked={!selectedInvoiceForEdit.goodsReceivedAsInvoiced}
+                              className="mr-2"
+                            />
+                            No
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Transport Payment Required?</label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="transportPayment"
+                              value="true"
+                              defaultChecked={selectedInvoiceForEdit.hasTransportPayment}
+                              className="mr-2"
+                            />
+                            Yes
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="transportPayment"
+                              value="false"
+                              defaultChecked={!selectedInvoiceForEdit.hasTransportPayment}
+                              className="mr-2"
+                            />
+                            No
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Transport Amount (UGX)</label>
+                        <input
+                          type="number"
+                          name="transportAmount"
+                          defaultValue={selectedInvoiceForEdit.transportAmount || ''}
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Any Damages?</label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="damages"
+                              value="true"
+                              defaultChecked={selectedInvoiceForEdit.hasDamages}
+                              className="mr-2"
+                            />
+                            Yes
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="damages"
+                              value="false"
+                              defaultChecked={!selectedInvoiceForEdit.hasDamages}
+                              className="mr-2"
+                            />
+                            No
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Additional Information */}
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Missing Items</label>
+                      <textarea
+                        name="missingItems"
+                        defaultValue={selectedInvoiceForEdit.missingItems || ''}
+                        rows={2}
+                        placeholder="Describe any missing items..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Missing Reason</label>
+                      <textarea
+                        name="missingReason"
+                        defaultValue={selectedInvoiceForEdit.missingReason || ''}
+                        rows={2}
+                        placeholder="Explain why items are missing..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                      <textarea
+                        name="notes"
+                        defaultValue={selectedInvoiceForEdit.notes || ''}
+                        rows={3}
+                        placeholder="Additional notes..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex space-x-3">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInvoiceForEdit(null)}
+                      className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
