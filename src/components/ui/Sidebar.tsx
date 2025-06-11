@@ -232,14 +232,14 @@ const navigationItems: NavigationItem[] = [
     id: 'damages', 
     icon: <AlertTriangle className="w-5 h-5" />, 
     label: 'Damages', 
-    path: '/receiver/damages',
+    path: '/dashboard/receiver/damages',
     roles: ['Receiver', 'Admin']
   },
   { 
     id: 'barcode', 
     icon: <QrCode className="w-5 h-5" />, 
     label: 'Barcode', 
-    path: '/receiver/barcode',
+    path: '/dashboard/receiver/barcode',
     roles: ['Receiver', 'Admin']
   },
   { 

@@ -184,19 +184,19 @@ export default function AddInvoicePage() {
           }
         }
         
-      } catch (serviceError) {
+      } catch (serviceError: any) {
         console.error('Service method error:', serviceError);
         
         // Try to diagnose the issue
-        if (serviceError.message?.includes('permission-denied')) {
+        if (serviceError?.message?.includes('permission-denied')) {
           alert('Permission denied. Please check your Firebase security rules.');
-        } else if (serviceError.message?.includes('network')) {
+        } else if (serviceError?.message?.includes('network')) {
           alert('Network error. Please check your internet connection.');
-        } else if (serviceError.message?.includes('not-found')) {
+        } else if (serviceError?.message?.includes('not-found')) {
           alert('Database not found. Please verify your Firebase configuration.');
         } else {
           console.error('Full error details:', serviceError);
-          alert(`Database error: ${serviceError.message || 'Unknown error'}`);
+          alert(`Database error: ${serviceError?.message || 'Unknown error'}`);
         }
       }
       
