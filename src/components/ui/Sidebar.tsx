@@ -19,7 +19,12 @@ import {
   Receipt,
   AlertTriangle,
   UserCheck,
-  ClipboardList
+  ClipboardList,
+  QrCode,
+  Factory,
+  ChevronDown,
+  Plus,
+  Eye
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,8 +36,14 @@ interface NavigationItem {
   id: string;
   icon: React.ReactNode;
   label: string;
-  path: string;
+  path?: string;
   roles: string[];
+  submenu?: {
+    id: string;
+    icon: React.ReactNode;
+    label: string;
+    path: string;
+  }[];
 }
 
 const navigationItems: NavigationItem[] = [
@@ -177,6 +188,67 @@ const navigationItems: NavigationItem[] = [
     path: '/receiver/returns',
     roles: ['Receiver', 'Admin']
   },
+  { 
+    id: 'suppliers', 
+    icon: <Factory className="w-5 h-5" />, 
+    label: 'Suppliers', 
+    roles: ['Receiver', 'Admin'],
+    submenu: [
+      {
+        id: 'add-supplier',
+        icon: <Plus className="w-4 h-4" />,
+        label: 'Add Supplier',
+        path: '/dashboard/receiver/suppliers/add'
+      },
+      {
+        id: 'view-suppliers',
+        icon: <Eye className="w-4 h-4" />,
+        label: 'View Suppliers',
+        path: '/dashboard/receiver/suppliers'
+      }
+    ]
+  },
+  { 
+    id: 'invoices', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'Invoices', 
+    roles: ['Receiver', 'Admin'],
+    submenu: [
+      {
+        id: 'add-invoice',
+        icon: <Plus className="w-4 h-4" />,
+        label: 'Add Invoice',
+        path: '/dashboard/receiver/invoices/add'
+      },
+      {
+        id: 'view-invoices',
+        icon: <Eye className="w-4 h-4" />,
+        label: 'View Invoices',
+        path: '/dashboard/receiver/invoices'
+      }
+    ]
+  },
+  { 
+    id: 'damages', 
+    icon: <AlertTriangle className="w-5 h-5" />, 
+    label: 'Damages', 
+    path: '/receiver/damages',
+    roles: ['Receiver', 'Admin']
+  },
+  { 
+    id: 'barcode', 
+    icon: <QrCode className="w-5 h-5" />, 
+    label: 'Barcode', 
+    path: '/receiver/barcode',
+    roles: ['Receiver', 'Admin']
+  },
+  { 
+    id: 'restock-items', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Restock Items', 
+    path: '/receiver/restock',
+    roles: ['Receiver', 'Admin']
+  },
   
   // Auditor specific
   { 
@@ -207,6 +279,7 @@ const navigationItems: NavigationItem[] = [
 export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const router = useRouter();
   const pathname = usePathname();
 
@@ -233,18 +306,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   };
 
   const handleItemClick = (item: NavigationItem) => {
-    if (onItemClick) {
-      onItemClick(item.id);
-    } else {
-      router.push(item.path);
+    if (item.submenu) {
+      // Toggle dropdown
+      const newOpenDropdowns = new Set(openDropdowns);
+      if (newOpenDropdowns.has(item.id)) {
+        newOpenDropdowns.delete(item.id);
+      } else {
+        newOpenDropdowns.add(item.id);
+      }
+      setOpenDropdowns(newOpenDropdowns);
+    } else if (item.path) {
+      if (onItemClick) {
+        onItemClick(item.id);
+      } else {
+        router.push(item.path);
+      }
     }
+  };
+
+  const handleSubmenuClick = (path: string) => {
+    router.push(path);
   };
 
   const isActiveItem = (item: NavigationItem): boolean => {
     if (activeItem) {
       return activeItem === item.id;
     }
-    return pathname === item.path || pathname.startsWith(item.path + '/');
+    if (item.path) {
+      return pathname === item.path || pathname.startsWith(item.path + '/');
+    }
+    // For dropdown items, check if any submenu is active
+    if (item.submenu) {
+      return item.submenu.some(subItem => 
+        pathname === subItem.path || pathname.startsWith(subItem.path + '/')
+      );
+    }
+    return false;
   };
 
   const filteredItems = getFilteredNavigationItems();
@@ -288,34 +385,68 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       {/* Navigation Items */}
       <nav className="flex flex-col gap-1 flex-1 px-3">
         {filteredItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleItemClick(item)}
-            className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative ${
-              isActiveItem(item)
-                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
-            }`}
-            title={!isExpanded ? item.label : undefined}
-          >
-            <span className={`${isExpanded ? 'mr-3' : ''} flex-shrink-0`}>
-              {item.icon}
-            </span>
-            
-            {/* Label - only show when expanded */}
-            {isExpanded && (
-              <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-                {item.label}
+          <div key={item.id}>
+            <button
+              onClick={() => handleItemClick(item)}
+              className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative w-full ${
+                isActiveItem(item)
+                  ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+              title={!isExpanded ? item.label : undefined}
+            >
+              <span className={`${isExpanded ? 'mr-3' : ''} flex-shrink-0`}>
+                {item.icon}
               </span>
-            )}
-            
-            {/* Tooltip - only show when collapsed */}
-            {!isExpanded && (
-              <div className="absolute left-16 bg-gray-900 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                {item.label}
+              
+              {/* Label - only show when expanded */}
+              {isExpanded && (
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden flex-1 text-left">
+                  {item.label}
+                </span>
+              )}
+
+              {/* Dropdown arrow - only show when expanded and has submenu */}
+              {isExpanded && item.submenu && (
+                <ChevronDown 
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    openDropdowns.has(item.id) ? 'rotate-180' : ''
+                  }`} 
+                />
+              )}
+              
+              {/* Tooltip - only show when collapsed */}
+              {!isExpanded && (
+                <div className="absolute left-16 bg-gray-900 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                  {item.label}
+                </div>
+              )}
+            </button>
+
+            {/* Submenu - only show when expanded and dropdown is open */}
+            {isExpanded && item.submenu && openDropdowns.has(item.id) && (
+              <div className="ml-6 mt-1 space-y-1">
+                {item.submenu.map((subItem) => (
+                  <button
+                    key={subItem.id}
+                    onClick={() => handleSubmenuClick(subItem.path)}
+                    className={`w-full h-10 rounded-lg flex items-center px-3 transition-all duration-200 text-sm ${
+                      pathname === subItem.path || pathname.startsWith(subItem.path + '/')
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-700'
+                    }`}
+                  >
+                    <span className="mr-2 flex-shrink-0">
+                      {subItem.icon}
+                    </span>
+                    <span className="font-medium whitespace-nowrap overflow-hidden">
+                      {subItem.label}
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
-          </button>
+          </div>
         ))}
       </nav>
 
