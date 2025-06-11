@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { FirestoreService } from './firestore-service';
+import { QRCodeService } from '../utils/qr-code';
 
 // Collection names
 const COLLECTIONS = {
@@ -66,6 +67,7 @@ export interface Invoice {
   // Damages
   hasDamages: boolean;
   damageIds?: string[]; // References to damage records
+  damages?: (Omit<Damage, 'id' | 'invoiceId'> & { reportedAt: Timestamp })[]; // Embedded damage data
   
   // Payment details
   amountInWords: string;
@@ -80,6 +82,11 @@ export interface Invoice {
   dueDate?: Timestamp;
   notes?: string;
   employeeId: string; // Who created the invoice
+  
+  // QR Code
+  qrCodeSVG?: string; // SVG string of the QR code
+  qrCodeURL?: string; // Data URL of the QR code for display
+  
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -137,7 +144,8 @@ export class EnhancedInvoiceService extends FirestoreService<Invoice> {
       dueDate: Timestamp.fromDate(plan.dueDate)
     })) || [];
 
-    const invoiceData = {
+    // Build the invoice data with only defined values
+    const invoiceData: any = {
       invoiceNumber: data.invoiceNumber,
       date: Timestamp.fromDate(data.date),
       amount: data.amount,
@@ -150,17 +158,13 @@ export class EnhancedInvoiceService extends FirestoreService<Invoice> {
       
       // Goods verification
       goodsReceivedAsInvoiced: data.goodsReceivedAsInvoiced,
-      missingItems: data.missingItems,
-      missingReason: data.missingReason,
       
       // Transport payment
       hasTransportPayment: data.hasTransportPayment,
-      transportAmount: data.transportAmount,
-      transportExpenseId: undefined as string | undefined, // Will be set when expense is created
       
       // Damages
       hasDamages: data.hasDamages,
-      damageIds: [] as string[], // Will be populated when damages are created
+      damageIds: [], // Will be populated when damages are created
       
       // Payment details
       amountInWords: data.amountInWords,
@@ -169,20 +173,83 @@ export class EnhancedInvoiceService extends FirestoreService<Invoice> {
       // Payment plan
       paymentPlan: paymentPlan,
       
-      // Other fields
-      shippingAddress: data.shippingAddress || '',
-      shippingDate: data.shippingDate ? Timestamp.fromDate(data.shippingDate) : undefined,
-      dueDate: data.dueDate ? Timestamp.fromDate(data.dueDate) : undefined,
-      notes: data.notes || '',
+      // Required timestamps
       employeeId: data.employeeId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };
 
+    // Add optional fields only if they have values
+    if (data.missingItems) {
+      invoiceData.missingItems = data.missingItems;
+    }
+    
+    if (data.missingReason) {
+      invoiceData.missingReason = data.missingReason;
+    }
+    
+    if (data.transportAmount !== undefined && data.transportAmount > 0) {
+      invoiceData.transportAmount = data.transportAmount;
+    }
+    
+    if (data.shippingAddress) {
+      invoiceData.shippingAddress = data.shippingAddress;
+    }
+    
+    if (data.shippingDate) {
+      invoiceData.shippingDate = Timestamp.fromDate(data.shippingDate);
+    }
+    
+    if (data.dueDate) {
+      invoiceData.dueDate = Timestamp.fromDate(data.dueDate);
+    }
+    
+    if (data.notes) {
+      invoiceData.notes = data.notes;
+    }
+
     const invoiceId = await this.create(invoiceData);
     
-    // Note: In a real implementation, you would create expense and damage records
-    // in their respective collections. For now, we're just storing the data in the invoice.
+    // Generate QR codes for the invoice
+    try {
+      console.log('Generating QR codes for invoice:', invoiceId, data.invoiceNumber);
+      
+      const [qrCodeSVG, qrCodeURL] = await Promise.all([
+        QRCodeService.generateInvoiceQRCodeSVG(invoiceId, data.invoiceNumber),
+        QRCodeService.generateInvoiceQRCode(invoiceId, data.invoiceNumber)
+      ]);
+      
+      console.log('QR codes generated successfully');
+      
+      // Update the invoice with QR code data
+      await this.update(invoiceId, {
+        qrCodeSVG,
+        qrCodeURL,
+        updatedAt: Timestamp.now()
+      });
+      
+      console.log('Invoice updated with QR codes');
+      
+    } catch (qrError) {
+      console.error('Failed to generate QR codes for invoice:', qrError);
+      // Don't fail the entire operation if QR generation fails
+    }
+    
+    // Create damage records if any
+    if (data.damages && data.damages.length > 0) {
+      // In a full implementation, you would create separate damage records
+      // For now, we'll store the damage data in the invoice
+      const damageData = data.damages.map(damage => ({
+        ...damage,
+        reportedAt: Timestamp.now()
+      }));
+      
+      // Update the invoice with damage information
+      await this.update(invoiceId, {
+        damages: damageData,
+        updatedAt: Timestamp.now()
+      });
+    }
 
     return invoiceId;
   }
@@ -381,6 +448,42 @@ export class EnhancedInvoiceService extends FirestoreService<Invoice> {
     }
 
     return createdIds;
+  }
+
+  // Generate QR codes for existing invoices that don't have them
+  async generateMissingQRCodes(): Promise<void> {
+    try {
+      console.log('Checking for invoices without QR codes...');
+      const allInvoices = await this.getAll();
+      const invoicesWithoutQR = allInvoices.filter(invoice => !invoice.qrCodeSVG || !invoice.qrCodeURL);
+      
+      console.log(`Found ${invoicesWithoutQR.length} invoices without QR codes`);
+      
+      for (const invoice of invoicesWithoutQR) {
+        try {
+          console.log(`Generating QR codes for invoice: ${invoice.invoiceNumber}`);
+          
+          const [qrCodeSVG, qrCodeURL] = await Promise.all([
+            QRCodeService.generateInvoiceQRCodeSVG(invoice.id, invoice.invoiceNumber),
+            QRCodeService.generateInvoiceQRCode(invoice.id, invoice.invoiceNumber)
+          ]);
+          
+          await this.update(invoice.id, {
+            qrCodeSVG,
+            qrCodeURL,
+            updatedAt: Timestamp.now()
+          });
+          
+          console.log(`QR codes generated for invoice: ${invoice.invoiceNumber}`);
+        } catch (error) {
+          console.error(`Failed to generate QR codes for invoice ${invoice.invoiceNumber}:`, error);
+        }
+      }
+      
+      console.log('Finished generating missing QR codes');
+    } catch (error) {
+      console.error('Error in generateMissingQRCodes:', error);
+    }
   }
 }
 
