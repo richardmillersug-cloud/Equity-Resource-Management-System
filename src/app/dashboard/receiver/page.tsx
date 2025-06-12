@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReceiverQueries } from '../../../lib/firebase/role-based-queries';
+import { OfflineReceiverQueries, OfflineAnalyticsQueries, OfflineUtils } from '../../../lib/firebase/offline-queries';
 import { 
   Truck, 
   Package, 
@@ -50,6 +51,7 @@ import {
   User,
   Phone
 } from 'lucide-react';
+import OfflineStatus from '../../../components/OfflineStatus';
 
 // Time period selector
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -165,8 +167,10 @@ export default function ReceiverDashboard() {
   // Daily suppliers and restock items state
   const [dailySuppliers, setDailySuppliers] = useState<any[]>([]);
   const [restockItems, setRestockItems] = useState<any[]>([]);
-  const [loadingDailyData, setLoadingDailyData] = useState(false);
+  const [loadingDailyData, setLoadingDailyData] = useState(true);
   const [currentDay, setCurrentDay] = useState<string>(new Date().toDateString());
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     loadAnalyticsData();
@@ -229,106 +233,67 @@ export default function ReceiverDashboard() {
   }, [currentDay]);
 
   const loadDailyData = async () => {
+    setLoadingDailyData(true);
+    setConnectionError(null);
+    
     try {
-      setLoadingDailyData(true);
-      
-      // Load today's expected suppliers
-      const suppliers = await ReceiverQueries.getTodaysExpectedSuppliers();
-      setDailySuppliers(suppliers);
-      
-      // Load today's restock items
-      const restock = await ReceiverQueries.getTodaysRestockItems();
-      setRestockItems(restock);
-      
-      setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error loading daily data:', error);
-      
-      // Mock data for demo
-      setDailySuppliers([
-        {
-          id: '1',
-          name: 'TechCorp Ltd',
-          expectedTime: '09:30 AM',
-          items: 45,
-          status: 'on-time',
-          priority: 'high',
-          contactPerson: 'John Smith',
-          phone: '+256 700 123456',
-          deliveryItems: [
-            { name: 'Laptops', quantity: 15, category: 'Electronics' },
-            { name: 'Monitors', quantity: 20, category: 'Electronics' },
-            { name: 'Keyboards', quantity: 10, category: 'Accessories' }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Supply Chain Co',
-          expectedTime: '11:15 AM',
-          items: 23,
-          status: 'delayed',
-          priority: 'medium',
-          contactPerson: 'Mary Johnson',
-          phone: '+256 700 789012',
-          deliveryItems: [
-            { name: 'Office Chairs', quantity: 8, category: 'Furniture' },
-            { name: 'Desks', quantity: 15, category: 'Furniture' }
-          ]
-        },
-        {
-          id: '3',
-          name: 'Global Parts Inc',
-          expectedTime: '02:00 PM',
-          items: 67,
-          status: 'early',
-          priority: 'high',
-          contactPerson: 'David Wilson',
-          phone: '+256 700 345678',
-          deliveryItems: [
-            { name: 'Printer Cartridges', quantity: 50, category: 'Supplies' },
-            { name: 'Paper Reams', quantity: 17, category: 'Supplies' }
-          ]
-        }
+      // Use offline-aware queries
+      const [suppliersResult, restockResult] = await Promise.allSettled([
+        OfflineReceiverQueries.getTodaysExpectedSuppliers().catch(error => {
+          console.warn('Suppliers query failed:', error);
+          if (error.message?.includes('index') || error.code === 'failed-precondition') {
+            throw new Error('Database indexes are being created. This may take a few minutes.');
+          }
+          throw error;
+        }),
+        OfflineReceiverQueries.getTodaysRestockItems().catch(error => {
+          console.warn('Restock query failed:', error);
+          if (error.message?.includes('index') || error.code === 'failed-precondition') {
+            throw new Error('Database indexes are being created. This may take a few minutes.');
+          }
+          throw error;
+        })
       ]);
 
-      setRestockItems([
-        {
-          id: '1',
-          itemName: 'HP Laptop Batteries',
-          currentStock: 5,
-          restockThreshold: 20,
-          suggestedQuantity: 50,
-          supplier: 'TechCorp Ltd',
-          priority: 'urgent',
-          category: 'Electronics',
-          lastRestocked: '2024-01-15',
-          averageUsage: 8
-        },
-        {
-          id: '2',
-          itemName: 'Office Paper A4',
-          currentStock: 12,
-          restockThreshold: 30,
-          suggestedQuantity: 100,
-          supplier: 'Supply Chain Co',
-          priority: 'high',
-          category: 'Supplies',
-          lastRestocked: '2024-01-20',
-          averageUsage: 15
-        },
-        {
-          id: '3',
-          itemName: 'Ethernet Cables',
-          currentStock: 8,
-          restockThreshold: 25,
-          suggestedQuantity: 75,
-          supplier: 'Global Parts Inc',
-          priority: 'medium',
-          category: 'Accessories',
-          lastRestocked: '2024-01-18',
-          averageUsage: 6
+      // Handle suppliers result
+      if (suppliersResult.status === 'fulfilled') {
+        setDailySuppliers(suppliersResult.value || []);
+      } else {
+        console.error('Failed to load suppliers:', suppliersResult.reason);
+        setDailySuppliers([]);
+        if (suppliersResult.reason?.message?.includes('index')) {
+          setConnectionError('Database is being optimized. Please wait a few minutes and refresh.');
         }
-      ]);
+      }
+
+      // Handle restock result
+      if (restockResult.status === 'fulfilled') {
+        setRestockItems(restockResult.value || []);
+      } else {
+        console.error('Failed to load restock items:', restockResult.reason);
+        setRestockItems([]);
+        if (restockResult.reason?.message?.includes('index')) {
+          setConnectionError('Database is being optimized. Please wait a few minutes and refresh.');
+        }
+      }
+
+      // If both failed with index errors, show specific message
+      if (suppliersResult.status === 'rejected' && restockResult.status === 'rejected') {
+        const bothIndexErrors = [suppliersResult.reason, restockResult.reason]
+          .every(error => error?.message?.includes('index') || error?.code === 'failed-precondition');
+        
+        if (bothIndexErrors) {
+          setConnectionError('Database indexes are being created. This process takes 5-10 minutes. Please check back shortly.');
+        } else {
+          setConnectionError('Unable to load data. Please try again.');
+        }
+      }
+
+    } catch (error) {
+      console.error('Error loading daily data:', error);
+      setConnectionError('Failed to load dashboard data. Please try again.');
+      setDailySuppliers([]);
+      setRestockItems([]);
     } finally {
       setLoadingDailyData(false);
     }
@@ -338,8 +303,8 @@ export default function ReceiverDashboard() {
     try {
       setLoading(true);
       
-      // This would be replaced with actual analytics queries based on time period
-      const data = await ReceiverQueries.getAnalyticsData(timePeriod);
+      // Use offline-aware analytics queries
+      const data = await OfflineAnalyticsQueries.getAnalyticsData(timePeriod);
       setAnalyticsData(data);
 
         setLoading(false);
@@ -397,53 +362,57 @@ export default function ReceiverDashboard() {
         },
         damages: { 
           total: 12, 
-          resolved: 7, 
-          pending: 5, 
-          totalCost: 89300,
+          resolved: 8, 
+          pending: 4, 
+          totalCost: 89000,
           categoryBreakdown: [
             { category: 'Electronics', count: 5, cost: 45000 },
-            { category: 'Machinery', count: 4, cost: 32000 },
-            { category: 'Parts', count: 3, cost: 12300 }
+            { category: 'Furniture', count: 4, cost: 32000 },
+            { category: 'Equipment', count: 3, cost: 12000 }
           ],
           trends: [
-            { month: 'Jan', count: 8, cost: 45000 },
-            { month: 'Feb', count: 12, cost: 67000 },
-            { month: 'Mar', count: 7, cost: 23000 }
+            { month: 'Jan', count: 8, cost: 34000 },
+            { month: 'Feb', count: 12, cost: 56000 },
+            { month: 'Mar', count: 6, cost: 23000 }
           ]
         },
         deliveries: { 
-          total: 203, 
-          onTime: 187, 
-          late: 16, 
-          upcoming: 34,
-          performanceScore: 92,
+          total: 89, 
+          onTime: 76, 
+          late: 8, 
+          upcoming: 5, 
+          performanceScore: 85,
           timeDistribution: [
-            { hour: 8, count: 12 }, { hour: 9, count: 18 }, { hour: 10, count: 25 },
-            { hour: 11, count: 31 }, { hour: 14, count: 28 }, { hour: 15, count: 22 }
+            { hour: 8, count: 12 },
+            { hour: 9, count: 18 },
+            { hour: 10, count: 15 },
+            { hour: 11, count: 14 },
+            { hour: 14, count: 16 },
+            { hour: 15, count: 14 }
           ]
         },
-        predictions: {
-          nextMonthInvoices: 178,
-          expectedReturns: 15,
-          riskLevel: 'medium',
+        predictions: { 
+          nextMonthInvoices: 178, 
+          expectedReturns: 15, 
+          riskLevel: 'medium' as const,
           recommendations: [
-            'Consider negotiating better terms with TechCorp Ltd',
-            'Review quality standards with suppliers showing high return rates',
-            'Implement predictive maintenance for damage-prone categories'
+            'Consider increasing inventory for high-demand items',
+            'Review supplier performance for late deliveries',
+            'Optimize delivery scheduling for peak hours'
           ]
         },
-        notifications: {
-          urgent: 3,
-          warnings: 7,
+        notifications: { 
+          urgent: 3, 
+          warnings: 7, 
           info: 12,
           alerts: [
-            { type: 'urgent', message: '5 invoices overdue for approval', time: '2 min ago', priority: 'high' },
-            { type: 'warning', message: 'Supplier payment due in 2 days', time: '1 hour ago', priority: 'medium' },
-            { type: 'info', message: 'New supplier registration pending', time: '3 hours ago', priority: 'low' }
+            { type: 'urgent', message: 'Critical inventory shortage detected', time: '2 hours ago', priority: 'high' as const },
+            { type: 'warning', message: 'Supplier delivery delayed', time: '4 hours ago', priority: 'medium' as const },
+            { type: 'info', message: 'Monthly report generated', time: '1 day ago', priority: 'low' as const }
           ]
-        }
+        },
+        _offline: !OfflineUtils.isOnline()
       });
-      
         setLoading(false);
       }
     };
@@ -1235,6 +1204,8 @@ export default function ReceiverDashboard() {
               <Target className="h-4 w-4 text-purple-500" />
               <span className="text-sm text-gray-600">Performance Score: {analyticsData.deliveries?.performanceScore || 0}%</span>
             </div>
+            {/* Offline Status Indicator */}
+            <OfflineStatus />
           </div>
           <div className="flex items-center space-x-4">
                           <div className="text-sm text-gray-600">
@@ -1254,6 +1225,45 @@ export default function ReceiverDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Offline Mode Banner */}
+      {!OfflineUtils.isOnline() && (
+        <OfflineStatus showDetails={true} />
+      )}
+
+      {/* Firebase Index Error Banner */}
+      {connectionError && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-orange-800 mb-1">
+                Database Optimization in Progress
+              </h3>
+              <p className="text-sm text-orange-700 mb-3">
+                {connectionError}
+              </p>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={loadDailyData}
+                  className="text-sm bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 transition-colors flex items-center space-x-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Try Again</span>
+                </button>
+                <a
+                  href="https://console.firebase.google.com/project/equitysys-41320/firestore/indexes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-orange-600 hover:text-orange-700 underline"
+                >
+                  View Firebase Console
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Advanced Metrics Dashboard */}
             <div>
@@ -1957,50 +1967,127 @@ export default function ReceiverDashboard() {
         )}
       </div>
 
-      {/* Daily Suppliers & Restock Items - Only show for current day */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-        {/* Today's Expected Suppliers */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Today's Expected Suppliers</h3>
-              <p className="text-sm text-gray-500">{getCurrentDayLabel()}</p>
+      {/* Offline Status Banner */}
+      {!OfflineUtils.isOnline() && (
+        <div className="mb-6">
+          <OfflineStatus showDetails={true} />
+        </div>
+      )}
+
+      {/* Firebase Index Error Banner */}
+      {connectionError && (
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-orange-800 mb-1">
+                Database Optimization in Progress
+              </h3>
+              <p className="text-sm text-orange-700 mb-3">
+                {connectionError}
+              </p>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={loadDailyData}
+                  className="text-sm bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 transition-colors flex items-center space-x-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Try Again</span>
+                </button>
+                <a
+                  href="https://console.firebase.google.com/project/equitysys-41320/firestore/indexes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-orange-600 hover:text-orange-700 underline"
+                >
+                  View Firebase Console
+                </a>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              {loadingDailyData && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              )}
-              <button
-                onClick={loadDailyData}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center"
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh
-              </button>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Suppliers & Restock Items - Prominent in Main Content */}
+      <div className="space-y-8 mb-8">
+        {/* Today's Expected Suppliers - Full Width */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Truck className="h-6 w-6 text-blue-600 mr-3" />
+                  Today's Expected Suppliers
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">{getCurrentDayLabel()}</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                {loadingDailyData && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                )}
+                {connectionError && (
+                  <div className="flex items-center text-orange-600 text-sm">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    <span>Database Optimizing</span>
+                  </div>
+                )}
+                {!connectionError && !loadingDailyData && (
+                  <div className="flex items-center text-green-600 text-sm">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    <span>Live Updates</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Action buttons in content section */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => router.push('/dashboard/receiver/deliveries')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>View All Deliveries</span>
+                </button>
+                <button
+                  onClick={loadDailyData}
+                  className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex items-center space-x-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Refresh</span>
+                </button>
+              </div>
+              <div className="text-sm text-gray-500">
+                {dailySuppliers.length} supplier{dailySuppliers.length !== 1 ? 's' : ''} expected today
+              </div>
             </div>
           </div>
 
           {dailySuppliers.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No suppliers expected today</p>
+            <div className="text-center py-12">
+              <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-gray-900 mb-2">No Suppliers Expected Today</h4>
+              <p className="text-gray-500">Check back tomorrow for new deliveries</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {dailySuppliers.map((supplier) => (
-                <div key={supplier.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                <div key={supplier.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
+                      <div className="flex items-center space-x-2 mb-2">
                         <h4 className="font-semibold text-gray-900">{supplier.name}</h4>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getSupplierStatusColor(supplier.status)}`}>
                           {supplier.status.replace('-', ' ').toUpperCase()}
                       </span>
+                      </div>
+                      <div className="flex items-center space-x-2 mb-2">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(supplier.priority)}`}>
                           {getPriorityIcon(supplier.priority)} {supplier.priority.toUpperCase()}
                       </span>
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
+                      <div className="text-sm text-gray-600 space-y-2">
                         <div className="flex items-center space-x-4">
                           <span className="flex items-center">
                             <Clock className="h-4 w-4 mr-1" />
@@ -2016,82 +2103,98 @@ export default function ReceiverDashboard() {
                             <User className="h-4 w-4 mr-1" />
                             {supplier.contactPerson}
                           </span>
-                          <span className="flex items-center">
-                            <Phone className="h-4 w-4 mr-1" />
-                            {supplier.phone}
-                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          {supplier.phone}
                         </div>
                       </div>
                     </div>
                   </div>
                   
                   {/* Delivery Items */}
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <h5 className="text-sm font-medium text-gray-700 mb-2">Expected Items:</h5>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {supplier.deliveryItems?.map((item: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
-                          <span className="font-medium">{item.name}</span>
-                          <span className="text-gray-600">×{item.quantity}</span>
-                        </div>
-                      ))}
+                  {supplier.deliveryItems && supplier.deliveryItems.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">Expected Items:</h5>
+                      <div className="grid grid-cols-1 gap-2">
+                        {supplier.deliveryItems.slice(0, 3).map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
+                            <span className="font-medium">{item.name}</span>
+                            <span className="text-gray-600">×{item.quantity}</span>
+                          </div>
+                        ))}
+                        {supplier.deliveryItems.length > 3 && (
+                          <div className="text-xs text-gray-500 text-center py-1">
+                            +{supplier.deliveryItems.length - 3} more items
           </div>
+                        )}
         </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
       </div>
 
-        {/* Items Expected to be Restocked Today */}
+        {/* Items Needing Restock - Full Width */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
       <div>
-              <h3 className="text-lg font-semibold text-gray-900">Items Needing Restock</h3>
-              <p className="text-sm text-gray-500">Low inventory alerts</p>
+              <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                <AlertTriangle className="h-6 w-6 text-orange-600 mr-3" />
+                Items Needing Restock
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Low inventory alerts</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               {loadingDailyData && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
               )}
-              <span className="text-sm font-medium text-orange-600">
+              <span className="text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
                 {restockItems.filter(item => item.priority === 'urgent').length} Urgent
+              </span>
+              <span className="text-sm text-gray-500">
+                {restockItems.length} total items
               </span>
             </div>
           </div>
 
           {restockItems.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle className="h-12 w-12 text-green-300 mx-auto mb-4" />
-              <p className="text-gray-500">All items are well stocked</p>
+            <div className="text-center py-12">
+              <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-gray-900 mb-2">All Items Well Stocked</h4>
+              <p className="text-gray-500">No restocking needed at this time</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {restockItems.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {restockItems.slice(0, 8).map((item) => (
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="font-semibold text-gray-900">{item.itemName}</h4>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <h4 className="font-semibold text-gray-900 text-sm">{item.itemName}</h4>
+                      </div>
+                      <div className="flex items-center space-x-2 mb-3">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(item.priority)}`}>
                           {getPriorityIcon(item.priority)} {item.priority.toUpperCase()}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
+                      <div className="text-xs text-gray-600 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span>Current Stock:</span>
+                          <span>Current:</span>
                           <span className={`font-medium ${item.currentStock <= item.restockThreshold * 0.3 ? 'text-red-600' : 
                             item.currentStock <= item.restockThreshold * 0.6 ? 'text-orange-600' : 'text-gray-900'}`}>
-                            {item.currentStock} units
+                            {item.currentStock}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>Restock Threshold:</span>
-                          <span className="font-medium text-gray-900">{item.restockThreshold} units</span>
+                          <span>Threshold:</span>
+                          <span className="font-medium text-gray-900">{item.restockThreshold}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>Suggested Order:</span>
-                          <span className="font-medium text-blue-600">{item.suggestedQuantity} units</span>
+                          <span>Suggested:</span>
+                          <span className="font-medium text-blue-600">{item.suggestedQuantity}</span>
                         </div>
                       </div>
                     </div>
@@ -2116,29 +2219,29 @@ export default function ReceiverDashboard() {
                     </div>
                   </div>
                   
-                  {/* Additional Info */}
+                  {/* Supplier Info */}
                   <div className="pt-3 border-t border-gray-100">
-                    <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                      <div>
-                        <span className="font-medium">Supplier:</span>
-                        <div className="text-gray-900">{item.supplier}</div>
-                        </div>
-                      <div>
-                        <span className="font-medium">Category:</span>
-                        <div className="text-gray-900">{item.category}</div>
-                      </div>
-                      <div>
-                        <span className="font-medium">Last Restocked:</span>
-                        <div className="text-gray-900">{item.lastRestocked}</div>
-                      </div>
-                      <div>
-                        <span className="font-medium">Avg. Usage:</span>
-                        <div className="text-gray-900">{item.averageUsage}/day</div>
-                      </div>
+                    <div className="text-xs text-gray-600">
+                      <div className="font-medium text-gray-900">{item.supplier}</div>
+                      <div className="text-gray-500">{item.category}</div>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          
+          {restockItems.length > 8 && (
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-500 mb-3">
+                Showing 8 of {restockItems.length} items needing restock
+              </p>
+              <button
+                onClick={() => router.push('/dashboard/receiver/deliveries')}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+              >
+                View All Restock Items
+              </button>
             </div>
           )}
         </div>
@@ -2204,13 +2307,13 @@ export default function ReceiverDashboard() {
             <BarChart3 className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-6">
-            <div>
+                      <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700">Delivery Success Rate</span>
                 <span className="text-sm font-bold text-green-600">
                   {formatPercentage(analyticsData.deliveries.onTime, analyticsData.deliveries.total)}
                 </span>
-              </div>
+                        </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className="bg-green-600 h-2 rounded-full" 
@@ -2218,7 +2321,7 @@ export default function ReceiverDashboard() {
                     width: `${(analyticsData.deliveries.onTime / analyticsData.deliveries.total) * 100}%` 
                   }}
                 ></div>
-              </div>
+                      </div>
             </div>
             
             <div>
@@ -2226,7 +2329,7 @@ export default function ReceiverDashboard() {
                 <span className="text-sm font-medium text-gray-700">Invoice Approval Rate</span>
                 <span className="text-sm font-bold text-blue-600">
                   {formatPercentage(analyticsData.invoices.approved + analyticsData.invoices.paid, analyticsData.invoices.total)}
-                </span>
+                      </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 

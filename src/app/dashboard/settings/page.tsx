@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService, AuthUser } from '../../../lib/firebase/auth';
+import { useTheme } from '../../../contexts/ThemeContext';
 import { 
   Settings,
   User,
@@ -83,6 +84,7 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
@@ -104,7 +106,7 @@ export default function SettingsPage() {
       position: ''
     },
     preferences: {
-      theme: 'light',
+      theme: theme,
       language: 'en',
       timezone: 'UTC',
       dateFormat: 'MM/DD/YYYY',
@@ -139,6 +141,17 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserSettings();
   }, []);
+
+  // Update settings when theme changes from context
+  useEffect(() => {
+    setSettings(prev => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        theme: theme
+      }
+    }));
+  }, [theme]);
 
   const loadUserSettings = async () => {
     try {
@@ -228,45 +241,61 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
+              <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
                 <Settings className="h-8 w-8 text-blue-600 mr-3" />
                 Settings
               </h1>
-              <p className="text-gray-600 mt-1">Manage your account and system preferences</p>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and system preferences</p>
             </div>
           </div>
           
-          <button
-            onClick={handleSaveSettings}
-            disabled={saving}
-            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {saving ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            {/* Quick Theme Toggle */}
+            <button
+              onClick={() => {
+                const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+                setTheme(nextTheme);
+              }}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              title={`Current: ${theme} mode. Click to cycle through themes.`}
+            >
+              {theme === 'light' && <Sun className="h-5 w-5 text-yellow-500" />}
+              {theme === 'dark' && <Moon className="h-5 w-5 text-blue-400" />}
+              {theme === 'system' && <Monitor className="h-5 w-5 text-gray-600 dark:text-gray-400" />}
+            </button>
+            
+            <button
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {saving ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Sidebar Navigation */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
             <nav className="space-y-2">
               {tabs.map((tab) => (
                 <button
@@ -274,8 +303,8 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
                     activeTab === tab.id
-                      ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
                   {tab.icon}
@@ -288,17 +317,17 @@ export default function SettingsPage() {
 
         {/* Main Content */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
             {/* Profile Tab */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile Information</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Profile Information</h2>
                   
                   {/* Avatar Section */}
                   <div className="flex items-center space-x-6 mb-6">
                     <div className="relative">
-                      <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         {settings.profile.avatar ? (
                           <img 
                             src={settings.profile.avatar} 
@@ -306,7 +335,7 @@ export default function SettingsPage() {
                             className="w-20 h-20 rounded-full object-cover"
                           />
                         ) : (
-                          <span className="text-2xl font-bold text-blue-600">
+                          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                             {settings.profile.firstName.charAt(0)}{settings.profile.lastName.charAt(0)}
                           </span>
                         )}
@@ -316,18 +345,18 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                         {settings.profile.firstName} {settings.profile.lastName}
                       </h3>
-                      <p className="text-gray-600">{settings.profile.position}</p>
-                      <p className="text-sm text-gray-500">{settings.profile.department}</p>
+                      <p className="text-gray-600 dark:text-gray-400">{settings.profile.position}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">{settings.profile.department}</p>
                     </div>
                   </div>
 
                   {/* Profile Form */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         First Name
                       </label>
                       <input
@@ -337,12 +366,12 @@ export default function SettingsPage() {
                           ...prev,
                           profile: { ...prev.profile, firstName: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Last Name
                       </label>
                       <input
@@ -352,12 +381,12 @@ export default function SettingsPage() {
                           ...prev,
                           profile: { ...prev.profile, lastName: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Email Address
                       </label>
                       <div className="relative">
@@ -369,13 +398,13 @@ export default function SettingsPage() {
                             ...prev,
                             profile: { ...prev.profile, email: e.target.value }
                           }))}
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                         />
                       </div>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Phone Number
                       </label>
                       <div className="relative">
@@ -387,13 +416,13 @@ export default function SettingsPage() {
                             ...prev,
                             profile: { ...prev.profile, phone: e.target.value }
                           }))}
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                         />
                       </div>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Department
                       </label>
                       <input
@@ -403,13 +432,13 @@ export default function SettingsPage() {
                           ...prev,
                           profile: { ...prev.profile, department: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                         readOnly
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Position
                       </label>
                       <input
@@ -419,7 +448,7 @@ export default function SettingsPage() {
                           ...prev,
                           profile: { ...prev.profile, position: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                         readOnly
                       />
                     </div>
@@ -430,42 +459,54 @@ export default function SettingsPage() {
 
             {/* Preferences Tab */}
             {activeTab === 'preferences' && (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Preferences</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Preferences</h2>
                   
                   {/* Theme Settings */}
                   <div className="mb-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">Appearance</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">Appearance</h3>
                     <div className="grid grid-cols-3 gap-4">
                       {[
                         { value: 'light', label: 'Light', icon: <Sun className="h-4 w-4" /> },
                         { value: 'dark', label: 'Dark', icon: <Moon className="h-4 w-4" /> },
                         { value: 'system', label: 'System', icon: <Monitor className="h-4 w-4" /> }
-                      ].map((theme) => (
+                      ].map((themeOption) => (
                         <button
-                          key={theme.value}
-                          onClick={() => setSettings(prev => ({
-                            ...prev,
-                            preferences: { ...prev.preferences, theme: theme.value as any }
-                          }))}
+                          key={themeOption.value}
+                          onClick={() => {
+                            setTheme(themeOption.value as any);
+                            setSettings(prev => ({
+                              ...prev,
+                              preferences: { ...prev.preferences, theme: themeOption.value as any }
+                            }));
+                          }}
                           className={`p-4 border rounded-lg flex flex-col items-center space-y-2 transition-colors ${
-                            settings.preferences.theme === theme.value
-                              ? 'border-blue-500 bg-blue-50 text-blue-600'
-                              : 'border-gray-300 hover:border-gray-400'
+                            settings.preferences.theme === themeOption.value
+                              ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900 dark:border-blue-400'
+                              : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                           }`}
                         >
-                          {theme.icon}
-                          <span className="text-sm font-medium">{theme.label}</span>
+                          {themeOption.icon}
+                          <span className="text-sm font-medium">{themeOption.label}</span>
+                          {settings.preferences.theme === themeOption.value && (
+                            <Check className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                          )}
                         </button>
                       ))}
                     </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      {settings.preferences.theme === 'system' 
+                        ? 'Automatically switches between light and dark based on your system preference'
+                        : `Currently using ${settings.preferences.theme} mode`
+                      }
+                    </p>
                   </div>
 
                   {/* Language & Region */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Language
                       </label>
                       <select
@@ -474,7 +515,7 @@ export default function SettingsPage() {
                           ...prev,
                           preferences: { ...prev.preferences, language: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       >
                         <option value="en">English</option>
                         <option value="sw">Swahili</option>
@@ -483,7 +524,7 @@ export default function SettingsPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Timezone
                       </label>
                       <select
@@ -492,7 +533,7 @@ export default function SettingsPage() {
                           ...prev,
                           preferences: { ...prev.preferences, timezone: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       >
                         <option value="UTC">UTC</option>
                         <option value="Africa/Kampala">East Africa Time (EAT)</option>
@@ -501,7 +542,7 @@ export default function SettingsPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Date Format
                       </label>
                       <select
@@ -510,7 +551,7 @@ export default function SettingsPage() {
                           ...prev,
                           preferences: { ...prev.preferences, dateFormat: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       >
                         <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                         <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -519,7 +560,7 @@ export default function SettingsPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Currency
                       </label>
                       <select
@@ -528,7 +569,7 @@ export default function SettingsPage() {
                           ...prev,
                           preferences: { ...prev.preferences, currency: e.target.value }
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                       >
                         <option value="UGX">Ugandan Shilling (UGX)</option>
                         <option value="USD">US Dollar (USD)</option>
@@ -539,12 +580,12 @@ export default function SettingsPage() {
 
                   {/* Dashboard Settings */}
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">Dashboard</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">Dashboard</h3>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <label className="text-sm font-medium text-gray-700">Auto Refresh</label>
-                          <p className="text-sm text-gray-500">Automatically refresh dashboard data</p>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto Refresh</label>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Automatically refresh dashboard data</p>
                         </div>
                         <button
                           onClick={() => setSettings(prev => ({
@@ -558,7 +599,7 @@ export default function SettingsPage() {
                             }
                           }))}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.preferences.dashboard.autoRefresh ? 'bg-blue-600' : 'bg-gray-200'
+                            settings.preferences.dashboard.autoRefresh ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                           }`}
                         >
                           <span
@@ -571,7 +612,7 @@ export default function SettingsPage() {
                       
                       {settings.preferences.dashboard.autoRefresh && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Refresh Interval (seconds)
                           </label>
                           <input
@@ -589,15 +630,15 @@ export default function SettingsPage() {
                                 }
                               }
                             }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                           />
                         </div>
                       )}
                       
                       <div className="flex items-center justify-between">
                         <div>
-                          <label className="text-sm font-medium text-gray-700">Compact Mode</label>
-                          <p className="text-sm text-gray-500">Use compact layout for dashboard</p>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Compact Mode</label>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Use compact layout for dashboard</p>
                         </div>
                         <button
                           onClick={() => setSettings(prev => ({
@@ -611,7 +652,7 @@ export default function SettingsPage() {
                             }
                           }))}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.preferences.dashboard.compactMode ? 'bg-blue-600' : 'bg-gray-200'
+                            settings.preferences.dashboard.compactMode ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                           }`}
                         >
                           <span
@@ -631,7 +672,7 @@ export default function SettingsPage() {
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Notification Preferences</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Notification Preferences</h2>
                   
                   <div className="space-y-6">
                     {[
@@ -640,14 +681,14 @@ export default function SettingsPage() {
                       { key: 'sms', label: 'SMS Notifications', icon: <Phone className="h-5 w-5" />, desc: 'Receive notifications via SMS' },
                       { key: 'desktop', label: 'Desktop Notifications', icon: <Monitor className="h-5 w-5" />, desc: 'Show desktop notifications in browser' }
                     ].map((notification) => (
-                      <div key={notification.key} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div key={notification.key} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
                         <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg text-blue-600 dark:text-blue-400">
                             {notification.icon}
                           </div>
                           <div>
-                            <h3 className="text-sm font-medium text-gray-900">{notification.label}</h3>
-                            <p className="text-sm text-gray-500">{notification.desc}</p>
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">{notification.label}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{notification.desc}</p>
                           </div>
                         </div>
                         <button

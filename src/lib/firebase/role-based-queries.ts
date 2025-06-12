@@ -12,7 +12,9 @@ import {
   getDocs, 
   onSnapshot,
   Timestamp,
-  QueryConstraint
+  QueryConstraint,
+  doc,
+  getDoc
 } from 'firebase/firestore';
 import { db } from './config';
 import { authService } from './auth';
@@ -30,7 +32,9 @@ import {
   LeaveRequest, 
   CashClose, 
   AuditLog,
-  Branch
+  Branch,
+  Delivery,
+  InventoryItem
 } from './models';
 
 // =====================================================
@@ -414,7 +418,7 @@ export class ReceiverQueries {
     });
   }
 
-  // Get today's expected suppliers for sidebar display
+  // Get today's expected suppliers with real-time data
   static async getTodaysExpectedSuppliers() {
     const userId = getCurrentUserId();
     if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
@@ -422,111 +426,120 @@ export class ReceiverQueries {
     }
 
     try {
-      // Simplified query - just get deliveries for this receiver
-      const deliveriesQuery = query(
-        collection(db, 'deliveries'),
-        where('receiverId', '==', userId),
-        limit(50) // Limit to avoid large data sets
-      );
-
-      const deliveriesSnapshot = await getDocs(deliveriesQuery);
-      const allDeliveries = deliveriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Filter for today's deliveries in JavaScript
+      // Get today's date range
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const todaysDeliveries = allDeliveries.filter((delivery: any) => {
-        if (!delivery.scheduledDate) return false;
+      // Simplified query - only use receiverId and scheduledDate to reduce index complexity
+      const deliveriesQuery = query(
+        collection(db, 'deliveries'),
+        where('receiverId', '==', userId),
+        where('scheduledDate', '>=', Timestamp.fromDate(today)),
+        where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
+        orderBy('scheduledDate'),
+        limit(50) // Limit results to prevent large queries
+      );
+
+      const deliveriesSnapshot = await getDocs(deliveriesQuery);
+      const todaysDeliveries = deliveriesSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as Delivery & { id: string }));
+
+      // Sort by scheduled time on client-side to avoid complex index
+      todaysDeliveries.sort((a, b) => {
+        // First sort by date, then by time
+        const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
+        if (dateCompare !== 0) return dateCompare;
         
-        const deliveryDate = delivery.scheduledDate.toDate();
-        return deliveryDate >= today && deliveryDate < tomorrow;
+        // Then sort by time
+        const timeA = a.scheduledTime || '00:00';
+        const timeB = b.scheduledTime || '00:00';
+        return timeA.localeCompare(timeB);
       });
 
-      // Get supplier details for each delivery
-      const supplierPromises = todaysDeliveries.map(async (delivery: any) => {
+      // Get supplier details for each delivery (batch processing)
+      const supplierIds = [...new Set(todaysDeliveries.map(d => d.supplierId))];
+      const supplierPromises = supplierIds.map(async (supplierId) => {
         try {
-          const supplierQuery = query(
-            collection(db, 'suppliers'),
-            where('__name__', '==', delivery.supplierId)
-          );
-          const supplierSnapshot = await getDocs(supplierQuery);
-          const supplierData = supplierSnapshot.docs[0]?.data();
-
-          if (!supplierData) return null;
-
-          // Calculate status based on current time vs expected time
-          const now = new Date();
-          const scheduledTime = delivery.scheduledDate.toDate();
-          const timeDiff = scheduledTime.getTime() - now.getTime();
-          const minutesDiff = Math.floor(timeDiff / (1000 * 60));
-
-          let status = 'on-time';
-          if (minutesDiff < -30) {
-            status = 'delayed';
-          } else if (minutesDiff > 60) {
-            status = 'early';
-          }
-
-          // Determine priority based on delivery value and urgency
-          let priority = 'medium';
-          if (delivery.totalValue > 10000 || delivery.urgent) {
-            priority = 'high';
-          } else if (delivery.totalValue < 1000) {
-            priority = 'low';
-          }
-
-          return {
-            id: delivery.supplierId,
-            name: supplierData.supplierName || 'Unknown Supplier',
-            expectedTime: scheduledTime.toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            items: delivery.itemCount || 0,
-            status: status,
-            priority: priority
+          const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId));
+        return {
+            id: supplierId, 
+            data: supplierDoc.exists() ? supplierDoc.data() as Supplier : null 
           };
         } catch (error) {
-          console.error('Error fetching supplier:', error);
-          return null;
+          console.warn(`Failed to fetch supplier ${supplierId}:`, error);
+          return { id: supplierId, data: null };
         }
       });
 
       const suppliers = await Promise.all(supplierPromises);
-      return suppliers.filter(supplier => supplier !== null);
-    } catch (error) {
-      console.error('Error fetching expected suppliers:', error);
-      // Return mock data on error for demo purposes
-      return [
-        {
-          id: '1',
-          name: 'TechCorp Ltd',
-          expectedTime: '09:30 AM',
-          items: 45,
-          status: 'on-time',
-          priority: 'high'
-        },
-        {
-          id: '2',
-          name: 'Supply Chain Co',
-          expectedTime: '11:15 AM',
-          items: 23,
-          status: 'delayed',
-          priority: 'medium'
-        },
-        {
-          id: '3',
-          name: 'Global Parts Inc',
-          expectedTime: '02:00 PM',
-          items: 67,
-          status: 'early',
-          priority: 'high'
+      const supplierMap = suppliers.reduce((acc, supplier) => {
+        if (supplier.data) {
+          acc[supplier.id] = supplier.data;
         }
-      ];
+        return acc;
+      }, {} as Record<string, Supplier>);
+
+      // Process deliveries with supplier data
+      const suppliersWithDeliveries = todaysDeliveries.map((delivery) => {
+        const supplierData = supplierMap[delivery.supplierId];
+        
+        if (!supplierData) {
+          return {
+            id: delivery.id,
+            name: 'Unknown Supplier',
+            expectedTime: delivery.scheduledTime || '00:00',
+            status: 'unknown',
+            priority: 'medium',
+            items: delivery.itemCount || 0,
+            contactPerson: 'N/A',
+            phone: 'N/A',
+            deliveryItems: delivery.deliveryItems || []
+          };
+        }
+
+        // Calculate delivery status
+        const now = new Date();
+        const scheduledDateTime = delivery.scheduledDate.toDate();
+        const [hours, minutes] = (delivery.scheduledTime || '00:00').split(':').map(Number);
+        scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+        const timeDiff = scheduledDateTime.getTime() - now.getTime();
+        const minutesDiff = Math.floor(timeDiff / (1000 * 60));
+
+        let status: 'on-time' | 'delayed' | 'early' = 'on-time';
+        if (delivery.status === 'delayed') {
+          status = 'delayed';
+        } else if (minutesDiff < -30) {
+          status = 'delayed';
+        } else if (minutesDiff > 60) {
+          status = 'early';
+        }
+
+        return {
+          id: delivery.id,
+          name: supplierData.supplierName || supplierData.name || 'Unknown Supplier',
+          expectedTime: delivery.scheduledTime || '00:00',
+          status,
+          priority: delivery.priority || 'medium',
+          items: delivery.itemCount || delivery.deliveryItems?.length || 0,
+          contactPerson: delivery.contactPerson || supplierData.contactPerson || 'N/A',
+          phone: delivery.contactPhone || supplierData.phone || 'N/A',
+          deliveryItems: delivery.deliveryItems || [],
+          totalValue: delivery.totalValue || 0,
+          trackingNumber: delivery.trackingNumber,
+          notes: delivery.notes
+        };
+      }).filter(supplier => supplier !== null);
+
+      return suppliersWithDeliveries;
+
+    } catch (error) {
+      console.error('Error fetching today\'s expected suppliers:', error);
+      throw error;
     }
   }
 
@@ -538,106 +551,112 @@ export class ReceiverQueries {
     }
 
     try {
-      // Simplified query - get all inventory items and filter in JavaScript
-      const restockQuery = query(
+      // Get current user's branch
+      const userDoc = await getDoc(doc(db, 'employees', userId));
+      const userData = userDoc.data() as Employee;
+      
+      if (!userData?.branchId) {
+        throw new Error('User branch not found');
+      }
+
+      // Optimized query - use separate queries to avoid complex composite index
+      // First query: Get all active items for this branch
+      const inventoryQuery = query(
         collection(db, 'inventory'),
-        limit(100) // Limit to avoid large data sets
+        where('branchId', '==', userData.branchId),
+        where('status', '==', 'active'),
+        limit(100) // Limit to prevent large queries
       );
 
-      const restockSnapshot = await getDocs(restockQuery);
-      const allItems = restockSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const inventorySnapshot = await getDocs(inventoryQuery);
+      const allItems = inventorySnapshot.docs.map(doc => ({ 
+          id: doc.id,
+        ...doc.data() 
+      } as InventoryItem & { id: string }));
 
-      // Filter items that need restocking in JavaScript
-      const itemsNeedingRestock = allItems.filter((item: any) => {
-        return item.currentStock <= item.restockThreshold;
-      });
-
-      // Sort by priority (most urgent first)
-      itemsNeedingRestock.sort((a: any, b: any) => {
-        const aRatio = a.currentStock / a.restockThreshold;
-        const bRatio = b.currentStock / b.restockThreshold;
-        return aRatio - bRatio; // Lower ratio = more urgent
-      });
-
-      // Get supplier details for each item
-      const itemsWithSuppliers = await Promise.all(
-        itemsNeedingRestock.slice(0, 20).map(async (item: any) => { // Limit to top 20 most urgent
-          let supplierName = 'Unknown Supplier';
-          
-          if (item.supplierId) {
-            try {
-              const supplierQuery = query(
-                collection(db, 'suppliers'),
-                where('__name__', '==', item.supplierId)
-              );
-              const supplierSnapshot = await getDocs(supplierQuery);
-              const supplierData = supplierSnapshot.docs[0]?.data();
-              supplierName = supplierData?.supplierName || 'Unknown Supplier';
-            } catch (error) {
-              console.error('Error fetching supplier:', error);
-            }
-          }
-
-          // Calculate priority based on stock level
+      // Filter and process items that need restocking (client-side filtering)
+      const itemsNeedingRestock = allItems
+        .filter(item => item.currentStock <= item.restockThreshold)
+        .map(item => {
           const stockRatio = item.currentStock / item.restockThreshold;
-          let priority = 'medium';
-          if (stockRatio <= 0.3) {
-            priority = 'urgent';
-          } else if (stockRatio <= 0.6) {
-            priority = 'high';
-          }
-
-          // Calculate suggested quantity
-          const suggestedQuantity = Math.max(
-            item.restockThreshold * 2,
-            item.averageUsage * 30 // 30 days worth
-          );
+          const priority = stockRatio <= 0.2 ? 'urgent' : 
+                          stockRatio <= 0.5 ? 'high' : 
+                          stockRatio <= 0.8 ? 'medium' : 'low';
+          
+          // Calculate suggested quantity based on max stock or 2x threshold
+          const maxTarget = item.maxStock || (item.restockThreshold * 2);
+          const suggestedQuantity = Math.max(0, maxTarget - item.currentStock);
+          
+          // Estimate days until empty based on average usage
+          const daysUntilEmpty = item.averageUsage > 0 ? 
+            Math.floor(item.currentStock / item.averageUsage) : null;
 
           return {
             id: item.id,
-            itemName: item.itemName || item.name || 'Unknown Item',
-            currentStock: item.currentStock || 0,
-            restockThreshold: item.restockThreshold || 0,
-            suggestedQuantity: suggestedQuantity,
-            supplier: supplierName,
-            priority: priority,
-            category: item.category || 'General',
-            lastRestocked: item.lastRestocked?.toDate?.()?.toISOString?.()?.split('T')[0] || 'Unknown',
-            averageUsage: item.averageUsage || 0
-          };
-        })
-      );
+            itemName: item.itemName,
+            category: item.category,
+            currentStock: item.currentStock,
+            restockThreshold: item.restockThreshold,
+            maxStock: item.maxStock,
+            unitCost: item.unitCost,
+            supplierId: item.supplierId,
+            branchId: item.branchId,
+            location: item.location || 'Unknown',
+            averageUsage: item.averageUsage,
+            status: item.status,
+            priority,
+            suggestedQuantity,
+            stockRatio: Math.round(stockRatio * 100) / 100,
+            daysUntilEmpty,
+            supplier: 'Loading...', // Will be populated later
+            lastRestocked: item.lastRestocked,
+            expiryDate: item.expiryDate
+        };
+      });
 
-      return itemsWithSuppliers;
+      // Sort by priority and stock ratio
+      itemsNeedingRestock.sort((a, b) => {
+        const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
+        
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+        return a.stockRatio - b.stockRatio;
+      });
+
+      // Get supplier names for the items (batch fetch)
+      const supplierIds = [...new Set(itemsNeedingRestock
+        .map(item => item.supplierId)
+        .filter(Boolean))];
+      
+      const supplierPromises = supplierIds.map(async (supplierId) => {
+        try {
+          const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId!));
+          return { id: supplierId, name: supplierDoc.exists() ? supplierDoc.data().name : 'Unknown Supplier' };
+        } catch (error) {
+          console.warn(`Failed to fetch supplier ${supplierId}:`, error);
+          return { id: supplierId, name: 'Unknown Supplier' };
+        }
+      });
+
+      const suppliers = await Promise.all(supplierPromises);
+      const supplierMap = suppliers.reduce((acc, supplier) => {
+        acc[supplier.id!] = supplier.name;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // Update items with supplier names
+      itemsNeedingRestock.forEach(item => {
+        item.supplier = item.supplierId ? supplierMap[item.supplierId] || 'Unknown Supplier' : 'No Supplier';
+      });
+
+      return itemsNeedingRestock;
+
     } catch (error) {
       console.error('Error fetching restock items:', error);
-      // Return mock data on error
-      return [
-        {
-          id: '1',
-          itemName: 'HP Laptop Batteries',
-          currentStock: 5,
-          restockThreshold: 20,
-          suggestedQuantity: 50,
-          supplier: 'TechCorp Ltd',
-          priority: 'urgent',
-          category: 'Electronics',
-          lastRestocked: '2024-01-15',
-          averageUsage: 8
-        },
-        {
-          id: '2',
-          itemName: 'Office Paper A4',
-          currentStock: 12,
-          restockThreshold: 30,
-          suggestedQuantity: 100,
-          supplier: 'Supply Chain Co',
-          priority: 'high',
-          category: 'Supplies',
-          lastRestocked: '2024-01-20',
-          averageUsage: 15
-        }
-      ];
+      throw error;
     }
   }
 
@@ -758,6 +777,263 @@ export class ReceiverQueries {
       damages: damageStats,
       deliveries: deliveryStats
     };
+  }
+
+  // Real-time subscription for today's expected suppliers
+  static subscribeTodaysExpectedSuppliers(callback: (data: any[]) => void) {
+    const userId = getCurrentUserId();
+    if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
+      throw new Error('Unauthorized access');
+    }
+
+    // Get today's date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Simplified query - avoid complex composite index
+    const deliveriesQuery = query(
+      collection(db, 'deliveries'),
+      where('receiverId', '==', userId),
+      where('scheduledDate', '>=', Timestamp.fromDate(today)),
+      where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
+      orderBy('scheduledDate'),
+      limit(50)
+    );
+
+    return onSnapshot(deliveriesQuery, async (snapshot) => {
+      try {
+        const todaysDeliveries = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        } as Delivery & { id: string }));
+
+        // Sort by scheduled time on client-side
+        todaysDeliveries.sort((a, b) => {
+          const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
+          if (dateCompare !== 0) return dateCompare;
+          
+          const timeA = a.scheduledTime || '00:00';
+          const timeB = b.scheduledTime || '00:00';
+          return timeA.localeCompare(timeB);
+        });
+
+        // Get supplier details (batch processing)
+        const supplierIds = [...new Set(todaysDeliveries.map(d => d.supplierId))];
+        
+        if (supplierIds.length === 0) {
+          callback([]);
+          return;
+        }
+
+        const supplierPromises = supplierIds.map(async (supplierId) => {
+          try {
+            const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId));
+            return { 
+              id: supplierId, 
+              data: supplierDoc.exists() ? supplierDoc.data() as Supplier : null 
+            };
+          } catch (error) {
+            return { id: supplierId, data: null };
+          }
+        });
+
+        const suppliers = await Promise.all(supplierPromises);
+        const supplierMap = suppliers.reduce((acc, supplier) => {
+          if (supplier.data) {
+            acc[supplier.id] = supplier.data;
+          }
+          return acc;
+        }, {} as Record<string, Supplier>);
+
+        // Process deliveries with supplier data
+        const suppliersWithDeliveries = todaysDeliveries.map((delivery) => {
+          const supplierData = supplierMap[delivery.supplierId];
+          
+          if (!supplierData) {
+            return {
+              id: delivery.id,
+              name: 'Unknown Supplier',
+              expectedTime: delivery.scheduledTime || '00:00',
+              status: 'unknown',
+              priority: 'medium',
+              items: delivery.itemCount || 0,
+              contactPerson: 'N/A',
+              phone: 'N/A',
+              deliveryItems: delivery.deliveryItems || []
+            };
+          }
+
+          // Calculate delivery status
+          const now = new Date();
+          const scheduledDateTime = delivery.scheduledDate.toDate();
+          const [hours, minutes] = (delivery.scheduledTime || '00:00').split(':').map(Number);
+          scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+          const timeDiff = scheduledDateTime.getTime() - now.getTime();
+          const minutesDiff = Math.floor(timeDiff / (1000 * 60));
+
+          let status: 'on-time' | 'delayed' | 'early' = 'on-time';
+          if (delivery.status === 'delayed') {
+            status = 'delayed';
+          } else if (minutesDiff < -30) {
+            status = 'delayed';
+          } else if (minutesDiff > 60) {
+            status = 'early';
+          }
+
+          return {
+            id: delivery.id,
+            name: supplierData.supplierName || supplierData.name || 'Unknown Supplier',
+            expectedTime: delivery.scheduledTime || '00:00',
+            status,
+            priority: delivery.priority || 'medium',
+            items: delivery.itemCount || delivery.deliveryItems?.length || 0,
+            contactPerson: delivery.contactPerson || supplierData.contactPerson || 'N/A',
+            phone: delivery.contactPhone || supplierData.phone || 'N/A',
+            deliveryItems: delivery.deliveryItems || [],
+            totalValue: delivery.totalValue || 0,
+            trackingNumber: delivery.trackingNumber,
+            notes: delivery.notes
+          };
+        }).filter(supplier => supplier !== null);
+
+        callback(suppliersWithDeliveries);
+
+      } catch (error) {
+        console.error('Error in suppliers subscription:', error);
+        callback([]); // Return empty array on error
+      }
+    }, (error) => {
+      console.error('Firestore subscription error:', error);
+      callback([]); // Return empty array on subscription error
+    });
+  }
+
+  // Real-time subscription for restock items
+  static subscribeRestockItems(callback: (data: any[]) => void) {
+    const userId = getCurrentUserId();
+    if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
+      throw new Error('Unauthorized access');
+    }
+
+    // First get user's branch
+    getDoc(doc(db, 'employees', userId)).then((userDoc) => {
+      const userData = userDoc.data() as Employee;
+      
+      if (!userData?.branchId) {
+        console.error('User branch not found');
+        callback([]);
+        return;
+      }
+
+      // Optimized subscription query
+      const inventoryQuery = query(
+        collection(db, 'inventory'),
+        where('branchId', '==', userData.branchId),
+        where('status', '==', 'active'),
+        limit(100) // Prevent large real-time updates
+      );
+
+      return onSnapshot(inventoryQuery, async (snapshot) => {
+        try {
+          const allItems = snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data() 
+          } as InventoryItem & { id: string }));
+
+          // Process items (same logic as getTodaysRestockItems)
+          const itemsNeedingRestock = allItems
+            .filter(item => item.currentStock <= item.restockThreshold)
+            .map(item => {
+              const stockRatio = item.currentStock / item.restockThreshold;
+              const priority = stockRatio <= 0.2 ? 'urgent' : 
+                              stockRatio <= 0.5 ? 'high' : 
+                              stockRatio <= 0.8 ? 'medium' : 'low';
+              
+              const maxTarget = item.maxStock || (item.restockThreshold * 2);
+              const suggestedQuantity = Math.max(0, maxTarget - item.currentStock);
+              
+              const daysUntilEmpty = item.averageUsage > 0 ? 
+                Math.floor(item.currentStock / item.averageUsage) : null;
+
+              return {
+                id: item.id,
+                itemName: item.itemName,
+                category: item.category,
+                currentStock: item.currentStock,
+                restockThreshold: item.restockThreshold,
+                maxStock: item.maxStock,
+                unitCost: item.unitCost,
+                supplierId: item.supplierId,
+                branchId: item.branchId,
+                location: item.location || 'Unknown',
+                averageUsage: item.averageUsage,
+                status: item.status,
+                priority,
+                suggestedQuantity,
+                stockRatio: Math.round(stockRatio * 100) / 100,
+                daysUntilEmpty,
+                supplier: 'Loading...',
+                lastRestocked: item.lastRestocked,
+                expiryDate: item.expiryDate
+              };
+            });
+
+          // Sort by priority
+          itemsNeedingRestock.sort((a, b) => {
+            const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+            const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
+            const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
+            
+            if (aPriority !== bPriority) {
+              return aPriority - bPriority;
+            }
+            return a.stockRatio - b.stockRatio;
+          });
+
+          // Get supplier names (optimized batch fetch)
+          const supplierIds = [...new Set(itemsNeedingRestock
+            .map(item => item.supplierId)
+            .filter(Boolean))];
+          
+          if (supplierIds.length > 0) {
+            const supplierPromises = supplierIds.map(async (supplierId) => {
+              try {
+                const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId!));
+                return { id: supplierId, name: supplierDoc.exists() ? supplierDoc.data().name : 'Unknown Supplier' };
+              } catch (error) {
+                return { id: supplierId, name: 'Unknown Supplier' };
+              }
+            });
+
+            const suppliers = await Promise.all(supplierPromises);
+            const supplierMap = suppliers.reduce((acc, supplier) => {
+              acc[supplier.id!] = supplier.name;
+              return acc;
+            }, {} as Record<string, string>);
+
+            // Update items with supplier names
+            itemsNeedingRestock.forEach(item => {
+              item.supplier = item.supplierId ? supplierMap[item.supplierId] || 'Unknown Supplier' : 'No Supplier';
+            });
+          }
+
+          callback(itemsNeedingRestock);
+
+        } catch (error) {
+          console.error('Error in restock items subscription:', error);
+          callback([]); // Return empty array on error
+        }
+      }, (error) => {
+        console.error('Firestore subscription error:', error);
+        callback([]); // Return empty array on subscription error
+      });
+    }).catch((error) => {
+      console.error('Error getting user data:', error);
+      callback([]);
+    });
   }
 }
 

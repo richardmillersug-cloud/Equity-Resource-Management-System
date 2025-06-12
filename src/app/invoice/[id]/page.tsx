@@ -121,6 +121,37 @@ export default function PublicInvoicePage() {
     }
   };
 
+  const copyToClipboard = async (text: string) => {
+    // Modern clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.log('Clipboard API failed:', err);
+      }
+    }
+    
+    // Fallback for older browsers
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const result = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return result;
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      return false;
+    }
+  };
+
   const handleShare = async () => {
     if (navigator.share && invoice) {
       try {
@@ -132,13 +163,21 @@ export default function PublicInvoicePage() {
       } catch (err) {
         console.log('Error sharing:', err);
         // Fallback to copying URL
-        navigator.clipboard.writeText(window.location.href);
-        alert('Invoice link copied to clipboard!');
+        const success = await copyToClipboard(window.location.href);
+        if (success) {
+          alert('Invoice link copied to clipboard!');
+        } else {
+          alert('Unable to copy link. Please copy the URL manually from your browser.');
+        }
       }
     } else {
       // Fallback to copying URL
-      navigator.clipboard.writeText(window.location.href);
-      alert('Invoice link copied to clipboard!');
+      const success = await copyToClipboard(window.location.href);
+      if (success) {
+        alert('Invoice link copied to clipboard!');
+      } else {
+        alert('Unable to copy link. Please copy the URL manually from your browser.');
+      }
     }
   };
 
