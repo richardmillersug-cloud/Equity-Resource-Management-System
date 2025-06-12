@@ -8,6 +8,7 @@ import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-suppl
 import { QrCode, Plus, XCircle, BarChart3, Package, CheckCircle, Activity, Printer, Eye, Search } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
+import { Timestamp } from 'firebase/firestore';
 
 export default function BarcodePage() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -72,7 +73,8 @@ export default function BarcodePage() {
       const allSuppliers = await supplierService.getAll();
       const activeSuppliers = allSuppliers
         .filter(supplier => supplier.status === 'Active')
-        .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+        .sort((a, b) => a.supplierName.localeCompare(b.supplierName))
+        .map(supplier => ({ id: supplier.id, name: supplier.supplierName }));
       setSuppliers(activeSuppliers);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -137,8 +139,8 @@ export default function BarcodePage() {
   const handlePrintClick = (item: BarcodeItem) => {
     setSelectedItem(item);
     setPrintSettings({
-      paperWidth: item.printSettings?.paperWidth || 50.8,
-      paperHeight: item.printSettings?.paperHeight || 25.4
+      paperWidth: 50.8, // Default paper width
+      paperHeight: 25.4 // Default paper height
     });
     setShowPrintModal(true);
   };
@@ -371,11 +373,21 @@ export default function BarcodePage() {
       printWindow.document.close();
       
       // Record the print activity
+      // Create proper print settings object
+      const fullPrintSettings = {
+        width: customPrintSettings?.paperWidth || printSettings.paperWidth,
+        height: customPrintSettings?.paperHeight || printSettings.paperHeight,
+        labelSize: '2"×1"',
+        showText: true,
+        fontSize: 12,
+        margin: 2
+      };
+
       await enhancedBarcodeService.recordPrint(
         item.id,
         currentUser?.employee?.employeeId || 'EMP001',
         1,
-        customPrintSettings || printSettings
+        fullPrintSettings
       );
 
       // Refresh items to update print history
@@ -398,7 +410,7 @@ export default function BarcodePage() {
         itemName: newItem.itemName,
         category: newItem.category,
         supplierName: newItem.supplierName,
-        receivedDate: newItem.receivedDate,
+        receivedDate: Timestamp.fromDate(new Date(newItem.receivedDate)),
         codeType: newItem.codeType,
         barcodeFormat: newItem.barcodeFormat,
         labelSize: newItem.printSettings.labelSize,

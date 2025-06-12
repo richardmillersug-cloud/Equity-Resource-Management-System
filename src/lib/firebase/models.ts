@@ -153,6 +153,58 @@ export interface Supplier {
   updatedAt: Timestamp;
 }
 
+export interface Delivery {
+  id: string;
+  supplierId: string; // Reference to Supplier
+  receiverId: string; // Reference to Employee (receiver)
+  scheduledDate: Timestamp;
+  scheduledTime: string; // Time in HH:MM format
+  actualDeliveryDate?: Timestamp;
+  status: 'scheduled' | 'in-transit' | 'delivered' | 'delayed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  totalValue: number;
+  itemCount: number;
+  contactPerson: string;
+  contactPhone: string;
+  deliveryItems: DeliveryItem[];
+  notes?: string;
+  trackingNumber?: string;
+  urgent: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface DeliveryItem {
+  itemName: string;
+  quantity: number;
+  category: string;
+  unitPrice?: number;
+  totalValue?: number;
+  description?: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  itemName: string;
+  barcode?: string;
+  category: string;
+  currentStock: number;
+  restockThreshold: number;
+  maxStock?: number;
+  unitCost: number;
+  sellingPrice?: number;
+  supplierId?: string; // Reference to Supplier
+  branchId: string; // Reference to Branch
+  location?: string; // Storage location
+  lastRestocked?: Timestamp;
+  averageUsage: number; // Average daily/weekly usage
+  status: 'active' | 'discontinued' | 'out-of-stock';
+  expiryDate?: Timestamp;
+  batchNumber?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface Invoice {
   id: string;
   date: Timestamp;
