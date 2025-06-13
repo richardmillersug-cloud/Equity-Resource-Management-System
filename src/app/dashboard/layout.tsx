@@ -39,8 +39,13 @@ export default function DashboardLayout({
       setShowUserMenu(false); // Close the menu immediately
       await authService.signOut();
       // The redirect will be handled by the auth state change listener
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing out:', error);
+      
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'Failed to sign out properly';
+      alert(`Sign out error: ${errorMessage}\n\nYou will be redirected to the login page.`);
+      
       // If there's an error, still try to redirect
       router.push('/auth/login');
     }

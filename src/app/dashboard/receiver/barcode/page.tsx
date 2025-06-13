@@ -416,10 +416,10 @@ export default function BarcodePage() {
         labelSize: newItem.printSettings.labelSize,
         codeValue: codeValue,
         codeImageUrl: '',
-        status: 'active',
+        status: 'Active',
         printSettings: newItem.printSettings,
         printHistory: [],
-        itemDescription: newItem.notes || undefined,
+        itemDescription: newItem.notes || '',
         userId: currentUser?.uid || ''
       };
 

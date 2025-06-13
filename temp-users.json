@@ -1,0 +1,67 @@
+{"users": [
+{
+  "localId": "LI0MRbSPkqeqc1mT2vFwKxMxeA72",
+  "email": "xaychidesign@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "+zdRapgEBv5Uqir+qE7RAh+5aXUAunpXzBoraVGwjKd7uOqFQHTJB5maY340t4G8OEXk60KE2+Y0NzoDfAfX6Q==",
+  "salt": "p18SpDGly9+0kg==",
+  "displayName": "JOHN DEO",
+  "lastSignedInAt": "1749811568820",
+  "createdAt": "1749811568820",
+  "providerUserInfo": []
+},
+{
+  "localId": "XIW4dbKhHlatsmRPYxPgH0qSCBH2",
+  "email": "elisasaychitoleko@gmail.com",
+  "emailVerified": true,
+  "passwordHash": "cUveugrQY9a205cYKklkSGq4qA8ia5Q3I7LTcDYC/3K5VbFbEky0nz6hdQ/j/wgbCYS4pZeLwBMZINzOcl/CtQ==",
+  "salt": "k7KSf3yCHEsIzQ==",
+  "displayName": "Elisa Ssekitoleko",
+  "lastSignedInAt": "1749767517395",
+  "createdAt": "1749477603477",
+  "providerUserInfo": []
+},
+{
+  "localId": "cT4HlimiDhX0EdtiUpua3qwYcN63",
+  "email": "nsubugank@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "3pbMy+O7UDjwGpYnJgYiMK5J11fkPgSn89evkUhGe34I1obqicvfoa/Spj5ZZ6Cut/4oFcCHfV//Nxk/+mHCog==",
+  "salt": "coQMaqLHLExnXA==",
+  "displayName": "Frank Nsubuga",
+  "lastSignedInAt": "1749763108700",
+  "createdAt": "1749474473163",
+  "providerUserInfo": []
+},
+{
+  "localId": "ehkspg32mmMWcrzLEi6s1iUCNyt1",
+  "email": "john@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "G2Dg/3QNyaNpyVFusUaQl5G6CEsfBrh5t9xp50sRbQcCMwYW7ti3qYNoGz2BBRIwbRL3nJiuYt1C2NXyHkwALA==",
+  "salt": "ZgwkCXESv2BFmA==",
+  "displayName": "JOHN DEO",
+  "lastSignedInAt": "1749814933510",
+  "createdAt": "1749814933510",
+  "providerUserInfo": []
+},
+{
+  "localId": "hfaNtveXONTRl3eqYAfr6aTUjQp1",
+  "email": "xaychidesigns@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "uRTTOIfh7gPnGaCCjEPkfCOK6ZcPQCcdkLG8bgKRIesVkHGWTbBdN8amXBaPuSHrZY037unFDvUg73V350iPwQ==",
+  "salt": "zgax+yz/JRtGyA==",
+  "displayName": "JOHN DEO",
+  "lastSignedInAt": "1749809367868",
+  "createdAt": "1749809367868",
+  "providerUserInfo": []
+},
+{
+  "localId": "zJApkYx2tfc1CDDEmCTGwpXa0552",
+  "email": "elisasaychitoleko2@gmail.com",
+  "emailVerified": true,
+  "passwordHash": "U6JjuUHZXU58P71YUYPteo3HViOe/li+/lymQVIhyTbhKRZBG4nS7+FqeIG1eeze7Va+RjCtt+FRlBJh1cWEMQ==",
+  "salt": "PYfZYGhEi+eOFQ==",
+  "displayName": "kooko Ssekitol",
+  "lastSignedInAt": "1749818794430",
+  "createdAt": "1749793857840",
+  "providerUserInfo": []
+}]}

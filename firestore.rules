@@ -73,9 +73,9 @@ service cloud.firestore {
     // =====================================================
     
     match /cashAllocations/{allocationId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']);
       allow create: if hasRole('Accountant');
-      allow update: if hasRole('Accountant') && resource.data.accountantId == request.auth.uid;
+      allow update: if hasRole('Accountant');
       allow delete: if hasRole('Admin');
     }
     
@@ -83,14 +83,11 @@ service cloud.firestore {
     // FUND ACKNOWLEDGMENTS (Rule 2.1 - Purchase Managers only their funds)
     // =====================================================
     
-    match /fundAcknowledgments/{acknowledgmentId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchase Manager']) && (
-        hasRole('Admin') || 
-        hasRole('Accountant') ||
-        (hasRole('Purchase Manager') && resource.data.purchasingManagerId == request.auth.uid)
-      );
-      allow create: if hasRole('Purchase Manager');
-      allow update: if hasRole('Purchase Manager') && resource.data.purchasingManagerId == request.auth.uid;
+    match /fundAcknowledgments/{fundId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow update: if hasRole('Accountant') || 
+        (hasAnyRole(['Purchasing Manager', 'Purchase Manager']) && resource.data.fundType == 'purchasing');
       allow delete: if hasRole('Admin');
     }
     
@@ -99,8 +96,7 @@ service cloud.firestore {
     // =====================================================
     
     match /specialFundsTracker/{trackerId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant']);
-      allow write: if hasRole('Accountant');
+      allow read, write: if hasAnyRole(['Admin', 'Accountant']);
     }
     
     // =====================================================
@@ -108,10 +104,11 @@ service cloud.firestore {
     // =====================================================
     
     match /expenses/{expenseId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
-      allow create: if hasAnyRole(['Accountant', 'Manager']) && 
-        request.resource.data.amount > 0; // Rule 4.3: Amount must be > 0
-      allow update: if hasAnyRole(['Admin', 'Accountant']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']) || 
+        resource.data.employeeId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) || 
+        resource.data.employeeId == request.auth.uid;
       allow delete: if hasRole('Admin');
     }
     
@@ -120,12 +117,9 @@ service cloud.firestore {
     // =====================================================
     
     match /suppliers/{supplierId} {
-      allow read: if hasAnyRole(['Admin', 'Purchase Manager', 'Stock Manager', 'Receiver']);
-      allow create: if hasRole('Purchase Manager');
-      allow update: if hasRole('Purchase Manager') && (
-        hasRole('Admin') || 
-        resource.data.employeeId == request.auth.uid
-      );
+      allow read: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager', 'Receiver', 'Manager']);
+      allow create: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
+      allow update: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
       allow delete: if hasRole('Admin');
     }
     
@@ -134,9 +128,10 @@ service cloud.firestore {
     // =====================================================
     
     match /invoices/{invoiceId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchase Manager', 'Receiver']);
-      allow create: if hasRole('Purchase Manager', 'Receiver']);
-      allow update: if hasAnyRole(['Admin', 'Accountant', 'Receiver']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager', 'Receiver']);
+      allow create: if hasAnyRole(['Receiver', 'Admin']);
+      allow update: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager', 'Accountant']) || 
+        resource.data.receiverId == request.auth.uid;
       allow delete: if hasRole('Admin');
     }
     
@@ -145,8 +140,8 @@ service cloud.firestore {
     // =====================================================
     
     match /payments/{paymentId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
-      allow write: if hasAnyRole(['Admin', 'Accountant']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']);
+      allow write: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
     }
     
     // =====================================================
@@ -155,8 +150,8 @@ service cloud.firestore {
     
     match /restockItems/{itemId} {
       allow read: if hasAnyRole(['Admin', 'Purchase Manager', 'Stock Manager']);
-      allow create: if hasRole('Purchase Manager', 'Stock Manager']);
-      allow update: if hasRole('Purchase Manager', 'Stock Manager']);
+      allow create: if hasAnyRole(['Purchase Manager', 'Stock Manager']);
+      allow update: if hasAnyRole(['Purchase Manager', 'Stock Manager']);
       allow delete: if hasRole('Admin');
     }
     
@@ -213,10 +208,11 @@ service cloud.firestore {
     // CASH CLOSES
     // =====================================================
     
-    match /cashCloses/{cashCloseId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager']);
-      allow create: if hasAnyRole(['Accountant', 'Supervisor']);
-      allow update: if hasAnyRole(['Admin', 'Accountant']);
+    match /cashClose/{closeId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if isAuthenticated();
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) || 
+        resource.data.employeeId == request.auth.uid;
       allow delete: if hasRole('Admin');
     }
     
@@ -225,7 +221,7 @@ service cloud.firestore {
     // =====================================================
     
     match /auditLogs/{logId} {
-      allow read: if hasAnyRole(['Admin', 'Auditor']);
+      allow read: if hasAnyRole(['Admin', 'Manager', 'Auditor']);
       allow create: if isAuthenticated(); // System can create audit logs
       allow update: if false; // Audit logs are immutable
       allow delete: if hasRole('Admin'); // Only admin can delete (for cleanup)
@@ -286,8 +282,8 @@ service cloud.firestore {
     // =====================================================
     
     match /reports/{reportId} {
-      allow read: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'HR', 'Auditor']);
-      allow create: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'HR']);
+      allow read: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Admin', 'Manager', 'Accountant']);
       allow update: if hasAnyRole(['Admin', 'Manager']);
       allow delete: if hasRole('Admin');
     }
@@ -299,6 +295,41 @@ service cloud.firestore {
     match /backups/{backupId} {
       allow read: if hasRole('Admin');
       allow write: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // EXPENSE REQUESTS
+    // =====================================================
+    
+    match /expenseRequests/{requestId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']) || 
+        resource.data.submittedBy == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) || 
+        resource.data.submittedBy == request.auth.uid;
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // CHEQUE TRACKER
+    // =====================================================
+    
+    match /chequeTracker/{chequeId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // INSTALLMENT PLANS
+    // =====================================================
+    
+    match /installmentPlans/{planId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow delete: if hasRole('Admin');
     }
     
     // =====================================================

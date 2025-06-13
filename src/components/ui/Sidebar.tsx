@@ -26,7 +26,16 @@ import {
   ChevronDown,
   Plus,
   Eye,
-  RefreshCw
+  RefreshCw,
+  CreditCard,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Banknote,
+  Smartphone,
+  Calendar,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -115,25 +124,53 @@ const navigationItems: NavigationItem[] = [
   
   // Purchase Manager specific
   { 
+    id: 'pm-dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'PM Dashboard', 
+    path: '/dashboard/purchase-manager',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'invoices', 
+    icon: <FileText className="w-5 h-5" />, 
+    label: 'Invoices', 
+    path: '/dashboard/purchase-manager/invoices',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'expenses', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'Expenses', 
+    path: '/dashboard/purchase-manager/expenses',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'payments', 
+    icon: <CreditCard className="w-5 h-5" />, 
+    label: 'Payments', 
+    path: '/dashboard/purchase-manager/payments',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
     id: 'suppliers', 
     icon: <Building2 className="w-5 h-5" />, 
     label: 'Suppliers', 
-    path: '/dashboard/purchase-manager',
-    roles: ['Purchase Manager', 'Admin']
+    path: '/dashboard/purchase-manager/suppliers',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'fund-acknowledgments', 
-    icon: <DollarSign className="w-5 h-5" />, 
-    label: 'Fund Acknowledgments', 
-    path: '/purchase-manager/funds',
-    roles: ['Purchase Manager', 'Admin']
+    id: 'cash-tracking', 
+    icon: <Smartphone className="w-5 h-5" />, 
+    label: 'Cash Tracking', 
+    path: '/dashboard/purchase-manager/cash-tracking',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'restock-items', 
-    icon: <Package className="w-5 h-5" />, 
-    label: 'Restock Items', 
-    path: '/purchase-manager/restock',
-    roles: ['Purchase Manager', 'Stock Manager', 'Admin']
+    id: 'pm-expenses-old', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'Expense Approvals', 
+    path: '/dashboard/purchase-manager/expense-approvals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   
   // HR specific
@@ -267,7 +304,7 @@ const navigationItems: NavigationItem[] = [
     icon: <Settings className="w-5 h-5" />, 
     label: 'Settings', 
     path: '/dashboard/settings',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor']
+    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor', 'User', '*']
   }
 ];
 
@@ -280,12 +317,23 @@ interface ExpectedSupplier {
   priority: 'high' | 'medium' | 'low';
 }
 
+interface PMQuickAction {
+  id: string;
+  title: string;
+  count: number;
+  type: 'pending-invoices' | 'pending-expenses' | 'overdue-payments' | 'cash-shortage';
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [expectedSuppliers, setExpectedSuppliers] = useState<ExpectedSupplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [pmQuickActions, setPMQuickActions] = useState<PMQuickAction[]>([]);
+  const [loadingPMActions, setLoadingPMActions] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -299,11 +347,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       if (user && user.employee?.roles?.[0]?.jobTitle === 'Receiver') {
         loadExpectedSuppliers();
       }
+      // Load PM quick actions when user changes and is a purchasing manager
+      const userRole = user?.employee?.roles?.[0]?.jobTitle;
+      if (user && (userRole === 'Purchase Manager' || userRole === 'Purchasing Manager')) {
+        loadPMQuickActions();
+      }
     });
 
     // Load expected suppliers immediately if user is already a receiver
     if (user && user.employee?.roles?.[0]?.jobTitle === 'Receiver') {
       loadExpectedSuppliers();
+    }
+
+    // Load PM quick actions immediately if user is already a purchasing manager
+    const userRole = user?.employee?.roles?.[0]?.jobTitle;
+    if (user && (userRole === 'Purchase Manager' || userRole === 'Purchasing Manager')) {
+      loadPMQuickActions();
     }
 
     return unsubscribe;
@@ -366,6 +425,57 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     }
   };
 
+  const loadPMQuickActions = async () => {
+    const userRole = getUserRole();
+    if (userRole !== 'Purchase Manager' && userRole !== 'Purchasing Manager') return;
+    
+    setLoadingPMActions(true);
+    try {
+      // Mock data for now - in real implementation, this would fetch from Firebase
+      const mockActions: PMQuickAction[] = [
+        {
+          id: 'pending-invoices',
+          title: 'Pending Invoices',
+          count: 5,
+          type: 'pending-invoices',
+          priority: 'high',
+          action: 'Approve/Reject'
+        },
+        {
+          id: 'pending-expenses',
+          title: 'Expense Approvals',
+          count: 3,
+          type: 'pending-expenses',
+          priority: 'medium',
+          action: 'Review'
+        },
+        {
+          id: 'overdue-payments',
+          title: 'Overdue Payments',
+          count: 2,
+          type: 'overdue-payments',
+          priority: 'high',
+          action: 'Process'
+        },
+        {
+          id: 'cash-shortage',
+          title: 'Cash Shortages',
+          count: 1,
+          type: 'cash-shortage',
+          priority: 'high',
+          action: 'Investigate'
+        }
+      ];
+      
+      setPMQuickActions(mockActions.filter(action => action.count > 0));
+    } catch (error) {
+      console.error('Error loading PM quick actions:', error);
+      setPMQuickActions([]);
+    } finally {
+      setLoadingPMActions(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'on-time': return 'bg-green-100 text-green-700 border-green-200';
@@ -399,7 +509,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   const getFilteredNavigationItems = (): NavigationItem[] => {
     const userRole = getUserRole();
     return navigationItems.filter(item => 
-      item.roles.includes(userRole) || item.roles.includes('*')
+      item.roles.includes(userRole) || 
+      item.roles.includes('*') ||
+      item.id === 'settings' // Always show settings
     );
   };
 
@@ -415,6 +527,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       }
       setOpenDropdowns(newOpenDropdowns);
       // Still navigate to the main deliveries page
+      if (item.path) {
+        if (onItemClick) {
+          onItemClick(item.id);
+        } else {
+          router.push(item.path);
+        }
+      }
+    }
+    // Special handling for PM dashboard item for purchasing managers
+    else if (item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager')) {
+      // Toggle dropdown for quick actions
+      const newOpenDropdowns = new Set(openDropdowns);
+      if (newOpenDropdowns.has(item.id)) {
+        newOpenDropdowns.delete(item.id);
+      } else {
+        newOpenDropdowns.add(item.id);
+      }
+      setOpenDropdowns(newOpenDropdowns);
+      // Still navigate to the main PM dashboard
       if (item.path) {
         if (onItemClick) {
           onItemClick(item.id);
@@ -522,8 +653,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
               </span>
             )}
 
-              {/* Dropdown arrow - only show when expanded and has submenu OR is deliveries for receiver */}
-              {isExpanded && (item.submenu || (item.id === 'deliveries' && getUserRole() === 'Receiver')) && (
+              {/* Dropdown arrow - only show when expanded and has submenu OR is deliveries for receiver OR is pm-dashboard for PM */}
+              {isExpanded && (item.submenu || 
+                (item.id === 'deliveries' && getUserRole() === 'Receiver') ||
+                (item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager'))
+              ) && (
                 <ChevronDown 
                   className={`w-4 h-4 transition-transform duration-200 ${
                     openDropdowns.has(item.id) ? 'rotate-180' : ''
@@ -535,6 +669,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
               {!isExpanded && item.id === 'deliveries' && getUserRole() === 'Receiver' && expectedSuppliers.length > 0 && (
                 <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {expectedSuppliers.length}
+                </div>
+              )}
+
+              {/* PM quick actions count badge for pm-dashboard - only when collapsed */}
+              {!isExpanded && item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager') && pmQuickActions.length > 0 && (
+                <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {pmQuickActions.reduce((sum, action) => sum + action.count, 0)}
                 </div>
               )}
             
@@ -644,6 +785,98 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                   >
                     <RefreshCw className="w-3 h-3 text-blue-600 mr-2" />
                     <span className="text-xs font-medium text-blue-700">Refresh</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PM Quick Actions List - Special for pm-dashboard when purchasing manager */}
+            {isExpanded && item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager') && openDropdowns.has(item.id) && (
+              <div className="ml-6 mt-2 space-y-2">
+                {/* Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span className="text-xs font-semibold text-orange-900">Quick Actions</span>
+                  </div>
+                  <span className="text-xs text-orange-600 font-medium">{getCurrentTime()}</span>
+                </div>
+
+                {/* Loading State */}
+                {loadingPMActions && (
+                  <div className="px-3 py-4 text-center">
+                    <div className="animate-spin w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <span className="text-xs text-gray-500">Loading actions...</span>
+                  </div>
+                )}
+
+                {/* Quick Actions List */}
+                {!loadingPMActions && pmQuickActions.length > 0 && (
+                  <div className="max-h-64 overflow-y-auto space-y-1">
+                    {pmQuickActions.map((action) => (
+                      <div
+                        key={action.id}
+                        className="px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (action.type === 'pending-invoices') {
+                            router.push('/dashboard/purchase-manager?tab=invoices&filter=pending');
+                          } else if (action.type === 'pending-expenses') {
+                            router.push('/dashboard/purchase-manager?tab=expenses');
+                          } else if (action.type === 'overdue-payments') {
+                            router.push('/dashboard/purchase-manager?tab=payments&view=overdue');
+                          } else if (action.type === 'cash-shortage') {
+                            router.push('/dashboard/purchase-manager?tab=cash-tracking');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs">{getPriorityIcon(action.priority)}</span>
+                            <span className="text-xs font-medium text-gray-900 truncate" title={action.title}>
+                              {action.title.length > 12 ? action.title.substring(0, 12) + '...' : action.title}
+                            </span>
+                          </div>
+                          <span className="text-xs font-bold text-orange-600">{action.count}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-600">{action.action}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                            action.priority === 'high' ? 'bg-red-100 text-red-700 border-red-200' :
+                            action.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                            'bg-green-100 text-green-700 border-green-200'
+                          }`}>
+                            {action.priority.charAt(0).toUpperCase() + action.priority.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* No Actions */}
+                {!loadingPMActions && pmQuickActions.length === 0 && (
+                  <div className="px-3 py-4 text-center">
+                    <div className="text-gray-400 mb-2">✅</div>
+                    <span className="text-xs text-gray-500">All caught up!</span>
+                  </div>
+                )}
+
+                {/* Quick Actions Buttons */}
+                <div className="border-t border-gray-200 pt-2 space-y-1">
+                  <button
+                    onClick={() => router.push('/dashboard/purchase-manager')}
+                    className="w-full h-8 rounded-lg flex items-center px-3 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                  >
+                    <Eye className="w-3 h-3 text-emerald-600 mr-2" />
+                    <span className="text-xs font-medium text-emerald-700">View Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => loadPMQuickActions()}
+                    className="w-full h-8 rounded-lg flex items-center px-3 bg-orange-50 hover:bg-orange-100 transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3 text-orange-600 mr-2" />
+                    <span className="text-xs font-medium text-orange-700">Refresh</span>
                   </button>
                 </div>
               </div>
