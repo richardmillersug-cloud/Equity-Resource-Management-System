@@ -88,26 +88,42 @@ export const getCurrentUserId = (): string | null => {
 
 export const getCurrentUserRole = (): string | null => {
   const user = authService.getCurrentUser();
-  return user?.employee?.roles?.[0]?.jobTitle || null;
+  const role = user?.employee?.roles?.[0]?.jobTitle || null;
+  console.log('🔍 getCurrentUserRole - User:', user?.email, 'Role:', role);
+  console.log('🔍 Full user object:', JSON.stringify(user, null, 2));
+  return role;
 };
 
 export const hasPermission = (action: string): boolean => {
   const role = getCurrentUserRole();
-  if (!role) return false;
+  console.log('🔍 Permission check - Role:', role, 'Action:', action);
+  
+  if (!role) {
+    console.log('❌ No role found for user');
+    return false;
+  }
 
   const permissions: Record<string, string[]> = {
     'Admin': ['*'], // All permissions
     'Manager': ['VIEW_ALL_BRANCHES', 'VIEW_PERFORMANCE', 'MANAGE_EMPLOYEES'],
     'Accountant': ['CREATE_CASH_ALLOCATION', 'MANAGE_EXPENSES', 'VIEW_FINANCIAL_DATA'],
+    'Managing Director': ['VIEW_FINANCIAL_DATA', 'VIEW_ALL_BRANCHES', 'VIEW_PERFORMANCE'],
     'Purchase Manager': ['ACKNOWLEDGE_FUNDS', 'MANAGE_SUPPLIERS', 'MANAGE_RESTOCK'],
+    'Purchasing Manager': ['ACKNOWLEDGE_FUNDS', 'MANAGE_SUPPLIERS', 'MANAGE_RESTOCK'], // Added alias
     'HR': ['MANAGE_EMPLOYEES', 'VIEW_ATTENDANCE', 'MANAGE_LEAVE'],
     'Stock Manager': ['MANAGE_INVENTORY', 'VIEW_DAMAGE_REPORTS'],
     'Receiver': ['MANAGE_DELIVERIES', 'PROCESS_RETURNS'],
-    'Auditor': ['VIEW_AUDIT_TRAIL', 'VIEW_ALL_DATA']
+    'Auditor': ['VIEW_AUDIT_TRAIL', 'VIEW_ALL_DATA'],
+    'Supervisor': ['VIEW_ATTENDANCE', 'MANAGE_DELIVERIES'] // Added supervisor permissions
   };
 
   const userPermissions = permissions[role] || [];
-  return userPermissions.includes('*') || userPermissions.includes(action);
+  const hasPermission = userPermissions.includes('*') || userPermissions.includes(action);
+  
+  console.log('🔍 User permissions:', userPermissions);
+  console.log(hasPermission ? '✅ Permission granted' : '❌ Permission denied');
+  
+  return hasPermission;
 };
 
 // =====================================================
@@ -214,8 +230,17 @@ export class AccountantQueries {
   // Cash Allocations (Rule 1.1 - only accountants can create)
   static async getCashAllocations() {
     const userId = getCurrentUserId();
-    if (!userId || !hasPermission('CREATE_CASH_ALLOCATION')) {
-      throw new Error('Unauthorized access');
+    const userRole = getCurrentUserRole();
+    
+    console.log('🔍 getCashAllocations - UserID:', userId, 'Role:', userRole);
+    
+    if (!userId) {
+      throw new Error('No authenticated user found');
+    }
+    
+    if (!hasPermission('VIEW_FINANCIAL_DATA')) {
+      console.log('❌ Permission denied for user role:', userRole);
+      throw new Error(`Unauthorized access - Role '${userRole}' does not have permission to view financial data`);
     }
 
     const q = query(
@@ -304,7 +329,7 @@ export class AccountantQueries {
   // Real-time subscription for cash allocations
   static subscribeCashAllocations(callback: (data: any[]) => void) {
     const userId = getCurrentUserId();
-    if (!userId || !hasPermission('CREATE_CASH_ALLOCATION')) {
+    if (!userId || !hasPermission('VIEW_FINANCIAL_DATA')) {
       throw new Error('Unauthorized access');
     }
 
