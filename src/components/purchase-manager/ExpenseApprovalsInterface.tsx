@@ -27,6 +27,7 @@ import {
   X
 } from 'lucide-react';
 import { ExpenseApproval, subscribeToExpenseApprovals, approveExpense, rejectExpense } from '../../lib/firebase/purchasing-manager-service';
+import { authService } from '../../lib/firebase/auth';
 
 interface ExpenseApprovalsInterfaceProps {
   className?: string;
@@ -177,14 +178,17 @@ export const ExpenseApprovalsInterface: React.FC<ExpenseApprovalsInterfaceProps>
     if (!selectedExpense) return;
 
     try {
+      const currentUser = authService.getCurrentUser();
+      const currentUserId = currentUser?.uid || 'anonymous-user';
+
       if (approvalAction === 'approve') {
-        await approveExpense(selectedExpense.id, 'current-user-id'); // Replace with actual user ID
+        await approveExpense(selectedExpense.id, currentUserId);
       } else {
         if (!rejectionReason.trim()) {
           alert('Please provide a reason for rejection');
           return;
         }
-        await rejectExpense(selectedExpense.id, 'current-user-id', rejectionReason);
+        await rejectExpense(selectedExpense.id, currentUserId, rejectionReason);
       }
       
       setShowApprovalModal(false);

@@ -23,12 +23,14 @@ import {
   CheckCircle2,
   Copy
 } from 'lucide-react';
-import { Invoice, subscribeToInvoices, approveInvoice, rejectInvoice, payInvoice, PaymentMethod, Payment, subscribeToPayments } from '../../../../lib/firebase/purchasing-manager-service';
+import { Invoice, subscribeToInvoices, approveInvoice, rejectInvoice, PaymentMethod, InvoicePayment, subscribeToInvoicePayments, makeInvoicePayment, getInvoicePaymentHistory } from '../../../../lib/firebase/purchasing-manager-service';
+import { authService } from '../../../../lib/firebase/auth';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [invoicePayments, setInvoicePayments] = useState<InvoicePayment[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<InvoicePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -59,8 +61,8 @@ export default function InvoicesPage() {
       setLoading(false);
     });
 
-    const unsubscribePayments = subscribeToPayments((paymentData) => {
-      setPayments(paymentData);
+    const unsubscribePayments = subscribeToInvoicePayments((paymentData) => {
+      setInvoicePayments(paymentData);
     });
 
     return () => {
@@ -73,35 +75,24 @@ export default function InvoicesPage() {
     let filtered = [...invoices];
 
     if (statusFilter !== 'all') {
-      if (statusFilter === 'partial') {
-        // Filter for invoices with partial payments
-        filtered = filtered.filter(invoice => {
-          const paid = getTotalPaidAmount(invoice.id);
-          const remaining = getRemainingAmount(invoice);
-          return paid > 0 && remaining > 0;
-        });
-      } else if (statusFilter === 'unpaid') {
-        // Filter for invoices with no payments
-        filtered = filtered.filter(invoice => getTotalPaidAmount(invoice.id) === 0);
-      } else {
-        // Filter by invoice status
-        filtered = filtered.filter(invoice => invoice.status === statusFilter);
-      }
+      filtered = filtered.filter(invoice => invoice.status === statusFilter);
     }
 
     if (searchTerm) {
       filtered = filtered.filter(invoice =>
-        invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())
+        (invoice.supplierName && invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (invoice.invoiceNumber && invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
     setFilteredInvoices(filtered);
-  }, [invoices, statusFilter, searchTerm, payments]);
+  }, [invoices, statusFilter, searchTerm]);
 
   const handleApprove = async (invoiceId: string) => {
     try {
-      await approveInvoice(invoiceId, 'current-user-id');
+      const currentUser = authService.getCurrentUser();
+      const currentUserId = currentUser?.uid || 'anonymous-user';
+      await approveInvoice(invoiceId, currentUserId);
     } catch (error) {
       console.error('Error approving invoice:', error);
     }
@@ -109,13 +100,19 @@ export default function InvoicesPage() {
 
   const handleReject = async (invoiceId: string) => {
     try {
-      await rejectInvoice(invoiceId, 'current-user-id', 'Rejected by purchasing manager');
+      const currentUser = authService.getCurrentUser();
+      const currentUserId = currentUser?.uid || 'anonymous-user';
+      await rejectInvoice(invoiceId, currentUserId, 'Rejected by purchasing manager');
     } catch (error) {
       console.error('Error rejecting invoice:', error);
     }
   };
 
   const generatePaymentReference = (invoice: Invoice, paymentMethod: string) => {
+    if (!invoice || !paymentMethod) {
+      throw new Error('Invoice and payment method are required');
+    }
+
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -134,39 +131,38 @@ export default function InvoicesPage() {
     }[paymentMethod] || 'PAY';
     
     // Invoice number (last 4 characters or full if shorter)
-    const invoiceRef = invoice.invoiceNumber.slice(-4).toUpperCase();
+    const invoiceNumber = invoice.invoiceNumber || 'UNKNOWN';
+    const invoiceRef = invoiceNumber.slice(-4).toUpperCase();
     
-    // Generate unique reference with retry logic
-    let reference: string;
-    let attempts = 0;
-    const maxAttempts = 10;
+    // Get next installment number
+    const nextInstallment = (invoice.paymentCount || 0) + 1;
     
-    do {
-      const sequence = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      reference = `${methodPrefix}-${year}${month}${day}${hours}${minutes}-${invoiceRef}-${sequence}`;
-      attempts++;
-    } while (
-      payments.some(payment => payment.reference === reference) && 
-      attempts < maxAttempts
-    );
-    
-    // If still not unique after max attempts, add timestamp
-    if (payments.some(payment => payment.reference === reference)) {
-      const timestamp = Date.now().toString().slice(-4);
-      reference = `${methodPrefix}-${year}${month}${day}${hours}${minutes}-${invoiceRef}-${timestamp}`;
-    }
-    
-    return reference;
+    // Generate reference: METHOD-YYMMDDHHNN-INVOICE-INSTALLMENT
+    return `${methodPrefix}-${year}${month}${day}${hours}${minutes}-${invoiceRef}-${nextInstallment.toString().padStart(2, '0')}`;
   };
 
-  const handleMakePayment = (invoice: Invoice) => {
+  const handleMakePayment = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    const remainingAmount = getRemainingAmount(invoice);
-    setPaymentAmount(remainingAmount > 0 ? remainingAmount.toString() : invoice.amount.toString());
+    const remainingAmount = invoice.remainingAmount || invoice.amount;
+    setPaymentAmount(remainingAmount.toString());
     
     // Generate initial reference number with default method (cash)
-    const initialReference = generatePaymentReference(invoice, 'cash');
-    setPaymentReference(initialReference);
+    try {
+      const initialReference = generatePaymentReference(invoice, 'cash');
+      setPaymentReference(initialReference);
+    } catch (error) {
+      console.error('Error generating initial payment reference:', error);
+      setPaymentReference('');
+    }
+    
+    // Get payment history for this invoice
+    try {
+      const history = await getInvoicePaymentHistory(invoice.id);
+      setPaymentHistory(history || []);
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+      setPaymentHistory([]);
+    }
     
     setPaymentError('');
     setPaymentSuccess('');
@@ -179,14 +175,10 @@ export default function InvoicesPage() {
     }
 
     const amount = parseFloat(paymentAmount);
-    const invoiceAmount = selectedInvoice?.amount || 0;
+    const remainingAmount = selectedInvoice?.remainingAmount || selectedInvoice?.amount || 0;
 
-    if (!isPartialPayment && amount !== invoiceAmount) {
-      return 'Payment amount must equal invoice amount for full payment';
-    }
-
-    if (isPartialPayment && amount > invoiceAmount) {
-      return 'Payment amount cannot exceed invoice amount';
+    if (amount > remainingAmount) {
+      return 'Payment amount cannot exceed remaining amount';
     }
 
     switch (paymentMethod) {
@@ -238,7 +230,6 @@ export default function InvoicesPage() {
 
     try {
       const amount = parseFloat(paymentAmount);
-      const balance = isPartialPayment ? selectedInvoice.amount - amount : 0;
 
       const paymentMethodData: PaymentMethod = {
         type: paymentMethod as PaymentMethod['type'],
@@ -252,28 +243,36 @@ export default function InvoicesPage() {
             bankAccount, 
             bankName 
           }),
-                     ...(paymentMethod === 'mobile_money' && { 
-             mobileNumber,
-             transactionId 
-           }),
-           ...((['momo', 'airtel_pay'].includes(paymentMethod)) && { 
-             mobileNumber,
-             transactionId,
-             merchantCode
-           }),
-          referenceNumber: paymentReference
+          ...(paymentMethod === 'mobile_money' && { 
+            mobileNumber,
+            transactionId 
+          }),
+          ...((['momo', 'airtel_pay'].includes(paymentMethod)) && { 
+            mobileNumber,
+            transactionId,
+            referenceNumber: merchantCode
+          }),
         },
         amount,
-        balance,
-        status: 'pending' as const
+        status: 'cleared' as const
       };
 
-      // Process payment through Firebase service
-      await payInvoice(
+      // Get current user ID and name
+      const currentUser = authService.getCurrentUser();
+      const currentUserId = currentUser?.uid || 'anonymous-user';
+      const currentUserName = currentUser?.displayName || 
+                             (currentUser?.employee ? 
+                              `${currentUser.employee.firstName} ${currentUser.employee.lastName}` : 
+                              'Unknown User');
+
+      // Process payment through new Firebase service
+      await makeInvoicePayment(
         selectedInvoice.id, 
+        amount,
         paymentMethodData, 
-        'current-user-id', // This should be replaced with actual user ID
-        isPartialPayment
+        currentUserId,
+        currentUserName,
+        paymentNotes
       );
 
       setPaymentSuccess(`Payment of ${formatCurrency(amount)} processed successfully!`);
@@ -309,22 +308,11 @@ export default function InvoicesPage() {
   };
 
   const getInvoicePayments = (invoiceId: string) => {
-    return payments.filter(payment => 
-      payment.reference.includes(invoiceId) || 
-      payment.description?.includes(invoiceId)
-    );
+    return invoicePayments.filter(payment => payment.invoiceId === invoiceId);
   };
 
-  const getTotalPaidAmount = (invoiceId: string) => {
-    const invoicePayments = getInvoicePayments(invoiceId);
-    return invoicePayments
-      .filter(payment => payment.status === 'completed')
-      .reduce((total, payment) => total + payment.amount, 0);
-  };
-
-  const getRemainingAmount = (invoice: Invoice) => {
-    const totalPaid = getTotalPaidAmount(invoice.id);
-    return Math.max(0, invoice.amount - totalPaid);
+  const getPaymentCount = (invoiceId: string) => {
+    return getInvoicePayments(invoiceId).length;
   };
 
   const copyToClipboard = async (text: string) => {
@@ -408,6 +396,7 @@ export default function InvoicesPage() {
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'approved': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'paid': return 'bg-green-100 text-green-800 border-green-200';
+      case 'partial': return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -418,6 +407,7 @@ export default function InvoicesPage() {
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'approved': return <CheckCircle className="w-4 h-4" />;
       case 'paid': return <CheckCircle className="w-4 h-4" />;
+      case 'partial': return <DollarSign className="w-4 h-4" />;
       case 'rejected': return <XCircle className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
@@ -466,7 +456,7 @@ export default function InvoicesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Invoices</p>
-                <p className="text-2xl font-bold text-gray-900">{invoices.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{(invoices || []).length}</p>
               </div>
               <FileText className="w-8 h-8 text-gray-400" />
             </div>
@@ -477,7 +467,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Approval</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {invoices.filter(i => i.status === 'pending').length}
+                  {(invoices || []).filter(i => i.status === 'pending').length}
                 </p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
@@ -489,7 +479,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Approved</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {invoices.filter(i => i.status === 'approved').length}
+                  {(invoices || []).filter(i => i.status === 'approved').length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-blue-500" />
@@ -499,38 +489,27 @@ export default function InvoicesPage() {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Value</p>
-                <p className="text-xl font-bold text-green-600">
-                  {formatCurrency(invoices.reduce((sum, i) => sum + i.amount, 0))}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Outstanding: {formatCurrency(invoices.reduce((sum, i) => sum + getRemainingAmount(i), 0))}
+                <p className="text-sm font-medium text-gray-600">Partial Payments</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {(invoices || []).filter(i => i.status === 'partial').length}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
+              <Receipt className="w-8 h-8 text-orange-500" />
             </div>
           </div>
           
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Partial Payments</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {invoices.filter(i => {
-                    const paid = getTotalPaidAmount(i.id);
-                    const remaining = getRemainingAmount(i);
-                    return paid > 0 && remaining > 0;
-                  }).length}
+                <p className="text-sm font-medium text-gray-600">Total Value</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency((invoices || []).reduce((sum, i) => sum + i.amount, 0))}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {formatCurrency(invoices.filter(i => {
-                    const paid = getTotalPaidAmount(i.id);
-                    const remaining = getRemainingAmount(i);
-                    return paid > 0 && remaining > 0;
-                  }).reduce((sum, i) => sum + getTotalPaidAmount(i.id), 0))} collected
+                  Outstanding: {formatCurrency((invoices || []).reduce((sum, i) => sum + (i.remainingAmount || i.amount), 0))}
                 </p>
               </div>
-              <Receipt className="w-8 h-8 text-orange-500" />
+              <DollarSign className="w-8 h-8 text-green-500" />
             </div>
           </div>
         </div>
@@ -559,9 +538,8 @@ export default function InvoicesPage() {
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="paid">Paid</option>
-              <option value="rejected">Rejected</option>
               <option value="partial">Partial Payment</option>
-              <option value="unpaid">Unpaid</option>
+              <option value="rejected">Rejected</option>
             </select>
             <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
               <Download className="w-4 h-4" />
@@ -574,11 +552,11 @@ export default function InvoicesPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              Invoices ({filteredInvoices.length})
+              Invoices ({(filteredInvoices || []).length})
             </h2>
           </div>
           
-          {filteredInvoices.length === 0 ? (
+          {!filteredInvoices || filteredInvoices.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
@@ -596,10 +574,10 @@ export default function InvoicesPage() {
                       Supplier
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                      Amount & Payments
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Balance
+                      Payment Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Due Date
@@ -613,7 +591,7 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredInvoices.map((invoice) => (
+                  {(filteredInvoices || []).map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -632,52 +610,61 @@ export default function InvoicesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(invoice.amount)}
-                        </div>
-                        {getTotalPaidAmount(invoice.id) > 0 && (
-                          <div className="text-xs text-green-600">
-                            Paid: {formatCurrency(getTotalPaidAmount(invoice.id))}
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            Total: {formatCurrency(invoice.amount)}
                           </div>
-                        )}
+                          {(invoice.paidAmount || 0) > 0 && (
+                            <div className="text-xs text-green-600 font-medium">
+                              Paid: {formatCurrency(invoice.paidAmount || 0)}
+                            </div>
+                          )}
+                          {(invoice.remainingAmount || invoice.amount) > 0 && invoice.status !== 'paid' && (
+                            <div className="text-xs text-red-600 font-medium">
+                              Due: {formatCurrency(invoice.remainingAmount || invoice.amount)}
+                            </div>
+                          )}
+                          {(invoice.paymentCount || 0) > 0 && (
+                            <div className="text-xs text-blue-600">
+                              {invoice.paymentCount} installment{(invoice.paymentCount || 0) > 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
-                          const remainingAmount = getRemainingAmount(invoice);
-                          const totalPaid = getTotalPaidAmount(invoice.id);
+                          const paidAmount = invoice.paidAmount || 0;
+                          const remainingAmount = invoice.remainingAmount || invoice.amount;
                           
-                          if (totalPaid === 0) {
-                            // No payments made
-                            return (
-                              <div className="text-sm font-medium text-gray-900">
-                                {formatCurrency(invoice.amount)}
-                              </div>
-                            );
-                          } else if (remainingAmount === 0) {
-                            // Fully paid
+                          if (invoice.status === 'paid') {
                             return (
                               <div className="flex items-center space-x-1">
-                                <span className="text-sm font-medium text-green-600">Paid</span>
+                                <span className="text-sm font-medium text-green-600">Fully Paid</span>
                                 <CheckCircle className="w-4 h-4 text-green-500" />
                               </div>
                             );
-                          } else {
-                            // Partial payment
-                            const paymentPercentage = (totalPaid / invoice.amount) * 100;
+                          } else if (invoice.status === 'partial') {
+                            const paymentPercentage = (paidAmount / invoice.amount) * 100;
                             return (
                               <div>
-                                <div className="text-sm font-medium text-red-600">
-                                  {formatCurrency(remainingAmount)}
+                                <div className="text-sm font-medium text-orange-600">
+                                  {formatCurrency(remainingAmount)} remaining
                                 </div>
                                 <div className="text-xs text-gray-500 mb-1">
                                   {paymentPercentage.toFixed(1)}% paid
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                                   <div 
-                                    className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                                    className="bg-orange-500 h-1.5 rounded-full transition-all duration-300"
                                     style={{ width: `${paymentPercentage}%` }}
                                   />
                                 </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="text-sm font-medium text-gray-900">
+                                {formatCurrency(invoice.amount)} due
                               </div>
                             );
                           }
@@ -698,48 +685,76 @@ export default function InvoicesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-1">
                           <button 
                             onClick={() => {
                               setSelectedInvoice(invoice);
+                              setPaymentHistory([]);
                               setShowModal(true);
                             }}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View Invoice"
+                            className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
+                            title="View Invoice Details"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          
+                          {(invoice.paymentCount || 0) > 0 && (
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  const history = await getInvoicePaymentHistory(invoice.id);
+                                  setPaymentHistory(history || []);
+                                  setSelectedInvoice(invoice);
+                                  setShowModal(true);
+                                } catch (error) {
+                                  console.error('Error fetching payment history:', error);
+                                  setPaymentHistory([]);
+                                }
+                              }}
+                              className="p-1 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded"
+                              title={`View ${invoice.paymentCount} Payment${(invoice.paymentCount || 0) > 1 ? 's' : ''}`}
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+                          )}
+                          
+                          <button 
+                            onClick={() => handleMakePayment(invoice)}
+                            className={`p-1 rounded ${
+                              invoice.status !== 'paid' 
+                                ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
+                                : 'text-gray-400 cursor-not-allowed'
+                            }`}
+                            title={
+                              invoice.status === 'paid' ? 'Fully Paid' :
+                              invoice.status === 'partial' ? `Pay Remaining ${formatCurrency(invoice.remainingAmount || 0)}` :
+                              `Make Payment - ${formatCurrency(invoice.amount)}`
+                            }
+                            disabled={invoice.status === 'paid'}
+                          >
+                            <CreditCard className="w-4 h-4" />
+                          </button>
+                          
                           <button 
                             onClick={() => handlePrintInvoice(invoice)}
-                            className="text-gray-600 hover:text-gray-900"
+                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded"
                             title="Print Invoice"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={() => handleMakePayment(invoice)}
-                            className={`${
-                              getRemainingAmount(invoice) > 0 
-                                ? 'text-green-600 hover:text-green-900' 
-                                : 'text-gray-400 cursor-not-allowed'
-                            }`}
-                            title={getRemainingAmount(invoice) > 0 ? 'Make Payment' : 'Fully Paid'}
-                            disabled={getRemainingAmount(invoice) === 0}
-                          >
-                            <CreditCard className="w-4 h-4" />
-                          </button>
+                          
                           {invoice.status === 'pending' && (
                             <>
                               <button 
                                 onClick={() => handleApprove(invoice.id)}
-                                className="text-green-600 hover:text-green-900"
+                                className="p-1 text-green-600 hover:text-green-900 hover:bg-green-50 rounded"
                                 title="Approve Invoice"
                               >
                                 <CheckCircle className="w-4 h-4" />
                               </button>
                               <button 
                                 onClick={() => handleReject(invoice.id)}
-                                className="text-red-600 hover:text-red-900"
+                                className="p-1 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
                                 title="Reject Invoice"
                               >
                                 <XCircle className="w-4 h-4" />
@@ -771,47 +786,102 @@ export default function InvoicesPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Invoice Information</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Invoice Number:</span>
-                        <span className="font-medium">{selectedInvoice.invoiceNumber}</span>
+                <div className="space-y-6">
+                  {/* Payment Summary */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Payment Summary
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-900">{formatCurrency(selectedInvoice.amount)}</div>
+                        <div className="text-sm text-gray-600">Total Amount</div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Supplier:</span>
-                        <span className="font-medium">{selectedInvoice.supplierName}</span>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(selectedInvoice.paidAmount || 0)}</div>
+                        <div className="text-sm text-gray-600">Paid Amount</div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Amount:</span>
-                        <span className="font-medium">{formatCurrency(selectedInvoice.amount)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Paid Amount:</span>
-                        <span className="font-medium text-green-600">{formatCurrency(getTotalPaidAmount(selectedInvoice.id))}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Remaining:</span>
-                        <span className="font-medium text-red-600">{formatCurrency(getRemainingAmount(selectedInvoice))}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Due Date:</span>
-                        <span className="font-medium">{formatDate(selectedInvoice.dueDate)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Status:</span>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(selectedInvoice.status)}`}>
-                          {selectedInvoice.status.charAt(0).toUpperCase() + selectedInvoice.status.slice(1)}
-                        </span>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</div>
+                        <div className="text-sm text-gray-600">Remaining</div>
                       </div>
                     </div>
+                    
+                    {/* Payment Progress Bar */}
+                    {(selectedInvoice.paidAmount || 0) > 0 && (
+                      <div className="mt-4">
+                        <div className="flex justify-between text-sm text-gray-600 mb-1">
+                          <span>Payment Progress</span>
+                          <span>{(((selectedInvoice.paidAmount || 0) / selectedInvoice.amount) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${((selectedInvoice.paidAmount || 0) / selectedInvoice.amount) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-sm">
+                          <span className="text-gray-600">Installments:</span>
+                          <span className="font-medium ml-1">{selectedInvoice.paymentCount || 0}</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-gray-600">Status:</span>
+                          <span className={`ml-1 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(selectedInvoice.status)}`}>
+                            {selectedInvoice.status.charAt(0).toUpperCase() + selectedInvoice.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                      {selectedInvoice.lastPaymentDate && (
+                        <div className="text-sm text-gray-600">
+                          Last Payment: {formatDate(selectedInvoice.lastPaymentDate)}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-3">Invoice Information</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Invoice Number:</span>
+                          <span className="font-medium">{selectedInvoice.invoiceNumber}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Supplier:</span>
+                          <span className="font-medium">{selectedInvoice.supplierName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Created Date:</span>
+                          <span className="font-medium">{formatDate(selectedInvoice.createdAt)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Due Date:</span>
+                          <span className="font-medium">{formatDate(selectedInvoice.dueDate)}</span>
+                        </div>
+                        {selectedInvoice.paidAt && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Paid Date:</span>
+                            <span className="font-medium text-green-600">{formatDate(selectedInvoice.paidAt)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">FDN:</span>
+                          <span className="font-medium">{selectedInvoice.fdn || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
                   
                   <div>
                     <h4 className="font-medium text-gray-900 mb-3">Items</h4>
                     <div className="space-y-2 text-sm max-h-48 overflow-y-auto">
-                      {selectedInvoice.items.map((item, index) => (
+                      {(selectedInvoice.items || []).map((item, index) => (
                         <div key={index} className="border border-gray-200 rounded p-2">
                           <div className="font-medium">{item.description}</div>
                           <div className="text-gray-600">
@@ -823,86 +893,143 @@ export default function InvoicesPage() {
                   </div>
                 </div>
 
-                {/* Payment History */}
-                {getInvoicePayments(selectedInvoice.id).length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="font-medium text-gray-900 mb-3">Payment History</h4>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="space-y-3">
-                        {getInvoicePayments(selectedInvoice.id).map((payment, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-white rounded border">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-2 h-2 rounded-full ${
-                                payment.status === 'completed' ? 'bg-green-500' :
-                                payment.status === 'processing' ? 'bg-yellow-500' :
-                                payment.status === 'failed' ? 'bg-red-500' : 'bg-gray-500'
-                              }`} />
-                              <div>
-                                <p className="text-sm font-medium">{formatCurrency(payment.amount)}</p>
-                                <p className="text-xs text-gray-500">{payment.method} • {formatDate(payment.createdAt)}</p>
+                  {/* Payment History */}
+                  {paymentHistory && paymentHistory.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                        <Receipt className="w-4 h-4 mr-2" />
+                        Payment History ({paymentHistory.length} installments)
+                      </h4>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="space-y-3">
+                          {(paymentHistory || []).map((payment, index) => (
+                            <div key={payment.id} className="flex items-center justify-between p-3 bg-white rounded border">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
+                                  #{payment.installmentNumber}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{formatCurrency(payment.amount)}</p>
+                                  <div className="flex items-center space-x-2">
+                                    <p className="text-xs text-gray-500">{payment.paymentReference}</p>
+                                    <button
+                                      onClick={() => copyToClipboard(payment.paymentReference)}
+                                      className="text-xs text-blue-500 hover:text-blue-700"
+                                      title="Copy Reference"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    {payment.paymentMethod.type.replace('_', ' ')} • {formatDate(payment.paymentDate)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                  {payment.paymentStatus || 'Completed'}
+                                </span>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  By: {payment.paidByName} ({payment.paidBy})
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Running Total: {formatCurrency(payment.runningTotal || 0)}
+                                </p>
                               </div>
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              payment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              payment.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                              payment.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-gray-200">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Total Paid:</span>
+                              <span className="font-bold text-green-600">
+                                {formatCurrency(selectedInvoice.paidAmount || 0)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Remaining:</span>
+                              <span className="font-bold text-red-600">
+                                {formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}
+                              </span>
+                            </div>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                <div className="mt-6 flex justify-end space-x-3">
+                <div className="mt-6 flex justify-between">
                   <button
                     onClick={() => setShowModal(false)}
                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Close
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowModal(false);
-                      handleMakePayment(selectedInvoice);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Make Payment
-                  </button>
-                  {selectedInvoice.status === 'pending' && (
-                    <>
+                  
+                  <div className="flex space-x-3">
+                    {selectedInvoice.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleApprove(selectedInvoice.id);
+                            setShowModal(false);
+                          }}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleReject(selectedInvoice.id);
+                            setShowModal(false);
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>Reject</span>
+                        </button>
+                      </>
+                    )}
+                    
+                    {selectedInvoice.status !== 'paid' && (
                       <button
                         onClick={() => {
-                          handleApprove(selectedInvoice.id);
                           setShowModal(false);
+                          handleMakePayment(selectedInvoice);
                         }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                       >
-                        Approve
+                        <CreditCard className="w-4 h-4" />
+                        <span>
+                          {selectedInvoice.status === 'partial' 
+                            ? `Pay ${formatCurrency(selectedInvoice.remainingAmount || 0)}` 
+                            : 'Make Payment'
+                          }
+                        </span>
                       </button>
-                      <button
-                        onClick={() => {
-                          handleReject(selectedInvoice.id);
-                          setShowModal(false);
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => {
-                      setShowModal(false);
-                      handlePrintInvoice(selectedInvoice);
-                    }}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    Print
-                  </button>
+                    )}
+                    
+                    {selectedInvoice.status === 'paid' && (
+                      <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Fully Paid</span>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={() => {
+                        setShowModal(false);
+                        handlePrintInvoice(selectedInvoice);
+                      }}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Print</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -943,13 +1070,47 @@ export default function InvoicesPage() {
                       <p className="font-bold text-lg text-blue-600">{formatCurrency(selectedInvoice.amount)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Status:</p>
-                      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(selectedInvoice.status)}`}>
-                        {selectedInvoice.status.charAt(0).toUpperCase() + selectedInvoice.status.slice(1)}
-                      </span>
+                      <p className="text-gray-600">Paid Amount:</p>
+                      <p className="font-bold text-lg text-green-600">{formatCurrency(selectedInvoice.paidAmount || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Remaining:</p>
+                      <p className="font-bold text-lg text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Payments Made:</p>
+                      <p className="font-medium">{selectedInvoice.paymentCount || 0} payment{(selectedInvoice.paymentCount || 0) !== 1 ? 's' : ''}</p>
                     </div>
                   </div>
                 </div>
+
+                {/* Payment History */}
+                {paymentHistory && paymentHistory.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-medium text-gray-900 mb-3">Previous Payments</h4>
+                    <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
+                      <div className="space-y-2">
+                        {(paymentHistory || []).map((payment) => (
+                          <div key={payment.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                                #{payment.installmentNumber}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{formatCurrency(payment.amount)}</p>
+                                <p className="text-xs text-gray-500">{payment.paymentReference}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">{formatDate(payment.paymentDate)}</p>
+                              <p className="text-xs text-gray-500">{payment.paymentMethod.type.replace('_', ' ')}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Error/Success Messages */}
                 {paymentError && (
@@ -967,35 +1128,6 @@ export default function InvoicesPage() {
                 )}
 
                 <div className="space-y-4">
-                  {/* Payment Type Toggle */}
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        checked={!isPartialPayment}
-                        onChange={() => {
-                          setIsPartialPayment(false);
-                          setPaymentAmount(selectedInvoice.amount.toString());
-                        }}
-                        className="mr-2"
-                      />
-                      <span className="text-sm font-medium text-gray-700">Full Payment</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        checked={isPartialPayment}
-                        onChange={() => {
-                          setIsPartialPayment(true);
-                          setPaymentAmount('');
-                        }}
-                        className="mr-2"
-                      />
-                      <span className="text-sm font-medium text-gray-700">Partial Payment</span>
-                    </label>
-                  </div>
 
                   {/* Payment Method */}
                   <div>
@@ -1009,8 +1141,12 @@ export default function InvoicesPage() {
                         setPaymentMethod(newMethod);
                         // Regenerate reference number when payment method changes
                         if (selectedInvoice) {
-                          const newReference = generatePaymentReference(selectedInvoice, newMethod);
-                          setPaymentReference(newReference);
+                          try {
+                            const newReference = generatePaymentReference(selectedInvoice, newMethod);
+                            setPaymentReference(newReference);
+                          } catch (error) {
+                            console.error('Error generating payment reference:', error);
+                          }
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1034,16 +1170,16 @@ export default function InvoicesPage() {
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       min="0"
-                      max={selectedInvoice.amount}
+                      max={selectedInvoice.remainingAmount || selectedInvoice.amount}
                       step="0.01"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Enter amount"
-                      disabled={!isPartialPayment}
                     />
-                    {isPartialPayment && paymentAmount && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Remaining: {formatCurrency(selectedInvoice.amount - parseFloat(paymentAmount || '0'))}
-                      </p>
+                    {paymentAmount && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        <p>New remaining: {formatCurrency((selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0'))}</p>
+                        <p>This will be payment #{(selectedInvoice.paymentCount || 0) + 1}</p>
+                      </div>
                     )}
                   </div>
 
@@ -1263,8 +1399,12 @@ export default function InvoicesPage() {
                         type="button"
                         onClick={() => {
                           if (selectedInvoice) {
-                            const newReference = generatePaymentReference(selectedInvoice, paymentMethod);
-                            setPaymentReference(newReference);
+                            try {
+                              const newReference = generatePaymentReference(selectedInvoice, paymentMethod);
+                              setPaymentReference(newReference);
+                            } catch (error) {
+                              console.error('Error generating payment reference:', error);
+                            }
                           }
                         }}
                         className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center space-x-1"
@@ -1384,7 +1524,7 @@ export default function InvoicesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedInvoice.items.map((item, index) => (
+                        {(selectedInvoice.items || []).map((item, index) => (
                           <tr key={index}>
                             <td className="border border-gray-300 px-4 py-2">{item.description}</td>
                             <td className="border border-gray-300 px-4 py-2 text-right">{item.quantity}</td>
@@ -1448,14 +1588,69 @@ export default function InvoicesPage() {
                 </div>
 
                 <div className="mb-6">
+                  {/* Balance Information */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Balance Information
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(selectedInvoice.amount)}</div>
+                        <div className="text-xs text-gray-600">Total Invoice</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-green-600">{formatCurrency(selectedInvoice.paidAmount || 0)}</div>
+                        <div className="text-xs text-gray-600">Already Paid</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</div>
+                        <div className="text-xs text-gray-600">Current Balance</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-blue-600">{formatCurrency(parseFloat(paymentAmount || '0'))}</div>
+                        <div className="text-xs text-gray-600">This Payment</div>
+                      </div>
+                    </div>
+                    
+                    {/* Balance After Payment */}
+                    <div className="mt-4 pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Balance After Payment:</span>
+                        <span className={`text-lg font-bold ${
+                          (selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') <= 0 
+                            ? 'text-green-600' 
+                            : 'text-orange-600'
+                        }`}>
+                          {formatCurrency(Math.max(0, (selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0')))}
+                        </span>
+                      </div>
+                      {(selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') <= 0 && (
+                        <div className="mt-2 flex items-center space-x-2 text-green-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-sm font-medium">This payment will fully settle the invoice</span>
+                        </div>
+                      )}
+                      {(selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') > 0 && (
+                        <div className="mt-2 flex items-center space-x-2 text-orange-600">
+                          <Clock className="w-4 h-4" />
+                          <span className="text-sm font-medium">
+                            Partial payment - {formatCurrency((selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0'))} will remain
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Payment Summary</h4>
+                    <h4 className="font-medium text-blue-900 mb-2">Payment Details</h4>
                     <div className="space-y-1 text-sm text-blue-800">
                       <p><span className="font-medium">Invoice:</span> {selectedInvoice.invoiceNumber}</p>
                       <p><span className="font-medium">Supplier:</span> {selectedInvoice.supplierName}</p>
-                      <p><span className="font-medium">Amount:</span> {formatCurrency(parseFloat(paymentAmount || '0'))}</p>
-                      <p><span className="font-medium">Method:</span> {paymentMethod.replace('_', ' ').toUpperCase()}</p>
-                      <p><span className="font-medium">Reference:</span> <span className="font-mono text-blue-900">{paymentReference}</span></p>
+                      <p><span className="font-medium">Payment Amount:</span> {formatCurrency(parseFloat(paymentAmount || '0'))}</p>
+                      <p><span className="font-medium">Payment Method:</span> {paymentMethod.replace('_', ' ').toUpperCase()}</p>
+                      <p><span className="font-medium">Payment Reference:</span> <span className="font-mono text-blue-900">{paymentReference}</span></p>
+                      <p><span className="font-medium">Installment Number:</span> #{(selectedInvoice.paymentCount || 0) + 1}</p>
                       {(['momo', 'airtel_pay'].includes(paymentMethod)) && merchantCode && (
                         <p><span className="font-medium">Merchant Code:</span> {merchantCode}</p>
                       )}
@@ -1465,12 +1660,15 @@ export default function InvoicesPage() {
                       {(['mobile_money', 'momo', 'airtel_pay'].includes(paymentMethod)) && transactionId && (
                         <p><span className="font-medium">Transaction ID:</span> {transactionId}</p>
                       )}
+                      {paymentNotes && (
+                        <p><span className="font-medium">Notes:</span> {paymentNotes}</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <AlertCircle className="w-4 h-4 text-amber-500" />
-                    <p>Please confirm that all payment details are correct before proceeding.</p>
+                    <p>Please verify the balance information and payment details before confirming.</p>
                   </div>
                 </div>
 

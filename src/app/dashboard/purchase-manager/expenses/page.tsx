@@ -53,8 +53,8 @@ export default function ExpensesPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(expense =>
-        expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expense.submittedBy.toLowerCase().includes(searchTerm.toLowerCase())
+        (expense.description && expense.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (expense.submittedBy && expense.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 

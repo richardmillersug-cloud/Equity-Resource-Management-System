@@ -49,19 +49,20 @@ export interface Invoice {
   supplierName: string;
   invoiceNumber: string;
   amount: number;
+  paidAmount: number; // Total amount paid so far
+  remainingAmount: number; // Amount still owed
   dueDate: Date;
-  status: 'pending' | 'approved' | 'paid' | 'rejected' | 'overdue';
+  status: 'pending' | 'approved' | 'paid' | 'partial' | 'rejected' | 'overdue';
   items: InvoiceItem[];
   createdAt: Date;
   approvedAt?: Date;
   approvedBy?: string;
-  paidAt?: Date;
-  paidBy?: string;
+  paidAt?: Date; // Date when fully paid
+  lastPaymentDate?: Date; // Date of most recent payment
   rejectedAt?: Date;
   rejectedBy?: string;
   rejectionReason?: string;
-  paymentMethod?: PaymentMethod;
-  paymentReference?: string;
+  paymentCount: number; // Number of payments made
   installmentPlan?: InstallmentPlan;
   notes?: string;
   attachments?: string[];
@@ -173,21 +174,36 @@ export interface ExpenseApproval {
   remainingAmount: number;
 }
 
-export interface Payment {
+export interface InvoicePayment {
   id: string;
-  reference: string;
+  invoiceId: string;
+  invoiceNumber: string;
   supplierName: string;
-  amount: number;
-  method: string;
-  type: 'outgoing' | 'incoming';
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-  description?: string;
+  paymentReference: string;
+  amount: number; // Amount paid in this payment
+  paymentMethod: PaymentMethod;
+  paymentDate: Date;
+  paidBy: string; // User ID
+  paidByName: string; // User's display name
+  installmentNumber: number; // Which installment this is (1, 2, 3, etc.)
+  notes?: string | null;
   createdAt: Date;
-  processedAt?: Date;
-  processedBy?: string;
-  cancelledAt?: Date;
-  cancelledBy?: string;
-  cancellationReason?: string;
+  
+  // Enhanced tracking fields
+  runningTotal: number; // Total paid up to this payment
+  remainingAfterPayment: number; // Amount remaining after this payment
+  paymentStatus: 'completed' | 'pending' | 'failed' | 'cancelled';
+  approvedBy?: string | null; // Who approved this payment
+  approvedAt?: Date | null;
+  
+  // Cheque clearing fields
+  clearedAt?: Date | null;
+  clearedBy?: string | null;
+  
+  // Bounce fields
+  bouncedAt?: Date | null;
+  bouncedBy?: string | null;
+  bounceReason?: string | null;
 }
 
 export interface Expense {
@@ -207,7 +223,47 @@ export interface Expense {
   rejectionReason?: string;
 }
 
+// New interface for payment analytics
+export interface PaymentSummary {
+  invoiceId: string;
+  invoiceNumber: string;
+  supplierName: string;
+  totalAmount: number;
+  totalPaid: number;
+  remainingAmount: number;
+  paymentCount: number;
+  firstPaymentDate?: Date;
+  lastPaymentDate?: Date;
+  averagePaymentAmount: number;
+  paymentMethods: string[]; // List of methods used
+  status: 'unpaid' | 'partial' | 'paid' | 'overpaid';
+  payments: InvoicePayment[];
+}
+
+// Payment analytics interface
+export interface PaymentAnalytics {
+  totalPayments: number;
+  totalAmount: number;
+  averagePaymentSize: number;
+  paymentsByMethod: Record<string, number>;
+  paymentsBySupplier: Record<string, number>;
+  installmentDistribution: Record<number, number>; // installment number -> count
+  monthlyPayments: Record<string, number>; // YYYY-MM -> amount
+}
+
 export class PurchasingManagerService {
+  /**
+   * Clean undefined values from an object to prevent Firestore errors
+   */
+  private static cleanUndefinedValues(obj: any): any {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = value;
+      }
+    }
+    return cleaned;
+  }
   
   // ==================== CASH CLOSE TRACKING ====================
   
@@ -318,56 +374,6 @@ export class PurchasingManagerService {
   }
 
   /**
-   * Process payment for an invoice
-   */
-  static async payInvoice(
-    invoiceId: string, 
-    paymentMethod: PaymentMethod, 
-    paidBy: string,
-    isPartialPayment: boolean = false
-  ): Promise<void> {
-    const batch = writeBatch(db);
-    const invoiceRef = doc(db, 'invoices', invoiceId);
-    
-    // Update invoice
-    const invoiceUpdate: any = {
-      paymentMethod,
-      paidBy,
-      updatedAt: serverTimestamp()
-    };
-    
-    if (!isPartialPayment) {
-      invoiceUpdate.status = 'paid';
-      invoiceUpdate.paidAt = serverTimestamp();
-    }
-    
-    batch.update(invoiceRef, invoiceUpdate);
-    
-    // If cheque payment, create cheque tracker
-    if (paymentMethod.type === 'cheque') {
-      const chequeData: Omit<ChequeTracker, 'id'> = {
-        chequeNumber: paymentMethod.details.chequeNumber!,
-        amount: paymentMethod.amount,
-        balance: paymentMethod.balance || 0,
-        issueDate: new Date(),
-        dueDate: paymentMethod.details.chequeDate || new Date(),
-        status: 'issued',
-        bankName: paymentMethod.details.bankName || '',
-        payeeId: '', // Get from invoice
-        payeeName: '', // Get from supplier
-        invoiceId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const chequeRef = doc(collection(db, 'chequeTracker'));
-      batch.set(chequeRef, chequeData);
-    }
-    
-    await batch.commit();
-  }
-
-  /**
    * Create installment plan for an invoice
    */
   static async createInstallmentPlan(
@@ -429,6 +435,54 @@ export class PurchasingManagerService {
       
       callback(suppliers);
     });
+  }
+
+  /**
+   * Create a new supplier
+   */
+  static async createSupplier(supplierData: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const collectionRef = collection(db, 'suppliers');
+    
+    const newSupplier = {
+      ...supplierData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+    
+    const docRef = await addDoc(collectionRef, newSupplier);
+    return docRef.id;
+  }
+
+  /**
+   * Update supplier information
+   */
+  static async updateSupplier(supplierId: string, updates: Partial<Supplier>): Promise<void> {
+    const supplierRef = doc(db, 'suppliers', supplierId);
+    
+    await updateDoc(supplierRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  /**
+   * Update supplier status
+   */
+  static async updateSupplierStatus(supplierId: string, status: string): Promise<void> {
+    const supplierRef = doc(db, 'suppliers', supplierId);
+    
+    await updateDoc(supplierRef, {
+      status,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  /**
+   * Delete supplier
+   */
+  static async deleteSupplier(supplierId: string): Promise<void> {
+    const supplierRef = doc(db, 'suppliers', supplierId);
+    await deleteDoc(supplierRef);
   }
 
   /**
@@ -601,7 +655,7 @@ export class PurchasingManagerService {
         
         // Supplier metrics
         activeSuppliers: suppliers.length,
-        totalSupplierBalance: suppliers.reduce((sum, s) => sum + s.currentBalance, 0)
+        totalSupplierBalance: suppliers.reduce((sum, s) => sum + (s.currentBalance || 0), 0)
       };
     } catch (error) {
       console.error('Error getting dashboard metrics:', error);
@@ -614,10 +668,14 @@ export class PurchasingManagerService {
   /**
    * Subscribe to payments
    */
-  static subscribeToPayments(callback: (payments: Payment[]) => void): () => void {
+
+  /**
+   * Subscribe to invoice payments (individual payment records)
+   */
+  static subscribeToInvoicePayments(callback: (payments: InvoicePayment[]) => void): () => void {
     const q = query(
-      collection(db, 'payments'),
-      orderBy('createdAt', 'desc')
+      collection(db, 'invoicePayments'),
+      orderBy('paymentDate', 'desc')
     );
     
     return onSnapshot(q, (snapshot) => {
@@ -626,43 +684,467 @@ export class PurchasingManagerService {
         return {
           id: doc.id,
           ...data,
+          paymentDate: data.paymentDate?.toDate ? data.paymentDate.toDate() : data.paymentDate,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-          processedAt: data.processedAt?.toDate ? data.processedAt.toDate() : data.processedAt,
-          cancelledAt: data.cancelledAt?.toDate ? data.cancelledAt.toDate() : data.cancelledAt
+          paymentMethod: {
+            ...data.paymentMethod,
+            details: {
+              ...data.paymentMethod?.details,
+              chequeDate: data.paymentMethod?.details?.chequeDate?.toDate ? 
+                data.paymentMethod.details.chequeDate.toDate() : 
+                data.paymentMethod?.details?.chequeDate
+            }
+          }
         };
-      }) as Payment[];
+      }) as InvoicePayment[];
       
       callback(payments);
     });
   }
 
   /**
-   * Process payment
+   * Make a payment towards an invoice (supports partial payments)
    */
-  static async processPayment(paymentId: string, processedBy: string): Promise<void> {
-    const paymentRef = doc(db, 'payments', paymentId);
+  static async makeInvoicePayment(
+    invoiceId: string,
+    paymentAmount: number,
+    paymentMethod: PaymentMethod,
+    paidBy: string,
+    paidByName: string,
+    notes?: string
+  ): Promise<string> {
+    const batch = writeBatch(db);
     
-    await updateDoc(paymentRef, {
-      status: 'processing',
-      processedAt: serverTimestamp(),
-      processedBy,
-      updatedAt: serverTimestamp()
+    // Get current invoice data
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+    
+    if (!invoiceSnap.exists()) {
+      throw new Error('Invoice not found');
+    }
+    
+    const invoice = invoiceSnap.data() as Invoice;
+    
+    // For cheques, don't update invoice amounts until cleared
+    const isCheque = paymentMethod.type === 'cheque';
+    const newPaidAmount = isCheque ? (invoice.paidAmount || 0) : (invoice.paidAmount || 0) + paymentAmount;
+    const newRemainingAmount = invoice.amount - newPaidAmount;
+    const newPaymentCount = (invoice.paymentCount || 0) + 1;
+    
+    // Generate payment reference
+    let paymentReference: string;
+    try {
+      paymentReference = PurchasingManagerService.generatePaymentReference(invoice.invoiceNumber, newPaymentCount, paymentMethod.type);
+    } catch (error) {
+      console.error('Error generating payment reference:', error);
+      // Fallback reference if generation fails
+      paymentReference = `PAY-${Date.now()}-${invoiceId.slice(-4).toUpperCase()}-${newPaymentCount.toString().padStart(2, '0')}`;
+    }
+    
+    // Set payment status based on payment method
+    let paymentStatus: 'completed' | 'pending' | 'failed' | 'cancelled' = 'completed';
+    if (isCheque) {
+      paymentStatus = 'pending'; // Cheques start as pending
+    }
+    
+    // Debug logging before creating payment record
+    console.log('Creating payment record with data:', {
+      invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
+      supplierName: invoice.supplierName,
+      paymentReference,
+      amount: paymentAmount,
+      paidBy,
+      installmentNumber: newPaymentCount,
+      notes: notes || null,
+      approvedBy: invoice.approvedBy || null,
+      approvedAt: invoice.approvedAt || null,
+      paymentStatus,
+      isCheque
+    });
+
+    // Create payment record - ensure no undefined values for Firestore
+    const paymentData: Omit<InvoicePayment, 'id'> = {
+      invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
+      supplierName: invoice.supplierName,
+      paymentReference,
+      amount: paymentAmount,
+      paymentMethod,
+      paymentDate: new Date(),
+      paidBy,
+      paidByName,
+      installmentNumber: newPaymentCount,
+      notes: notes || null, // Use null instead of undefined
+      createdAt: new Date(),
+      runningTotal: newPaidAmount,
+      remainingAfterPayment: newRemainingAmount,
+      paymentStatus,
+      approvedBy: invoice.approvedBy || null, // Use null instead of undefined
+      approvedAt: invoice.approvedAt || null  // Use null instead of undefined
+    };
+    
+    const paymentRef = doc(collection(db, 'invoicePayments'));
+    // Clean any undefined values before writing to Firestore
+    const cleanedPaymentData = PurchasingManagerService.cleanUndefinedValues(paymentData);
+    batch.set(paymentRef, cleanedPaymentData);
+    
+    // Update invoice only if not a cheque (cheques don't update amounts until cleared)
+    if (!isCheque) {
+      const invoiceUpdate: Partial<Invoice> = {
+        paidAmount: newPaidAmount,
+        remainingAmount: newRemainingAmount,
+        paymentCount: newPaymentCount,
+        lastPaymentDate: new Date(),
+        status: newRemainingAmount <= 0 ? 'paid' : 'partial'
+      };
+      
+      // If fully paid, set paidAt date
+      if (newRemainingAmount <= 0) {
+        invoiceUpdate.paidAt = new Date();
+      }
+      
+      // Clean any undefined values before updating invoice
+      const cleanedInvoiceUpdate = PurchasingManagerService.cleanUndefinedValues(invoiceUpdate);
+      batch.update(invoiceRef, cleanedInvoiceUpdate);
+    } else {
+      // For cheques, only update payment count
+      const invoiceUpdate: Partial<Invoice> = {
+        paymentCount: newPaymentCount
+      };
+      batch.update(invoiceRef, invoiceUpdate);
+    }
+    
+    // If it's a cheque, also create/update cheque tracker record
+    if (isCheque && paymentMethod.details.chequeNumber) {
+      const chequeData: Omit<ChequeTracker, 'id'> = {
+        chequeNumber: paymentMethod.details.chequeNumber,
+        amount: paymentAmount,
+        balance: paymentAmount,
+        issueDate: new Date(),
+        dueDate: paymentMethod.details.chequeDate || new Date(),
+        status: 'issued',
+        bankName: paymentMethod.details.bankName || 'Unknown Bank',
+        payeeId: invoice.supplierId,
+        payeeName: invoice.supplierName,
+        invoiceId: invoiceId,
+        notes: notes || undefined,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      const chequeRef = doc(collection(db, 'chequeTracker'));
+      batch.set(chequeRef, PurchasingManagerService.cleanUndefinedValues(chequeData));
+    }
+    
+    await batch.commit();
+    return paymentRef.id;
+  }
+
+  /**
+   * Generate a unique payment reference
+   */
+  private static generatePaymentReference(invoiceNumber: string, installmentNumber: number, paymentMethod: string): string {
+    if (!invoiceNumber || !paymentMethod) {
+      throw new Error('Invoice number and payment method are required for payment reference generation');
+    }
+
+    const date = new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    // Method prefix
+    const methodPrefix = {
+      'cash': 'CSH',
+      'cheque': 'CHQ',
+      'bank_deposit': 'BNK',
+      'mobile_money': 'MOB',
+      'momo': 'MTN',
+      'airtel_pay': 'ATL'
+    }[paymentMethod] || 'PAY';
+    
+    // Invoice number (last 4 characters or full if shorter)
+    const invoiceRef = invoiceNumber.slice(-4).toUpperCase();
+    
+    // Generate reference: METHOD-YYMMDDHHNN-INVOICE-INSTALLMENT
+    return `${methodPrefix}-${year}${month}${day}${hours}${minutes}-${invoiceRef}-${installmentNumber.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Get payment history for a specific invoice
+   */
+  static async getInvoicePaymentHistory(invoiceId: string): Promise<InvoicePayment[]> {
+    // Use only the where clause to avoid index requirement
+    const q = query(
+      collection(db, 'invoicePayments'),
+      where('invoiceId', '==', invoiceId)
+    );
+    
+    const snapshot = await getDocs(q);
+    const payments = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        paymentDate: data.paymentDate?.toDate ? data.paymentDate.toDate() : data.paymentDate,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+        approvedAt: data.approvedAt?.toDate ? data.approvedAt.toDate() : data.approvedAt
+      };
+    }) as InvoicePayment[];
+    
+    // Sort in JavaScript instead of Firestore to avoid index requirement
+    return payments.sort((a, b) => {
+      const dateA = a.paymentDate instanceof Date ? a.paymentDate : new Date(a.paymentDate);
+      const dateB = b.paymentDate instanceof Date ? b.paymentDate : new Date(b.paymentDate);
+      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
     });
   }
 
   /**
-   * Cancel payment
+   * Get payment summary for a specific invoice
    */
-  static async cancelPayment(paymentId: string, cancelledBy: string, reason: string): Promise<void> {
-    const paymentRef = doc(db, 'payments', paymentId);
-    
-    await updateDoc(paymentRef, {
-      status: 'cancelled',
-      cancelledAt: serverTimestamp(),
-      cancelledBy,
-      cancellationReason: reason,
-      updatedAt: serverTimestamp()
-    });
+  static async getInvoicePaymentSummary(invoiceId: string): Promise<PaymentSummary | null> {
+    try {
+      // Get invoice details
+      const invoiceDoc = await getDoc(doc(db, 'invoices', invoiceId));
+      if (!invoiceDoc.exists()) return null;
+      
+      const invoice = invoiceDoc.data() as Invoice;
+      
+      // Get all payments for this invoice
+      const payments = await this.getInvoicePaymentHistory(invoiceId);
+      
+      if (payments.length === 0) {
+        return {
+          invoiceId,
+          invoiceNumber: invoice.invoiceNumber,
+          supplierName: invoice.supplierName,
+          totalAmount: invoice.amount,
+          totalPaid: 0,
+          remainingAmount: invoice.amount,
+          paymentCount: 0,
+          averagePaymentAmount: 0,
+          paymentMethods: [],
+          status: 'unpaid',
+          payments: []
+        };
+      }
+
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+      const remainingAmount = invoice.amount - totalPaid;
+      const uniqueMethods = [...new Set(payments.map(p => p.paymentMethod.type))];
+      
+      let status: 'unpaid' | 'partial' | 'paid' | 'overpaid' = 'unpaid';
+      if (totalPaid === 0) status = 'unpaid';
+      else if (totalPaid < invoice.amount) status = 'partial';
+      else if (totalPaid === invoice.amount) status = 'paid';
+      else status = 'overpaid';
+
+      return {
+        invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        supplierName: invoice.supplierName,
+        totalAmount: invoice.amount,
+        totalPaid,
+        remainingAmount,
+        paymentCount: payments.length,
+        firstPaymentDate: payments[payments.length - 1]?.paymentDate,
+        lastPaymentDate: payments[0]?.paymentDate,
+        averagePaymentAmount: totalPaid / payments.length,
+        paymentMethods: uniqueMethods,
+        status,
+        payments: payments.reverse() // Chronological order
+      };
+    } catch (error) {
+      console.error('Error getting payment summary:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get payment analytics across all payments
+   */
+  static async getPaymentAnalytics(
+    startDate?: Date, 
+    endDate?: Date, 
+    supplierId?: string
+  ): Promise<PaymentAnalytics> {
+    try {
+      let q = query(collection(db, 'invoicePayments'));
+      
+      // Add date filters if provided
+      if (startDate) {
+        q = query(q, where('paymentDate', '>=', startDate));
+      }
+      if (endDate) {
+        q = query(q, where('paymentDate', '<=', endDate));
+      }
+      
+      const snapshot = await getDocs(q);
+      const payments = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          paymentDate: data.paymentDate?.toDate ? data.paymentDate.toDate() : data.paymentDate
+        };
+      }) as InvoicePayment[];
+
+      // Filter by supplier if provided
+      const filteredPayments = supplierId 
+        ? payments.filter(p => p.supplierName.toLowerCase().includes(supplierId.toLowerCase()))
+        : payments;
+
+      const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+      const averagePaymentSize = filteredPayments.length > 0 ? totalAmount / filteredPayments.length : 0;
+
+      // Group by payment method
+      const paymentsByMethod: Record<string, number> = {};
+      filteredPayments.forEach(p => {
+        const method = p.paymentMethod.type;
+        paymentsByMethod[method] = (paymentsByMethod[method] || 0) + p.amount;
+      });
+
+      // Group by supplier
+      const paymentsBySupplier: Record<string, number> = {};
+      filteredPayments.forEach(p => {
+        paymentsBySupplier[p.supplierName] = (paymentsBySupplier[p.supplierName] || 0) + p.amount;
+      });
+
+      // Group by installment number
+      const installmentDistribution: Record<number, number> = {};
+      filteredPayments.forEach(p => {
+        installmentDistribution[p.installmentNumber] = (installmentDistribution[p.installmentNumber] || 0) + 1;
+      });
+
+      // Group by month
+      const monthlyPayments: Record<string, number> = {};
+      filteredPayments.forEach(p => {
+        const monthKey = `${p.paymentDate.getFullYear()}-${(p.paymentDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        monthlyPayments[monthKey] = (monthlyPayments[monthKey] || 0) + p.amount;
+      });
+
+      return {
+        totalPayments: filteredPayments.length,
+        totalAmount,
+        averagePaymentSize,
+        paymentsByMethod,
+        paymentsBySupplier,
+        installmentDistribution,
+        monthlyPayments
+      };
+    } catch (error) {
+      console.error('Error getting payment analytics:', error);
+      return {
+        totalPayments: 0,
+        totalAmount: 0,
+        averagePaymentSize: 0,
+        paymentsByMethod: {},
+        paymentsBySupplier: {},
+        installmentDistribution: {},
+        monthlyPayments: {}
+      };
+    }
+  }
+
+  /**
+   * Get all payment summaries for multiple invoices
+   */
+  static async getAllPaymentSummaries(invoiceIds?: string[]): Promise<PaymentSummary[]> {
+    try {
+      let invoicesQuery = query(collection(db, 'invoices'));
+      
+      if (invoiceIds && invoiceIds.length > 0) {
+        invoicesQuery = query(invoicesQuery, where('__name__', 'in', invoiceIds));
+      }
+
+      const invoicesSnapshot = await getDocs(invoicesQuery);
+      const summaries: PaymentSummary[] = [];
+
+      for (const invoiceDoc of invoicesSnapshot.docs) {
+        const summary = await this.getInvoicePaymentSummary(invoiceDoc.id);
+        if (summary) {
+          summaries.push(summary);
+        }
+      }
+
+      return summaries.sort((a, b) => 
+        (b.lastPaymentDate?.getTime() || 0) - (a.lastPaymentDate?.getTime() || 0)
+      );
+    } catch (error) {
+      console.error('Error getting all payment summaries:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search payments by various criteria
+   */
+  static async searchPayments(criteria: {
+    invoiceNumber?: string;
+    supplierName?: string;
+    paymentReference?: string;
+    paymentMethod?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    minAmount?: number;
+    maxAmount?: number;
+  }): Promise<InvoicePayment[]> {
+    try {
+      let q = query(collection(db, 'invoicePayments'));
+
+      // Apply filters
+      if (criteria.dateFrom) {
+        q = query(q, where('paymentDate', '>=', criteria.dateFrom));
+      }
+      if (criteria.dateTo) {
+        q = query(q, where('paymentDate', '<=', criteria.dateTo));
+      }
+
+      const snapshot = await getDocs(q);
+      let payments = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          paymentDate: data.paymentDate?.toDate ? data.paymentDate.toDate() : data.paymentDate,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt
+        };
+      }) as InvoicePayment[];
+
+      // Apply client-side filters
+      if (criteria.invoiceNumber) {
+        payments = payments.filter(p => 
+          p.invoiceNumber.toLowerCase().includes(criteria.invoiceNumber!.toLowerCase())
+        );
+      }
+      if (criteria.supplierName) {
+        payments = payments.filter(p => 
+          p.supplierName.toLowerCase().includes(criteria.supplierName!.toLowerCase())
+        );
+      }
+      if (criteria.paymentReference) {
+        payments = payments.filter(p => 
+          p.paymentReference.toLowerCase().includes(criteria.paymentReference!.toLowerCase())
+        );
+      }
+      if (criteria.paymentMethod) {
+        payments = payments.filter(p => p.paymentMethod.type === criteria.paymentMethod);
+      }
+      if (criteria.minAmount) {
+        payments = payments.filter(p => p.amount >= criteria.minAmount!);
+      }
+      if (criteria.maxAmount) {
+        payments = payments.filter(p => p.amount <= criteria.maxAmount!);
+      }
+
+      return payments.sort((a, b) => b.paymentDate.getTime() - a.paymentDate.getTime());
+    } catch (error) {
+      console.error('Error searching payments:', error);
+      return [];
+    }
   }
 
   // ==================== EXPENSES ====================
@@ -692,26 +1174,232 @@ export class PurchasingManagerService {
     });
   }
 
-  // ==================== SUPPLIER MANAGEMENT ====================
-  
   /**
-   * Update supplier status
+   * Clear a cheque payment - updates payment status and invoice amounts
    */
-  static async updateSupplierStatus(supplierId: string, status: string): Promise<void> {
-    const supplierRef = doc(db, 'suppliers', supplierId);
+  static async clearChequePayment(paymentId: string, clearedBy: string): Promise<void> {
+    const batch = writeBatch(db);
     
-    await updateDoc(supplierRef, {
-      status,
-      updatedAt: serverTimestamp()
-    });
+    // Get payment record
+    const paymentRef = doc(db, 'invoicePayments', paymentId);
+    const paymentSnap = await getDoc(paymentRef);
+    
+    if (!paymentSnap.exists()) {
+      throw new Error('Payment not found');
+    }
+    
+    const payment = paymentSnap.data() as InvoicePayment;
+    
+    if (payment.paymentMethod.type !== 'cheque') {
+      throw new Error('This payment is not a cheque');
+    }
+    
+    if (payment.paymentStatus === 'completed') {
+      throw new Error('Cheque is already cleared');
+    }
+    
+    // Get invoice
+    const invoiceRef = doc(db, 'invoices', payment.invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+    
+    if (!invoiceSnap.exists()) {
+      throw new Error('Invoice not found');
+    }
+    
+    const invoice = invoiceSnap.data() as Invoice;
+    
+    // Update payment status
+    const paymentUpdate = {
+      paymentStatus: 'completed' as const,
+      clearedAt: new Date(),
+      clearedBy
+    };
+    batch.update(paymentRef, paymentUpdate);
+    
+    // Update invoice amounts now that cheque is cleared
+    const newPaidAmount = (invoice.paidAmount || 0) + payment.amount;
+    const newRemainingAmount = invoice.amount - newPaidAmount;
+    
+    const invoiceUpdate: Partial<Invoice> = {
+      paidAmount: newPaidAmount,
+      remainingAmount: newRemainingAmount,
+      lastPaymentDate: new Date(),
+      status: newRemainingAmount <= 0 ? 'paid' : 'partial'
+    };
+    
+    // If fully paid, set paidAt date
+    if (newRemainingAmount <= 0) {
+      invoiceUpdate.paidAt = new Date();
+    }
+    
+    batch.update(invoiceRef, invoiceUpdate);
+    
+    // Update cheque tracker if exists
+    if (payment.paymentMethod.details.chequeNumber) {
+      const chequeQuery = query(
+        collection(db, 'chequeTracker'),
+        where('chequeNumber', '==', payment.paymentMethod.details.chequeNumber),
+        where('invoiceId', '==', payment.invoiceId)
+      );
+      
+      const chequeSnap = await getDocs(chequeQuery);
+      if (!chequeSnap.empty) {
+        const chequeDoc = chequeSnap.docs[0];
+        batch.update(chequeDoc.ref, {
+          status: 'cleared',
+          clearedDate: new Date(),
+          updatedAt: new Date()
+        });
+      }
+    }
+    
+    await batch.commit();
   }
 
   /**
-   * Delete supplier
+   * Mark a cheque payment as bounced
    */
-  static async deleteSupplier(supplierId: string): Promise<void> {
-    const supplierRef = doc(db, 'suppliers', supplierId);
-    await deleteDoc(supplierRef);
+  static async bounceChequePayment(paymentId: string, bouncedBy: string, reason?: string): Promise<void> {
+    const batch = writeBatch(db);
+    
+    // Get payment record
+    const paymentRef = doc(db, 'invoicePayments', paymentId);
+    const paymentSnap = await getDoc(paymentRef);
+    
+    if (!paymentSnap.exists()) {
+      throw new Error('Payment not found');
+    }
+    
+    const payment = paymentSnap.data() as InvoicePayment;
+    
+    if (payment.paymentMethod.type !== 'cheque') {
+      throw new Error('This payment is not a cheque');
+    }
+    
+    if (payment.paymentStatus === 'failed') {
+      throw new Error('Cheque is already marked as bounced');
+    }
+    
+    // Get invoice to revert amounts if needed
+    const invoiceRef = doc(db, 'invoices', payment.invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+    
+    if (!invoiceSnap.exists()) {
+      throw new Error('Invoice not found');
+    }
+    
+    const invoice = invoiceSnap.data() as Invoice;
+    
+    // Check if this cheque was previously cleared (and thus counted in invoice amounts)
+    const wasPreviouslyCleared = payment.paymentStatus === 'completed';
+    
+    // Update payment status to failed
+    const paymentUpdate = {
+      paymentStatus: 'failed' as const,
+      bouncedAt: new Date(),
+      bouncedBy,
+      bounceReason: reason || 'Cheque bounced'
+    };
+    batch.update(paymentRef, paymentUpdate);
+    
+    // If the cheque was previously cleared, we need to revert the invoice amounts
+    let invoiceUpdate: Partial<Invoice> = {};
+    
+    if (wasPreviouslyCleared) {
+      // Revert the amounts - subtract the bounced cheque amount
+      const newPaidAmount = Math.max(0, (invoice.paidAmount || 0) - payment.amount);
+      const newRemainingAmount = invoice.amount - newPaidAmount;
+      
+      invoiceUpdate = {
+        paidAmount: newPaidAmount,
+        remainingAmount: newRemainingAmount,
+        status: newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partial' : 'approved')
+      };
+      
+      // Remove paidAt date if invoice is no longer fully paid
+      if (newRemainingAmount > 0) {
+        invoiceUpdate.paidAt = null as any;
+      }
+    } else {
+      // For pending cheques, just ensure status is correct
+      const currentPaidAmount = invoice.paidAmount || 0;
+      const remainingAmount = invoice.amount - currentPaidAmount;
+      
+      invoiceUpdate = {
+        status: currentPaidAmount === 0 ? 'approved' : (currentPaidAmount < invoice.amount ? 'partial' : 'paid'),
+        remainingAmount: remainingAmount
+      };
+    }
+    
+    batch.update(invoiceRef, invoiceUpdate);
+    
+    // Update cheque tracker if exists
+    if (payment.paymentMethod.details.chequeNumber) {
+      const chequeQuery = query(
+        collection(db, 'chequeTracker'),
+        where('chequeNumber', '==', payment.paymentMethod.details.chequeNumber),
+        where('invoiceId', '==', payment.invoiceId)
+      );
+      
+      const chequeSnap = await getDocs(chequeQuery);
+      if (!chequeSnap.empty) {
+        const chequeDoc = chequeSnap.docs[0];
+        batch.update(chequeDoc.ref, {
+          status: 'bounced',
+          notes: reason || 'Cheque bounced',
+          updatedAt: new Date()
+        });
+      }
+    }
+    
+    await batch.commit();
+  }
+
+  /**
+   * Get pending cheques that need attention
+   */
+  static async getPendingCheques(): Promise<InvoicePayment[]> {
+    const q = query(
+      collection(db, 'invoicePayments'),
+      where('paymentMethod.type', '==', 'cheque'),
+      where('paymentStatus', '==', 'pending')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        paymentDate: data.paymentDate?.toDate ? data.paymentDate.toDate() : data.paymentDate,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+        paymentMethod: {
+          ...data.paymentMethod,
+          details: {
+            ...data.paymentMethod?.details,
+            chequeDate: data.paymentMethod?.details?.chequeDate?.toDate ? 
+              data.paymentMethod.details.chequeDate.toDate() : 
+              data.paymentMethod?.details?.chequeDate
+          }
+        }
+      };
+    }) as InvoicePayment[];
+  }
+
+  /**
+   * Get overdue cheques (past due date but not cleared)
+   */
+  static async getOverdueCheques(): Promise<InvoicePayment[]> {
+    const pendingCheques = await this.getPendingCheques();
+    const today = new Date();
+    
+    return pendingCheques.filter(payment => {
+      const chequeDate = payment.paymentMethod.details.chequeDate;
+      if (!chequeDate) return false;
+      
+      const dueDate = chequeDate instanceof Date ? chequeDate : new Date(chequeDate);
+      return dueDate < today;
+    });
   }
 }
 
@@ -722,20 +1410,25 @@ export const {
   subscribeToSuppliers,
   subscribeToChequeTracker,
   subscribeToExpenseApprovals,
-  subscribeToPayments,
+  subscribeToInvoicePayments,
   subscribeToExpenses,
   approveInvoice,
   rejectInvoice,
-  payInvoice,
+  makeInvoicePayment,
+  getInvoicePaymentHistory,
+  getInvoicePaymentSummary,
+  getPaymentAnalytics,
+  getAllPaymentSummaries,
+  searchPayments,
   createInstallmentPlan,
+  createSupplier,
+  updateSupplier,
   updateSupplierPayment,
   updateSupplierStatus,
   deleteSupplier,
   updateChequeStatus,
   approveExpense,
   rejectExpense,
-  processPayment,
-  cancelPayment,
   getDashboardMetrics,
   calculateProfitMetrics
 } = PurchasingManagerService; 
