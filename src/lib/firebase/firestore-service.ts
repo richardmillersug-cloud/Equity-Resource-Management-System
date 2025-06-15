@@ -310,26 +310,8 @@ export class InvoiceService extends FirestoreService<Invoice> {
     ]);
   }
 
-  async updateInvoiceStatus(invoiceId: string, paidAmount: number): Promise<void> {
-    const invoice = await this.getById(invoiceId);
-    if (!invoice) throw new Error('Invoice not found');
-
-    const remainingBalance = invoice.amount - paidAmount;
-    let status: Invoice['status'] = 'Pending';
-
-    if (remainingBalance <= 0) {
-      status = 'Paid';
-    } else if (paidAmount > 0) {
-      status = 'Partial';
-    } else if (invoice.dueDate && invoice.dueDate.toDate() < new Date()) {
-      status = 'Overdue';
-    }
-
-    await this.update(invoiceId, {
-      status,
-      remainingBalance: Math.max(0, remainingBalance)
-    });
-  }
+  // REMOVED: Old payment status update logic
+  // Use PurchasingManagerService.makeInvoicePayment() instead
 
   async getSupplierInvoices(supplierId: string): Promise<Invoice[]> {
     return this.getAll([
@@ -338,58 +320,8 @@ export class InvoiceService extends FirestoreService<Invoice> {
   }
 }
 
-export class PaymentService extends FirestoreService<Payment> {
-  constructor() {
-    super(COLLECTIONS.PAYMENTS);
-  }
-
-  async createPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>): Promise<string> {
-    // Validate payment amount against invoice
-    if (paymentData.invoiceId) {
-      const invoiceService = new InvoiceService();
-      const invoice = await invoiceService.getById(paymentData.invoiceId);
-      
-      if (!invoice) {
-        throw new Error('Invoice not found');
-      }
-
-      if (paymentData.amount > invoice.remainingBalance) {
-        throw new Error('Payment amount exceeds remaining balance');
-      }
-
-      // Create payment
-      const paymentId = await this.create(paymentData);
-
-      // Update invoice status
-      const totalPaid = await this.getTotalPaidForInvoice(paymentData.invoiceId);
-      await invoiceService.updateInvoiceStatus(paymentData.invoiceId, totalPaid);
-
-      return paymentId;
-    }
-
-    return this.create(paymentData);
-  }
-
-  async getTotalPaidForInvoice(invoiceId: string): Promise<number> {
-    const payments = await this.getAll([
-      { field: 'invoiceId', operator: '==', value: invoiceId }
-    ]);
-
-    return payments.reduce((total, payment) => total + payment.amount, 0);
-  }
-
-  async getInvoicePayments(invoiceId: string): Promise<Payment[]> {
-    return this.getAll([
-      { field: 'invoiceId', operator: '==', value: invoiceId }
-    ], { orderBy: 'paymentDate', orderDirection: 'desc' });
-  }
-
-  async getSupplierPayments(supplierId: string): Promise<Payment[]> {
-    return this.getAll([
-      { field: 'supplierId', operator: '==', value: supplierId }
-    ], { orderBy: 'paymentDate', orderDirection: 'desc' });
-  }
-}
+// REMOVED: Old PaymentService class
+// Use PurchasingManagerService payment methods instead
 
 export class SupplierService extends FirestoreService<Supplier> {
   constructor() {
@@ -639,7 +571,7 @@ export const firestoreServices = {
   employee: new EmployeeService(),
   cashAllocation: new CashAllocationService(),
   invoice: new InvoiceService(),
-  payment: new PaymentService(),
+  // payment: REMOVED - Use PurchasingManagerService instead
   supplier: new SupplierService(),
   expense: new ExpenseService(),
   attendance: new AttendanceService(),

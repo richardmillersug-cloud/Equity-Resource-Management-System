@@ -93,10 +93,10 @@ export default function InvoicesPage() {
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(invoice =>
-        invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.fdn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (invoice.invoiceNumber && invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (invoice.supplierName && invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (invoice.fdn && invoice.fdn.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (invoice.description && invoice.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 

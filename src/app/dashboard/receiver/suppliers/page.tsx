@@ -104,12 +104,12 @@ export default function SuppliersPage() {
   const filterSuppliers = () => {
     let filtered = suppliers;
 
-    // Search filter
+        // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(supplier => 
-        supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        supplier.tinNumber.includes(searchTerm) ||
-        supplier.phoneNumbers.some(phone => phone.includes(searchTerm))
+      filtered = filtered.filter(supplier =>
+        (supplier.supplierName && supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (supplier.tinNumber && supplier.tinNumber.includes(searchTerm)) ||
+        (supplier.phoneNumbers && supplier.phoneNumbers.some(phone => phone && phone.includes(searchTerm)))
       );
     }
 

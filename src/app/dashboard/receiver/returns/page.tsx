@@ -820,12 +820,12 @@ export default function ReturnNotesPage() {
   // Filter return notes based on search query and filters
   const filteredReturnNotes = returnNotes.filter(returnNote => {
     const matchesSearch = searchQuery.toLowerCase() === '' || 
-      returnNote.returnNoteNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      returnNote.items.some(item => 
-        item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      (returnNote.returnNoteNumber && returnNote.returnNoteNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (returnNote.supplierName && returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (returnNote.reason && returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (returnNote.items && returnNote.items.some(item => 
+        item.itemName && item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
+      ));
     
     const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
     const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
