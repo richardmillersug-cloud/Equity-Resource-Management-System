@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { HRQueries } from '../../../lib/firebase/role-based-queries';
 import { 
   Users, 
@@ -8,12 +9,40 @@ import {
   AlertCircle,
   CheckCircle,
   TrendingUp,
-  FileText
+  FileText,
+  Clock,
+  UserCheck,
+  DollarSign,
+  BarChart3,
+  QrCode,
+  Plus,
+  Edit,
+  Eye,
+  CheckCircle2,
+  XCircle,
+  Clock3
 } from 'lucide-react';
+
+interface HRStats {
+  totalEmployees: number;
+  activeEmployees: number;
+  pendingLeaves: number;
+  todayAttendance: number;
+  pendingPayroll: number;
+  thisMonthHires: number;
+}
 
 export default function HRDashboard() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [stats, setStats] = useState<HRStats>({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    pendingLeaves: 0,
+    todayAttendance: 0,
+    pendingPayroll: 0,
+    thisMonthHires: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,11 +51,30 @@ export default function HRDashboard() {
       try {
         setLoading(true);
         
-        const employeesData = await HRQueries.getEmployeeOverview();
-        setEmployees(employeesData);
+        const [employeesData, leaveData] = await Promise.all([
+          HRQueries.getEmployeeOverview(),
+          HRQueries.getLeaveRequests()
+        ]);
 
-        const leaveData = await HRQueries.getLeaveRequests();
+        setEmployees(employeesData);
         setLeaveRequests(leaveData);
+
+        // Calculate stats
+        const activeEmployees = employeesData.filter(emp => emp.employmentStatus === 'Active').length;
+        const pendingLeaves = leaveData.filter(req => req.status === 'Pending').length;
+        const currentMonth = new Date().getMonth();
+        const thisMonthHires = employeesData.filter(emp => 
+          emp.hireDate && new Date(emp.hireDate.seconds * 1000).getMonth() === currentMonth
+        ).length;
+
+        setStats({
+          totalEmployees: employeesData.length,
+          activeEmployees,
+          pendingLeaves,
+          todayAttendance: Math.floor(activeEmployees * 0.85), // Simulated for now
+          pendingPayroll: Math.floor(activeEmployees * 0.1), // Simulated for now
+          thisMonthHires
+        });
 
         setLoading(false);
       } catch (err) {
@@ -38,9 +86,6 @@ export default function HRDashboard() {
 
     loadHRData();
   }, []);
-
-  const activeEmployees = employees.filter(emp => emp.employmentStatus === 'Active').length;
-  const pendingLeaves = leaveRequests.filter(req => req.status === 'Pending').length;
 
   if (loading) {
     return (
@@ -68,96 +113,207 @@ export default function HRDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">HR Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Active Employees</p>
-              <p className="text-2xl font-bold text-gray-900">{activeEmployees}</p>
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">HR Dashboard</h1>
+          <p className="text-gray-500">Manage your workforce and HR operations</p>
+        </div>
+        <Link 
+          href="/dashboard/hr/employees/add"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Add Employee
+        </Link>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Users className="h-6 w-6 text-blue-600" />
             </div>
           </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Total Employees</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
+          </div>
+        </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Pending Leave Requests</p>
-              <p className="text-2xl font-bold text-gray-900">{pendingLeaves}</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
           </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Active Employees</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.activeEmployees}</p>
+          </div>
+        </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-green-600" />
-              </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
+              <Calendar className="h-6 w-6 text-yellow-600" />
             </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Total Employees</p>
-              <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Pending Leave</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.pendingLeaves}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+              <Clock className="h-6 w-6 text-purple-600" />
             </div>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Today's Attendance</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.todayAttendance}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center">
+              <DollarSign className="h-6 w-6 text-red-600" />
+            </div>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">Pending Payroll</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.pendingPayroll}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-indigo-600" />
+            </div>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 mb-1">New Hires (Month)</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.thisMonthHires}</p>
           </div>
         </div>
       </div>
 
+      {/* Quick Actions */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">Manage Employees</h3>
-                <p className="text-sm text-gray-500">Add or update employee records</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link href="/dashboard/hr/employees">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Users className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Manage Employees</h3>
+                  <p className="text-sm text-gray-500">Add, edit, or view employee records</p>
+                </div>
               </div>
             </div>
-          </button>
+          </Link>
 
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-md transition-all">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">Process Leave Requests</h3>
-                <p className="text-sm text-gray-500">Approve or reject leave applications</p>
+          <Link href="/dashboard/hr/attendance">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <UserCheck className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Attendance Tracking</h3>
+                  <p className="text-sm text-gray-500">Track daily attendance and hours</p>
+                </div>
               </div>
             </div>
-          </button>
+          </Link>
 
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <FileText className="h-5 w-5 text-purple-600" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">Generate Reports</h3>
-                <p className="text-sm text-gray-500">Create HR analytics reports</p>
+          <Link href="/dashboard/hr/leave-requests">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-yellow-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <Calendar className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Leave Requests</h3>
+                  <p className="text-sm text-gray-500">Approve or reject leave applications</p>
+                </div>
               </div>
             </div>
-          </button>
+          </Link>
+
+          <Link href="/dashboard/hr/payroll">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Payroll Processing</h3>
+                  <p className="text-sm text-gray-500">Process employee salaries and payments</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/dashboard/hr/barcodes">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <QrCode className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Barcode Management</h3>
+                  <p className="text-sm text-gray-500">Generate and manage employee IDs</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/dashboard/hr/reports">
+            <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-red-300 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">HR Reports</h3>
+                  <p className="text-sm text-gray-500">Generate analytics and reports</p>
+                </div>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Employee Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {employees.slice(0, 9).map((employee) => (
-            <div key={employee.id} className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-blue-600" />
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Employees */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Employees</h3>
+            <Link href="/dashboard/hr/employees" className="text-blue-600 hover:text-blue-800 text-sm">
+              View all
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {employees.slice(0, 5).map((employee) => (
+              <div key={employee.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{employee.firstName} {employee.lastName}</p>
+                    <p className="text-sm text-gray-500">{employee.roles?.[0]?.jobTitle || 'N/A'}</p>
+                  </div>
                 </div>
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                   employee.employmentStatus === 'Active' 
@@ -167,18 +323,41 @@ export default function HRDashboard() {
                   {employee.employmentStatus}
                 </span>
               </div>
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {employee.firstName} {employee.lastName}
-                </h3>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p><span className="font-medium">Role:</span> {employee.roles?.[0]?.jobTitle || 'N/A'}</p>
-                  <p><span className="font-medium">Email:</span> {employee.email}</p>
-                  <p><span className="font-medium">Years of Service:</span> {employee.yearsOfService}</p>
+            ))}
+          </div>
+        </div>
+
+        {/* Pending Leave Requests */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Pending Leave Requests</h3>
+            <Link href="/dashboard/hr/leave-requests" className="text-blue-600 hover:text-blue-800 text-sm">
+              View all
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {leaveRequests.filter(req => req.status === 'Pending').slice(0, 5).map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{request.employeeName || 'Employee'}</p>
+                    <p className="text-sm text-gray-500">{request.leaveType} - {request.daysRequested} days</p>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button className="p-1 text-green-600 hover:text-green-800">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </button>
+                  <button className="p-1 text-red-600 hover:text-red-800">
+                    <XCircle className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

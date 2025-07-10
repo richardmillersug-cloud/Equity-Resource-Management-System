@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -56,6 +55,18 @@ service cloud.firestore {
     
     function isReceiver() {
       return hasRole('Receiver');
+    }
+    
+    function isAccountant() {
+      return hasRole('Accountant');
+    }
+    
+    function isHR() {
+      return hasRole('HR');
+    }
+    
+    function isManager() {
+      return hasRole('Manager');
     }
     
     // =====================================================
@@ -120,10 +131,10 @@ service cloud.firestore {
     // =====================================================
     
     match /expenses/{expenseId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']) || 
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'HR', 'Purchasing Manager', 'Purchase Manager']) || 
         resource.data.employeeId == request.auth.uid;
       allow create: if isAuthenticated();
-      allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) || 
+      allow update: if hasAnyRole(['Admin', 'Accountant', 'HR', 'Purchasing Manager', 'Purchase Manager']) || 
         resource.data.employeeId == request.auth.uid;
       allow delete: if hasRole('Admin');
     }
@@ -277,51 +288,67 @@ service cloud.firestore {
     }
     
     // =====================================================
-    // ATTENDANCE (Rule 10.1-10.4)
+    // ATTENDANCE (Rule 10.1-10.4) - Updated collection name
     // =====================================================
     
-    match /attendances/{attendanceId} {
+    match /attendance/{attendanceId} {
       allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow create: if hasAnyRole(['HR', 'Supervisor']) || 
+      allow create: if hasAnyRole(['HR', 'Supervisor', 'Admin']) || 
         (isAuthenticated() && request.resource.data.employeeId == request.auth.uid);
       allow update: if hasAnyRole(['Admin', 'HR']);
       allow delete: if hasRole('Admin');
     }
     
     // =====================================================
-    // LEAVE REQUESTS
+    // LEAVE REQUESTS - Enhanced permissions for HR workflow
     // =====================================================
     
     match /leaveRequests/{requestId} {
       allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow create: if isAuthenticated() && 
-        request.resource.data.employeeId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        request.resource.data.employeeId == request.auth.uid ||
+        hasAnyRole(['Admin', 'HR'])
+      );
       allow update: if hasAnyRole(['Admin', 'HR']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
       allow delete: if hasRole('Admin');
     }
     
     // =====================================================
-    // AUDIT LOGS (Rule 13.1, 13.2, 13.3)
+    // AUDIT LOGS (Rule 13.1, 13.2, 13.3) - Enhanced for HR access
     // =====================================================
     
     match /auditLogs/{logId} {
-      allow read: if hasAnyRole(['Admin', 'Manager', 'Auditor']);
+      allow read: if hasAnyRole(['Admin', 'Manager', 'HR', 'Auditor']);
       allow create: if isAuthenticated(); // System can create audit logs
       allow update: if false; // Audit logs are immutable
       allow delete: if hasRole('Admin'); // Only admin can delete (for cleanup)
     }
     
     // =====================================================
-    // PAYROLL
+    // PAYROLL - Enhanced permissions
     // =====================================================
     
     match /payroll/{payrollId} {
-      allow read: if hasAnyRole(['Admin', 'HR']) || 
+      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow write: if hasAnyRole(['Admin', 'HR']);
+      allow create: if hasAnyRole(['Admin', 'HR']);
+      allow update: if hasAnyRole(['Admin', 'HR']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // BARCODES - HR management of employee barcodes
+    // =====================================================
+    
+    match /barcodes/{barcodeId} {
+      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid);
+      allow create: if hasAnyRole(['Admin', 'HR']);
+      allow update: if hasAnyRole(['Admin', 'HR']);
+      allow delete: if hasRole('Admin');
     }
     
     // =====================================================
@@ -363,13 +390,13 @@ service cloud.firestore {
     }
     
     // =====================================================
-    // REPORTS (Generated reports storage)
+    // REPORTS (Generated reports storage) - Enhanced for HR access
     // =====================================================
     
     match /reports/{reportId} {
-      allow read: if hasAnyRole(['Admin', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver']);
-      allow create: if hasAnyRole(['Admin', 'Manager', 'Accountant']);
-      allow update: if hasAnyRole(['Admin', 'Manager']);
+      allow read: if hasAnyRole(['Admin', 'Manager', 'HR', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver']);
+      allow create: if hasAnyRole(['Admin', 'Manager', 'HR', 'Accountant']);
+      allow update: if hasAnyRole(['Admin', 'Manager', 'HR']);
       allow delete: if hasRole('Admin');
     }
     

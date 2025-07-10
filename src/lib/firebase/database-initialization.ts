@@ -42,6 +42,12 @@ export class DatabaseInitialization {
       await this.initializeDamagesCollection();
       await this.initializeRestockItemsCollection();
 
+      // HR Collections
+      await this.initializeAttendanceCollection();
+      await this.initializeLeaveRequestsCollection();
+      await this.initializePayrollCollection();
+      await this.initializeBarcodesCollection();
+
       // Shared Collections
       await this.initializeInvoicesCollection();
       await this.initializeEmployeesCollection();
@@ -1171,13 +1177,203 @@ export class DatabaseInitialization {
         ],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
+      },
+      {
+        firstName: 'Grace',
+        lastName: 'Namukasa',
+        email: 'grace.namukasa@equi.com',
+        phoneNumber: '+256789123456',
+        nationalId: 'CM90001234569P',
+        position: 'HR Manager',
+        department: 'Human Resources',
+        branchId: 'branch_kampala',
+        hireDate: Timestamp.fromDate(new Date('2023-02-10')),
+        salary: 1300000,
+        status: 'active',
+        roles: [
+          {
+            jobRoleId: 'hr',
+            jobTitle: 'HR',
+            permissions: ['EMPLOYEE_MANAGEMENT', 'PAYROLL_MANAGEMENT', 'ATTENDANCE_TRACKING', 'LEAVE_APPROVAL']
+          }
+        ],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       }
     ];
 
     for (const data of employeesData) {
       await addDoc(collectionRef, data);
     }
-    console.log('✅ employees collection initialized with 2 records');
+    console.log('✅ employees collection initialized with 3 records');
+  }
+
+  // =====================================================
+  // HR COLLECTIONS
+  // =====================================================
+
+  static async initializeAttendanceCollection(): Promise<void> {
+    const collectionRef = collection(db, 'attendance');
+    
+    const snapshot = await getDocs(collectionRef);
+    if (snapshot.size > 0) {
+      console.log('⏭️  attendance collection already has data, skipping...');
+      return;
+    }
+
+    const attendanceData = [
+      {
+        employeeId: 'emp_001',
+        attendanceDate: Timestamp.fromDate(new Date()),
+        checkInTime: Timestamp.fromDate(new Date(Date.now() - 8 * 60 * 60 * 1000)),
+        checkOutTime: Timestamp.fromDate(new Date(Date.now() - 1 * 60 * 60 * 1000)),
+        status: 'Present',
+        hoursWorked: 8,
+        overtimeHours: 0,
+        barcodeScanned: 'BC001',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      {
+        employeeId: 'emp_002',
+        attendanceDate: Timestamp.fromDate(new Date()),
+        checkInTime: Timestamp.fromDate(new Date(Date.now() - 7 * 60 * 60 * 1000)),
+        status: 'Present',
+        hoursWorked: 0,
+        overtimeHours: 0,
+        barcodeScanned: 'BC002',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+    ];
+
+    for (const data of attendanceData) {
+      await addDoc(collectionRef, data);
+    }
+    console.log('✅ attendance collection initialized with 2 records');
+  }
+
+  static async initializeLeaveRequestsCollection(): Promise<void> {
+    const collectionRef = collection(db, 'leaveRequests');
+    
+    const snapshot = await getDocs(collectionRef);
+    if (snapshot.size > 0) {
+      console.log('⏭️  leaveRequests collection already has data, skipping...');
+      return;
+    }
+
+    const leaveRequestsData = [
+      {
+        employeeId: 'emp_001',
+        leaveType: 'Annual',
+        startDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        endDate: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
+        daysRequested: 7,
+        status: 'Pending',
+        reason: 'Family vacation',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      {
+        employeeId: 'emp_002',
+        leaveType: 'Sick',
+        startDate: Timestamp.fromDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)),
+        endDate: Timestamp.fromDate(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)),
+        daysRequested: 2,
+        status: 'Approved',
+        reason: 'Medical checkup',
+        approvedBy: 'emp_hr_001',
+        approvalDate: Timestamp.fromDate(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)),
+        comments: 'Approved for medical reasons',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+    ];
+
+    for (const data of leaveRequestsData) {
+      await addDoc(collectionRef, data);
+    }
+    console.log('✅ leaveRequests collection initialized with 2 records');
+  }
+
+  static async initializePayrollCollection(): Promise<void> {
+    const collectionRef = collection(db, 'payroll');
+    
+    const snapshot = await getDocs(collectionRef);
+    if (snapshot.size > 0) {
+      console.log('⏭️  payroll collection already has data, skipping...');
+      return;
+    }
+
+    const payrollData = [
+      {
+        employeeId: 'emp_001',
+        payPeriodStart: Timestamp.fromDate(new Date(2024, 0, 1)),
+        payPeriodEnd: Timestamp.fromDate(new Date(2024, 0, 31)),
+        baseSalary: 2500000,
+        grossSalary: 2500000,
+        deductions: 625000, // 25% tax + NSSF
+        netSalary: 1875000,
+        paymentDate: Timestamp.fromDate(new Date(2024, 1, 1)),
+        overtimePay: 0,
+        processedBy: 'emp_hr_001',
+        status: 'paid',
+        createdAt: serverTimestamp()
+      },
+      {
+        employeeId: 'emp_002',
+        payPeriodStart: Timestamp.fromDate(new Date(2024, 0, 1)),
+        payPeriodEnd: Timestamp.fromDate(new Date(2024, 0, 31)),
+        baseSalary: 1800000,
+        grossSalary: 1800000,
+        deductions: 450000, // 25% tax + NSSF
+        netSalary: 1350000,
+        paymentDate: Timestamp.fromDate(new Date(2024, 1, 1)),
+        overtimePay: 0,
+        processedBy: 'emp_hr_001',
+        status: 'paid',
+        createdAt: serverTimestamp()
+      }
+    ];
+
+    for (const data of payrollData) {
+      await addDoc(collectionRef, data);
+    }
+    console.log('✅ payroll collection initialized with 2 records');
+  }
+
+  static async initializeBarcodesCollection(): Promise<void> {
+    const collectionRef = collection(db, 'barcodes');
+    
+    const snapshot = await getDocs(collectionRef);
+    if (snapshot.size > 0) {
+      console.log('⏭️  barcodes collection already has data, skipping...');
+      return;
+    }
+
+    const barcodesData = [
+      {
+        employeeId: 'emp_001',
+        name: 'James Mugisha',
+        barcodeNumber: 'BC001234567890',
+        barcodeDate: Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+        barcodeTime: Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+        createdAt: serverTimestamp()
+      },
+      {
+        employeeId: 'emp_002',
+        name: 'Sarah Nakato',
+        barcodeNumber: 'BC002345678901',
+        barcodeDate: Timestamp.fromDate(new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)),
+        barcodeTime: Timestamp.fromDate(new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)),
+        createdAt: serverTimestamp()
+      }
+    ];
+
+    for (const data of barcodesData) {
+      await addDoc(collectionRef, data);
+    }
+    console.log('✅ barcodes collection initialized with 2 records');
   }
 
   static async initializeBranchesCollection(): Promise<void> {
