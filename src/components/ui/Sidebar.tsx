@@ -165,13 +165,7 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager/cash-tracking',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
-  { 
-    id: 'pm-expenses-old', 
-    icon: <Receipt className="w-5 h-5" />, 
-    label: 'Expense Approvals', 
-    path: '/dashboard/purchase-manager/expense-approvals',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
+
   
   // HR specific
   { 
@@ -321,7 +315,7 @@ interface PMQuickAction {
   id: string;
   title: string;
   count: number;
-  type: 'pending-invoices' | 'pending-expenses' | 'overdue-payments' | 'cash-shortage';
+  type: 'pending-invoices' | 'overdue-payments' | 'cash-shortage';
   priority: 'high' | 'medium' | 'low';
   action: string;
 }
@@ -441,14 +435,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
           priority: 'high',
           action: 'Approve/Reject'
         },
-        {
-          id: 'pending-expenses',
-          title: 'Expense Approvals',
-          count: 3,
-          type: 'pending-expenses',
-          priority: 'medium',
-          action: 'Review'
-        },
+
         {
           id: 'overdue-payments',
           title: 'Overdue Payments',

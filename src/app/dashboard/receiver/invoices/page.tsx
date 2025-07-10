@@ -245,83 +245,90 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <FileText className="w-8 h-8 mr-3 text-purple-600" />
-                Invoices Management
-              </h1>
-              <p className="text-gray-600 mt-2">Manage and track all invoices from suppliers</p>
+        {/* Modern Hero Header */}
+        <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+          <div className="relative p-8 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                    Invoices Management
+                  </h1>
+                  <p className="text-purple-100 text-lg">Manage and track all invoices from suppliers</p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push('/dashboard/receiver/invoices/add')}
+                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add New Invoice</span>
+              </button>
             </div>
-            <button
-              onClick={() => router.push('/dashboard/receiver/invoices/add')}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors shadow-lg"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add New Invoice</span>
-            </button>
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Enhanced Statistics Cards */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Invoices</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Total Invoices</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.total}</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-purple-600" />
+                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
+                  <p className="text-3xl font-bold text-yellow-600 group-hover:text-yellow-700 transition-colors">{stats.pending}</p>
                 </div>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-600" />
+                <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Approved</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Approved</p>
+                  <p className="text-3xl font-bold text-green-600 group-hover:text-green-700 transition-colors">{stats.approved}</p>
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
+                <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Value</p>
-                  <p className="text-2xl font-bold text-purple-600">{formatAmount(stats.totalAmount)}</p>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
+                  <p className="text-3xl font-bold text-purple-600 group-hover:text-purple-700 transition-colors">{formatAmount(stats.totalAmount)}</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-purple-600" />
+                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <DollarSign className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+        {/* Modern Filters and Search */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
             <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
               <div className="relative">
@@ -331,7 +338,7 @@ export default function InvoicesPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search invoices..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent w-full md:w-64"
+                  className="pl-10 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent w-full md:w-64 bg-white shadow-sm"
                 />
               </div>
 
@@ -340,7 +347,7 @@ export default function InvoicesPage() {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none bg-white"
+                  className="pl-10 pr-8 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none bg-white shadow-sm"
                 >
                   <option value="all">All Status</option>
                   <option value="Draft">Draft</option>
@@ -367,37 +374,48 @@ export default function InvoicesPage() {
                     setLoading(false);
                   }
                 }}
-                className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200"
                 title="Generate Missing QR Codes"
               >
                 <QrCode className="w-5 h-5" />
               </button>
-              <button className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+              <button className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200">
                 <Download className="w-5 h-5" />
               </button>
-              <button className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+              <button className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200">
                 <Printer className="w-5 h-5" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Invoices Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {filteredInvoices.length === 0 ? (
-            <div className="p-12 text-center">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Invoices Found</h3>
-              <p className="text-gray-600 mb-6">
+        {/* Modern Invoices List */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+              Invoices ({(filteredInvoices || []).length})
+            </h2>
+          </div>
+          
+          {!filteredInvoices || filteredInvoices.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-violet-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <FileText className="w-12 h-12 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No invoices found</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
                 {searchTerm || selectedStatus !== 'all' 
-                  ? 'No invoices match your current filters.' 
+                  ? 'No invoices match your current search criteria. Try adjusting your filters or search terms.' 
                   : 'Get started by creating your first invoice.'
                 }
               </p>
               {!searchTerm && selectedStatus === 'all' && (
                 <button
                   onClick={() => router.push('/dashboard/receiver/invoices/add')}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                  className="mt-6 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-8 py-3 rounded-2xl flex items-center gap-2 mx-auto transition-all duration-300 shadow-lg hover:shadow-xl font-medium"
                 >
                   <Plus className="w-5 h-5" />
                   <span>Add First Invoice</span>
@@ -406,89 +424,109 @@ export default function InvoicesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice Details
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Supplier
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount & Details
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {filteredInvoices.map((invoice, index) => (
+                    <tr key={invoice.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="font-medium text-gray-900">{invoice.invoiceNumber}</div>
-                          <div className="text-sm text-gray-500">FDN: {invoice.fdn}</div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">{invoice.description}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {invoice.invoiceNumber}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            FDN: {invoice.fdn || 'N/A'}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate max-w-xs">
+                            {invoice.description}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <User className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm font-medium text-gray-900">{invoice.supplierName}</span>
+                          <div className="text-sm text-gray-900">{invoice.supplierName}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{formatAmount(invoice.amount)}</div>
-                        <div className="text-sm text-gray-500">Qty: {invoice.quantity}</div>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatAmount(invoice.amount)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Qty: {invoice.quantity || 'N/A'}
+                          </div>
+                          {invoice.description && (
+                            <div className="text-xs text-blue-600 truncate max-w-xs">
+                              {invoice.description}
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(invoice.status)}`}>
                           {getStatusIcon(invoice.status)}
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                            {invoice.status}
-                          </span>
-                        </div>
+                          <span>{invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}</span>
+                        </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{formatDate(invoice.date)}</span>
+                          <div className="text-sm text-gray-900">
+                            {formatDate(invoice.date)}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
-                          <button
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-1">
+                          <button 
                             onClick={() => setSelectedInvoiceForDetails(invoice)}
-                            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="View Details"
+                            className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
+                            title="View Invoice Details"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button
+                          
+                          <button 
                             onClick={() => setSelectedInvoiceForPrint(invoice)}
-                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded"
                             title="Print Invoice"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
+                          
                           <button
                             onClick={() => handleGenerateQR(invoice)}
-                            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            className="p-1 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded"
                             title="Generate QR Code"
                           >
                             <QrCode className="w-4 h-4" />
                           </button>
+                          
                           <button
                             onClick={() => setSelectedInvoiceForEdit(invoice)}
-                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1 text-green-600 hover:text-green-900 hover:bg-green-50 rounded"
                             title="Edit Invoice"
                           >
                             <Edit className="w-4 h-4" />
@@ -503,16 +541,71 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        {/* Summary */}
-        {filteredInvoices.length > 0 && (
-          <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">
-                Showing {filteredInvoices.length} of {invoices.length} invoices
-              </span>
-              <span className="text-sm font-medium text-gray-900">
-                Total Value: {formatAmount(filteredInvoices.reduce((sum, invoice) => sum + invoice.amount, 0))}
-              </span>
+        {/* Invoice Summary */}
+        {filteredInvoices && filteredInvoices.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">
+                  {filteredInvoices.length}
+                </div>
+                <div className="text-sm text-gray-600">Total Invoices</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {formatAmount(filteredInvoices.reduce((sum, invoice) => sum + invoice.amount, 0))}
+                </div>
+                <div className="text-sm text-gray-600">Total Value</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatAmount(filteredInvoices.filter(i => i.status === 'Approved' || i.status === 'Paid').reduce((sum, invoice) => sum + invoice.amount, 0))}
+                </div>
+                <div className="text-sm text-gray-600">Approved Value</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {formatAmount(filteredInvoices.filter(i => i.status === 'Pending').reduce((sum, invoice) => sum + invoice.amount, 0))}
+                </div>
+                <div className="text-sm text-gray-600">Pending Value</div>
+              </div>
+            </div>
+            
+            {/* Status Breakdown */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Status Breakdown</h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-xl font-bold text-gray-600">
+                    {filteredInvoices.filter(i => i.status === 'Draft').length}
+                  </div>
+                  <div className="text-xs text-gray-800">Draft</div>
+                </div>
+                <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                  <div className="text-xl font-bold text-yellow-600">
+                    {filteredInvoices.filter(i => i.status === 'Pending').length}
+                  </div>
+                  <div className="text-xs text-yellow-800">Pending</div>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <div className="text-xl font-bold text-green-600">
+                    {filteredInvoices.filter(i => i.status === 'Approved').length}
+                  </div>
+                  <div className="text-xs text-green-800">Approved</div>
+                </div>
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <div className="text-xl font-bold text-blue-600">
+                    {filteredInvoices.filter(i => i.status === 'Paid').length}
+                  </div>
+                  <div className="text-xs text-blue-800">Paid</div>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded-lg">
+                  <div className="text-xl font-bold text-red-600">
+                    {filteredInvoices.filter(i => i.status === 'Rejected').length}
+                  </div>
+                  <div className="text-xs text-red-800">Rejected</div>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -67,6 +67,7 @@ export default function AddInvoicePage() {
   const [selectedSupplier, setSelectedSupplier] = useState<EnhancedSupplier | null>(null);
   const [userRole, setUserRole] = useState<string>('');
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+  const [returnPath, setReturnPath] = useState('/dashboard/receiver/invoices');
 
   const [formData, setFormData] = useState<FormData>({
     invoiceNumber: '',
@@ -99,6 +100,12 @@ export default function AddInvoicePage() {
 
   useEffect(() => {
     console.log('Invoice Add Page: Initializing...');
+    
+    // Check if user came from purchase manager
+    const referrer = document.referrer;
+    if (referrer.includes('/dashboard/purchase-manager/invoices')) {
+      setReturnPath('/dashboard/purchase-manager/invoices');
+    }
     
     // Test Firebase connection first
     testFirebaseConnection();
@@ -504,7 +511,7 @@ export default function AddInvoicePage() {
       setShowSuccess(true);
       
       setTimeout(() => {
-        router.push('/dashboard/receiver/invoices');
+        router.push(returnPath);
       }, 2000);
       
     } catch (error) {
@@ -556,7 +563,7 @@ export default function AddInvoicePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push('/dashboard/receiver/invoices')}
+                onClick={() => router.push(returnPath)}
                 className="bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors shadow-sm"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -1144,8 +1151,7 @@ export default function AddInvoicePage() {
             </div>
           </div>
 
-          {/* Payment Plan - Only visible to Purchase Managers */}
-          {userRole === 'Purchase Manager' && (
+          {/* Payment Plan - Available to all users */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900 flex items-center">
@@ -1163,81 +1169,138 @@ export default function AddInvoicePage() {
             </div>
 
             <div className="space-y-4">
-              {formData.paymentPlan.map((installment, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">Installment {installment.installmentNumber}</h4>
-                    {formData.paymentPlan.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removePaymentInstallment(index)}
-                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+              {formData.paymentPlan.map((installment, index) => {
+                // Calculate running total up to this installment
+                const runningTotal = formData.paymentPlan
+                  .slice(0, index + 1)
+                  .reduce((sum, inst) => sum + (inst.amount || 0), 0);
+                
+                // Calculate remaining balance after this installment
+                const remainingBalance = Math.max(0, formData.amount - runningTotal);
+                
+                return (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900">Installment {installment.installmentNumber}</h4>
+                      {formData.paymentPlan.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removePaymentInstallment(index)}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Due Date
+                        </label>
+                        <input
+                          type="date"
+                          value={installment.dueDate}
+                          onChange={(e) => updatePaymentInstallment(index, 'dueDate', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount (UGX)
+                        </label>
+                        <input
+                          type="number"
+                          value={installment.amount}
+                          onChange={(e) => updatePaymentInstallment(index, 'amount', Number(e.target.value))}
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Balance After Payment
+                        </label>
+                        <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm font-mono">
+                          {new Intl.NumberFormat('en-UG', {
+                            style: 'currency',
+                            currency: 'UGX',
+                            minimumFractionDigits: 0
+                          }).format(remainingBalance)}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={installment.status}
+                          onChange={(e) => updatePaymentInstallment(index, 'status', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Overdue">Overdue</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Due Date
-                      </label>
-                      <input
-                        type="date"
-                        value={installment.dueDate}
-                        onChange={(e) => updatePaymentInstallment(index, 'dueDate', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
+            {/* Payment Plan Summary */}
+            {formData.paymentPlan.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Payment Plan Summary</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700">Total Invoice Amount:</span>
+                    <div className="font-medium text-blue-900">
+                      {new Intl.NumberFormat('en-UG', {
+                        style: 'currency',
+                        currency: 'UGX',
+                        minimumFractionDigits: 0
+                      }).format(formData.amount)}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Amount (UGX)
-                      </label>
-                      <input
-                        type="number"
-                        value={installment.amount}
-                        onChange={(e) => updatePaymentInstallment(index, 'amount', Number(e.target.value))}
-                        min="0"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Total Planned Payments:</span>
+                    <div className="font-medium text-blue-900">
+                      {new Intl.NumberFormat('en-UG', {
+                        style: 'currency',
+                        currency: 'UGX',
+                        minimumFractionDigits: 0
+                      }).format(formData.paymentPlan.reduce((sum, inst) => sum + (inst.amount || 0), 0))}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
-                      <select
-                        value={installment.status}
-                        onChange={(e) => updatePaymentInstallment(index, 'status', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
-                      </select>
+                  </div>
+                  <div>
+                    <span className="text-blue-700">Difference:</span>
+                    <div className={`font-medium ${
+                      Math.abs(formData.amount - formData.paymentPlan.reduce((sum, inst) => sum + (inst.amount || 0), 0)) < 0.01
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
+                      {new Intl.NumberFormat('en-UG', {
+                        style: 'currency',
+                        currency: 'UGX',
+                        minimumFractionDigits: 0
+                      }).format(formData.amount - formData.paymentPlan.reduce((sum, inst) => sum + (inst.amount || 0), 0))}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Payment Plan Note for Receivers */}
-          {userRole !== 'Purchase Manager' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <div className="flex items-center">
-                <Calendar className="w-5 h-5 text-blue-600 mr-2" />
-                <h3 className="text-lg font-medium text-blue-900">Payment Plan</h3>
+                {Math.abs(formData.amount - formData.paymentPlan.reduce((sum, inst) => sum + (inst.amount || 0), 0)) >= 0.01 && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                    <AlertTriangle className="w-4 h-4 inline mr-1" />
+                    Warning: Payment plan total does not match invoice amount. Please adjust installment amounts.
+                  </div>
+                )}
               </div>
-              <p className="text-blue-700 mt-2">
-                Payment plans are managed by the Purchase Manager. A default single-payment plan will be created for this invoice.
-                Contact your Purchase Manager to set up custom payment installments.
-              </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Additional Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -1272,7 +1335,6 @@ export default function AddInvoicePage() {
                   />
                 </div>
 
-                {userRole === 'Purchase Manager' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Due Date
@@ -1285,17 +1347,6 @@ export default function AddInvoicePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
-                ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 text-blue-600 mr-2" />
-                    <h4 className="text-sm font-medium text-blue-900">Due Date</h4>
-                  </div>
-                  <p className="text-blue-700 text-sm mt-1">
-                    Due dates are managed by the Purchase Manager. Contact your Purchase Manager to set payment due dates.
-                  </p>
-                </div>
-                )}
               </div>
             </div>
 
@@ -1318,7 +1369,7 @@ export default function AddInvoicePage() {
           <div className="flex items-center justify-end space-x-4">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/receiver/invoices')}
+              onClick={() => router.push(returnPath)}
               className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors"
             >
               Cancel
