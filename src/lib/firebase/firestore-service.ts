@@ -546,6 +546,181 @@ export class AuditService extends FirestoreService<AuditLog> {
   }
 }
 
+// ==================== HR SERVICES ====================
+
+export class PayrollService extends FirestoreService<Payroll> {
+  constructor() {
+    super(COLLECTIONS.PAYROLL);
+  }
+
+  async createPayroll(payrollData: Omit<Payroll, 'id' | 'createdAt'>): Promise<string> {
+    // Validate that net salary is calculated correctly
+    const calculatedNetSalary = payrollData.grossSalary - payrollData.deductions;
+    if (Math.abs(calculatedNetSalary - payrollData.netSalary) > 0.01) {
+      throw new Error('Net salary calculation is incorrect');
+    }
+
+    return this.create(payrollData);
+  }
+
+  async getEmployeePayroll(employeeId: string, year?: number, month?: number): Promise<Payroll[]> {
+    const filters: QueryFilters[] = [
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ];
+
+    if (year && month) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      filters.push(
+        { field: 'payPeriodStart', operator: '>=', value: Timestamp.fromDate(startDate) },
+        { field: 'payPeriodEnd', operator: '<=', value: Timestamp.fromDate(endDate) }
+      );
+    }
+
+    return this.getAll(filters, { orderBy: 'payPeriodStart', orderDirection: 'desc' });
+  }
+
+  async getPayrollByStatus(status: Payroll['status']): Promise<Payroll[]> {
+    return this.getAll([
+      { field: 'status', operator: '==', value: status }
+    ], { orderBy: 'payPeriodStart', orderDirection: 'desc' });
+  }
+
+  async processPayroll(payrollId: string, processedBy: string): Promise<void> {
+    await this.update(payrollId, {
+      status: 'processed',
+      processedBy
+    });
+  }
+
+  async markPayrollAsPaid(payrollId: string): Promise<void> {
+    await this.update(payrollId, {
+      status: 'paid',
+      paymentDate: Timestamp.now()
+    });
+  }
+}
+
+export class LeaveRequestService extends FirestoreService<LeaveRequest> {
+  constructor() {
+    super(COLLECTIONS.LEAVE_REQUESTS);
+  }
+
+  async createLeaveRequest(leaveData: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Promise<string> {
+    // Calculate days requested
+    const startDate = leaveData.startDate.toDate();
+    const endDate = leaveData.endDate.toDate();
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    const leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'> = {
+      ...leaveData,
+      daysRequested: daysDiff,
+      status: 'Pending'
+    };
+
+    return this.create(leaveRequest);
+  }
+
+  async getEmployeeLeaveRequests(employeeId: string, status?: LeaveRequest['status']): Promise<LeaveRequest[]> {
+    const filters: QueryFilters[] = [
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ];
+
+    if (status) {
+      filters.push({ field: 'status', operator: '==', value: status });
+    }
+
+    return this.getAll(filters, { orderBy: 'startDate', orderDirection: 'desc' });
+  }
+
+  async getPendingLeaveRequests(): Promise<LeaveRequest[]> {
+    return this.getAll([
+      { field: 'status', operator: '==', value: 'Pending' }
+    ], { orderBy: 'startDate', orderDirection: 'asc' });
+  }
+
+  async approveLeaveRequest(leaveRequestId: string, approvedBy: string, comments?: string): Promise<void> {
+    await this.update(leaveRequestId, {
+      status: 'Approved',
+      approvedBy,
+      approvalDate: Timestamp.now(),
+      comments
+    });
+  }
+
+  async rejectLeaveRequest(leaveRequestId: string, approvedBy: string, comments: string): Promise<void> {
+    await this.update(leaveRequestId, {
+      status: 'Rejected',
+      approvedBy,
+      approvalDate: Timestamp.now(),
+      comments
+    });
+  }
+
+  async getLeaveBalance(employeeId: string, leaveType: LeaveRequest['leaveType'], year: number): Promise<number> {
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31);
+    
+    const approvedLeaves = await this.getAll([
+      { field: 'employeeId', operator: '==', value: employeeId },
+      { field: 'leaveType', operator: '==', value: leaveType },
+      { field: 'status', operator: '==', value: 'Approved' },
+      { field: 'startDate', operator: '>=', value: Timestamp.fromDate(startDate) },
+      { field: 'endDate', operator: '<=', value: Timestamp.fromDate(endDate) }
+    ]);
+
+    const usedDays = approvedLeaves.reduce((total, leave) => total + leave.daysRequested, 0);
+    
+    // Default annual leave allocation (could be configurable)
+    const annualAllocation = leaveType === 'Annual' ? 21 : 
+                           leaveType === 'Sick' ? 7 : 
+                           leaveType === 'Maternity' ? 84 : 
+                           leaveType === 'Paternity' ? 4 : 0;
+
+    return Math.max(0, annualAllocation - usedDays);
+  }
+}
+
+export class BarcodeService extends FirestoreService<Barcode> {
+  constructor() {
+    super(COLLECTIONS.BARCODES);
+  }
+
+  async createBarcode(barcodeData: Omit<Barcode, 'id' | 'createdAt'>): Promise<string> {
+    // Check if barcode number is unique
+    const existingBarcode = await this.getAll([
+      { field: 'barcodeNumber', operator: '==', value: barcodeData.barcodeNumber }
+    ]);
+
+    if (existingBarcode.length > 0) {
+      throw new Error('Barcode number already exists');
+    }
+
+    return this.create(barcodeData);
+  }
+
+  async getEmployeeBarcodes(employeeId: string): Promise<Barcode[]> {
+    return this.getAll([
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ], { orderBy: 'barcodeDate', orderDirection: 'desc' });
+  }
+
+  async getByBarcodeNumber(barcodeNumber: string): Promise<Barcode | null> {
+    const barcodes = await this.getAll([
+      { field: 'barcodeNumber', operator: '==', value: barcodeNumber }
+    ]);
+
+    return barcodes.length > 0 ? barcodes[0] : null;
+  }
+
+  async generateBarcodeNumber(): Promise<string> {
+    // Generate a unique barcode number
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substr(2, 5);
+    return `BC${timestamp}${random}`.toUpperCase();
+  }
+}
+
 // ==================== TRANSACTION SERVICE ====================
 
 export class TransactionService {
@@ -577,5 +752,8 @@ export const firestoreServices = {
   attendance: new AttendanceService(),
   cashClose: new CashCloseService(),
   audit: new AuditService(),
+  payroll: new PayrollService(),
+  leaveRequest: new LeaveRequestService(),
+  barcode: new BarcodeService(),
   transaction: new TransactionService()
 }; 

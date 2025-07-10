@@ -77,6 +77,13 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
       baseSalary: 1200000,
       description: 'Handles all accounting and financial operations',
       assignedDate: new Date() as any
+    },
+    { 
+      jobRoleId: 'hr',
+      jobTitle: 'HR', 
+      baseSalary: 1300000,
+      description: 'Manages human resources, employee relations, and payroll',
+      assignedDate: new Date() as any
     }
   ]);
 
