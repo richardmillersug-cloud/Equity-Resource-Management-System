@@ -6,11 +6,11 @@ import {
   subscribeToInvoices, 
   subscribeToInvoicePayments, 
   subscribeToCashCloses,
-  subscribeToExpenseApprovals,
+
   Invoice,
   InvoicePayment,
   CashClose,
-  ExpenseApproval
+  Expense
 } from '../../../../lib/firebase/purchasing-manager-service';
 import { authService } from '../../../../lib/firebase/auth';
 
@@ -18,7 +18,7 @@ export default function SyncCheckPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
   const [cashCloses, setCashCloses] = useState<CashClose[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseApproval[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -43,17 +43,14 @@ export default function SyncCheckPage() {
       console.log('Cash Closes from Firestore:', data);
     });
 
-    const unsubscribeExpenses = subscribeToExpenseApprovals((data) => {
-      setExpenses(data);
-      console.log('Expenses from Firestore:', data);
-      setLoading(false);
-    });
+    // Expense approvals removed
+    setLoading(false);
 
     return () => {
       unsubscribeInvoices();
       unsubscribePayments();
       unsubscribeCashCloses();
-      unsubscribeExpenses();
+
     };
   }, []);
 

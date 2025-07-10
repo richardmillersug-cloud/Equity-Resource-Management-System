@@ -155,25 +155,6 @@ export interface ChequeTracker {
   updatedAt: Date;
 }
 
-export interface ExpenseApproval {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  expenseId: string;
-  name: string;
-  amount: number;
-  type: 'GENERAL' | 'URA' | 'EMERGENCIES' | 'DAYTODAY';
-  status: 'pending' | 'approved' | 'rejected';
-  requestDate: Date;
-  approvalDate?: Date;
-  approvedBy?: string;
-  rejectionReason?: string;
-  note?: string;
-  receipts?: string[];
-  paidAmount: number;
-  remainingAmount: number;
-}
-
 export interface InvoicePayment {
   id: string;
   invoiceId: string;
@@ -563,62 +544,6 @@ export class PurchasingManagerService {
     await updateDoc(chequeRef, updateData);
   }
 
-  // ==================== EXPENSE APPROVALS ====================
-  
-  /**
-   * Subscribe to expense approvals
-   */
-  static subscribeToExpenseApprovals(callback: (expenses: ExpenseApproval[]) => void): () => void {
-    const q = query(
-      collection(db, 'expenses'),
-      where('status', '==', 'pending'),
-      orderBy('requestDate', 'desc')
-    );
-    
-    return onSnapshot(q, (snapshot) => {
-      const expenses = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          requestDate: data.requestDate?.toDate ? data.requestDate.toDate() : data.requestDate,
-          approvalDate: data.approvalDate?.toDate ? data.approvalDate.toDate() : data.approvalDate
-        };
-      }) as ExpenseApproval[];
-      
-      callback(expenses);
-    });
-  }
-
-  /**
-   * Approve expense
-   */
-  static async approveExpense(expenseId: string, approvedBy: string): Promise<void> {
-    const expenseRef = doc(db, 'expenses', expenseId);
-    
-    await updateDoc(expenseRef, {
-      status: 'approved',
-      approvalDate: serverTimestamp(),
-      approvedBy,
-      updatedAt: serverTimestamp()
-    });
-  }
-
-  /**
-   * Reject expense
-   */
-  static async rejectExpense(expenseId: string, rejectedBy: string, reason: string): Promise<void> {
-    const expenseRef = doc(db, 'expenses', expenseId);
-    
-    await updateDoc(expenseRef, {
-      status: 'rejected',
-      approvalDate: serverTimestamp(),
-      approvedBy: rejectedBy,
-      rejectionReason: reason,
-      updatedAt: serverTimestamp()
-    });
-  }
-
   // ==================== DASHBOARD ANALYTICS ====================
   
   /**
@@ -635,7 +560,7 @@ export class PurchasingManagerService {
       ]);
 
       const invoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Invoice[];
-      const expenses = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ExpenseApproval[];
+      const expenses = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Expense[];
       const cashCloses = cashClosesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CashClose[];
       const suppliers = suppliersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
 
@@ -1409,7 +1334,7 @@ export const {
   subscribeToInvoices,
   subscribeToSuppliers,
   subscribeToChequeTracker,
-  subscribeToExpenseApprovals,
+
   subscribeToInvoicePayments,
   subscribeToExpenses,
   approveInvoice,
@@ -1427,8 +1352,7 @@ export const {
   updateSupplierStatus,
   deleteSupplier,
   updateChequeStatus,
-  approveExpense,
-  rejectExpense,
+
   getDashboardMetrics,
   calculateProfitMetrics
 } = PurchasingManagerService; 

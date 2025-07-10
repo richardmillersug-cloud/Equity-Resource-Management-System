@@ -17,7 +17,7 @@ import {
   Plus,
   AlertTriangle
 } from 'lucide-react';
-import { Expense, subscribeToExpenses, approveExpense, rejectExpense } from '../../../../lib/firebase/purchasing-manager-service';
+import { Expense, subscribeToExpenses } from '../../../../lib/firebase/purchasing-manager-service';
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -28,8 +28,7 @@ export default function ExpensesPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  // Rejection modal state removed
 
   useEffect(() => {
     const unsubscribe = subscribeToExpenses((expenseData) => {
@@ -61,23 +60,7 @@ export default function ExpensesPage() {
     setFilteredExpenses(filtered);
   }, [expenses, statusFilter, typeFilter, searchTerm]);
 
-  const handleApprove = async (expenseId: string) => {
-    try {
-      await approveExpense(expenseId, 'current-user-id');
-    } catch (error) {
-      console.error('Error approving expense:', error);
-    }
-  };
-
-  const handleReject = async (expenseId: string, reason: string) => {
-    try {
-      await rejectExpense(expenseId, 'current-user-id', reason);
-      setShowRejectionModal(false);
-      setRejectionReason('');
-    } catch (error) {
-      console.error('Error rejecting expense:', error);
-    }
-  };
+  // Expense approval functions removed
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {
@@ -186,148 +169,204 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Receipt className="w-6 h-6 text-orange-600" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Modern Hero Header */}
+        <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+          <div className="relative p-8 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <Receipt className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                    Expense Management
+                  </h1>
+                  <p className="text-purple-100 text-lg">Review and approve expense claims with modern tools</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Expense Management</h1>
-                <p className="text-gray-600">Review and approve expense claims</p>
-              </div>
+              <button className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                <Plus className="w-5 h-5" />
+                <span>New Expense</span>
+              </button>
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
-              <Plus className="w-4 h-4" />
-              <span>New Expense</span>
-            </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        {/* Enhanced Stats Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-bold text-gray-900">{expenses.length}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{expenses.length}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All expenses</span>
+                </div>
               </div>
-              <Receipt className="w-8 h-8 text-gray-400" />
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Receipt className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">
+                <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">
                   {expenses.filter(e => e.status === 'pending').length}
                 </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Awaiting review</span>
+                </div>
               </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
+              <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Approved</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-gray-500 text-sm font-medium mb-1">Approved</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
                   {expenses.filter(e => e.status === 'approved').length}
                 </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Ready for payment</span>
+                </div>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-gray-500 text-sm font-medium mb-1">Rejected</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">
                   {expenses.filter(e => e.status === 'rejected').length}
                 </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Declined</span>
+                </div>
               </div>
-              <XCircle className="w-8 h-8 text-red-500" />
+              <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <XCircle className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                <p className="text-xl font-bold text-orange-600">
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Amount</p>
+                <p className="text-2xl font-bold text-gray-900 group-hover:text-violet-600 transition-colors">
                   {formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
                 </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-violet-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All expenses</span>
+                </div>
               </div>
-              <DollarSign className="w-8 h-8 text-orange-500" />
+              <div className="w-14 h-14 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <DollarSign className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
           
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Urgent</p>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-gray-500 text-sm font-medium mb-1">Urgent</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">
                   {expenses.filter(e => e.priority === 'high').length}
                 </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">High priority</span>
+                </div>
               </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+              <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <AlertTriangle className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        {/* Advanced Search & Filters */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex-1 max-w-2xl">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-purple-500 transition-colors" />
                 <input
                   type="text"
                   placeholder="Search expenses by description or submitter..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-500"
                 />
               </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="paid">Paid</option>
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            >
-              <option value="all">All Types</option>
-              <option value="GENERAL">General</option>
-              <option value="URA">URA</option>
-              <option value="EMERGENCIES">Emergencies</option>
-              <option value="DAYTODAY">Day to Day</option>
-            </select>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </button>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                >
+                  <option value="all">All Types</option>
+                  <option value="GENERAL">General</option>
+                  <option value="URA">URA</option>
+                  <option value="EMERGENCIES">Emergencies</option>
+                  <option value="DAYTODAY">Day to Day</option>
+                </select>
+              </div>
+
+              <button className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium">
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Expenses List */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
+        {/* Modern Expenses List */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <Receipt className="w-4 h-4 text-white" />
+              </div>
               Expenses ({filteredExpenses.length})
             </h2>
           </div>
@@ -428,25 +467,7 @@ export default function ExpensesPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {expense.status === 'pending' && (
-                            <>
-                              <button 
-                                onClick={() => handleApprove(expense.id)}
-                                className="text-green-600 hover:text-green-900"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  setSelectedExpense(expense);
-                                  setShowRejectionModal(true);
-                                }}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          {/* Approval buttons removed */}
                         </div>
                       </td>
                     </tr>
@@ -543,86 +564,14 @@ export default function ExpensesPage() {
                   >
                     Close
                   </button>
-                  {selectedExpense.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleApprove(selectedExpense.id);
-                          setShowModal(false);
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowModal(false);
-                          setShowRejectionModal(true);
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
+                  {/* Approval buttons removed */}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Rejection Modal */}
-        {showRejectionModal && selectedExpense && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Reject Expense</h3>
-                  <button
-                    onClick={() => {
-                      setShowRejectionModal(false);
-                      setRejectionReason('');
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <p className="text-gray-600 mb-4">
-                  Please provide a reason for rejecting this expense:
-                </p>
-
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Enter rejection reason..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  rows={4}
-                />
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowRejectionModal(false);
-                      setRejectionReason('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleReject(selectedExpense.id, rejectionReason)}
-                    disabled={!rejectionReason.trim()}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Reject Expense
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Rejection modal removed */}
       </div>
     </div>
   );

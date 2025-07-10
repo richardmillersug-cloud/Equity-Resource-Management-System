@@ -226,7 +226,7 @@ export default function PaymentsPage() {
               <div key={i} className="bg-white p-6 rounded-lg shadow-sm border">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                 <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </div>
+            </div>
             ))}
           </div>
         </div>
@@ -235,88 +235,119 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-            Payment Records
-          </h1>
-          <p className="text-gray-600 mt-1">Track all payment transactions and installments</p>
-        </div>
-        <button
-          onClick={exportToCSV}
-          disabled={filteredPayments.length === 0}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" />
-          Export
-        </button>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Modern Hero Header */}
+        <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+          <div className="relative p-8 text-white">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Payments</p>
-              <p className="text-2xl font-bold text-gray-900">{totalPayments}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Receipt className="w-6 h-6 text-blue-600" />
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                    Payment Records
+                  </h1>
+                  <p className="text-purple-100 text-lg">Track all payment transactions and installments with ease</p>
+                </div>
+              </div>
+              <button
+                onClick={exportToCSV}
+                disabled={filteredPayments.length === 0}
+                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                <Download className="w-5 h-5" />
+                <span>Export</span>
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Cash Payments</p>
-              <p className="text-2xl font-bold text-green-600">{cashPayments}</p>
+        {/* Enhanced Stats Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Payments</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{totalPayments}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All transactions</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Receipt className="w-7 h-7 text-white" />
+              </div>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Banknote className="w-6 h-6 text-green-600" />
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Cash Payments</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{cashPayments}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Physical cash</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Banknote className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Bank Transfers</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{bankTransfers}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Bank deposits</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Building2 className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Mobile Money</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors">{mobilePayments}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Digital payments</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Smartphone className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
+                <p className="text-2xl font-bold text-gray-900 group-hover:text-violet-600 transition-colors">UGX {totalAmount.toLocaleString()}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-violet-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All payments</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <CreditCard className="w-7 h-7 text-white" />
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Bank Transfers</p>
-              <p className="text-2xl font-bold text-purple-600">{bankTransfers}</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Mobile Money</p>
-              <p className="text-2xl font-bold text-orange-600">{mobilePayments}</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Smartphone className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Value</p>
-              <p className="text-2xl font-bold text-gray-900">UGX {totalAmount.toLocaleString()}</p>
-            </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-gray-600" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Cheque Summary */}
       {(pendingCheques.length > 0 || overdueCheques.length > 0) && (
@@ -356,95 +387,97 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search by invoice number, supplier, payment reference, or paid by..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        {/* Advanced Search & Filters */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex-1 max-w-2xl">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-purple-500 transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search by invoice number, supplier, payment reference, or paid by..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-500"
+                />
+              </div>
             </div>
-          </div>
-          <div className="flex gap-4">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <select
-                value={filterMethod}
-                onChange={(e) => setFilterMethod(e.target.value)}
-                className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-              >
-                <option value="all">All Methods</option>
-                <option value="cash">Cash</option>
-                <option value="cheque">Cheque</option>
-                <option value="bank_deposit">Bank Deposit</option>
-                <option value="mobile_money">Mobile Money</option>
-                <option value="momo">MTN MoMo</option>
-                <option value="airtel_pay">Airtel Money</option>
-              </select>
-            </div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-              >
-                <option value="all">All Status</option>
-                <option value="completed">Completed</option>
-                <option value="pending">Pending</option>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <select
+                  value={filterMethod}
+                  onChange={(e) => setFilterMethod(e.target.value)}
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                >
+                  <option value="all">All Methods</option>
+                  <option value="cash">Cash</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="bank_deposit">Bank Deposit</option>
+                  <option value="mobile_money">Mobile Money</option>
+                  <option value="momo">MTN MoMo</option>
+                  <option value="airtel_pay">Airtel Money</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-500" />
+            <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+            >
+              <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
                 <option value="failed">Failed/Bounced</option>
-              </select>
+            </select>
             </div>
           </div>
         </div>
-      </div>
-
+          </div>
+          
       {/* Payments Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment Details
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Invoice & Supplier
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount & Method
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Installment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPayments.map((payment) => (
-                <tr key={payment.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredPayments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
                       <div className="text-sm font-bold text-blue-900 font-mono bg-blue-50 px-2 py-1 rounded">
                         {payment.paymentReference}
-                      </div>
+                          </div>
                       <div className="text-sm text-gray-500 mt-1">
                         Paid by: {payment.paidByName} ({payment.paidBy})
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
                         {payment.invoiceNumber}
@@ -452,11 +485,11 @@ export default function PaymentsPage() {
                       <div className="text-sm text-gray-500">
                         {payment.supplierName}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900">
                         UGX {payment.amount.toLocaleString()}
                       </div>
                       <div className="flex items-center gap-1 mt-1">
@@ -485,22 +518,22 @@ export default function PaymentsPage() {
                           )}
                         </div>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       Payment #{payment.installmentNumber}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
                       {payment.paymentDate.toLocaleDateString()}
-                    </div>
+                          </div>
                     <div className="text-sm text-gray-500">
                       {payment.paymentDate.toLocaleTimeString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleViewDetails(payment)}
@@ -521,7 +554,7 @@ export default function PaymentsPage() {
                             <CheckCircle className="w-3 h-3" />
                             Clear
                           </button>
-                          <button
+                          <button 
                             onClick={() => {
                               handleBounceCheque(payment.id);
                             }}
@@ -533,12 +566,12 @@ export default function PaymentsPage() {
                           </button>
                         </div>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
         </div>
 
         {filteredPayments.length === 0 && (
@@ -550,26 +583,26 @@ export default function PaymentsPage() {
                 ? 'Try adjusting your search or filter criteria.' 
                 : 'No payment records available. Make payments from the Invoices page to see them here.'}
             </p>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
 
-      {/* Payment Details Modal */}
+        {/* Payment Details Modal */}
       {selectedPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Payment Details</h2>
-                <button
+                  <button
                   onClick={() => setSelectedPayment(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                    className="text-gray-400 hover:text-gray-600"
+                  >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </button>
-              </div>
+                  </button>
+                </div>
             </div>
 
             <div className="p-6 space-y-6">
@@ -687,8 +720,8 @@ export default function PaymentsPage() {
                         <p className="mt-1 text-sm text-gray-900 font-mono">{selectedPayment.paymentMethod.details.referenceNumber}</p>
                       </div>
                     )}
-                  </div>
-                </div>
+                      </div>
+                    </div>
               )}
 
               {/* Notes */}
@@ -707,7 +740,7 @@ export default function PaymentsPage() {
                   <h3 className="text-lg font-medium text-red-900 mb-4">Bounce Information</h3>
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                  <div>
                         <label className="block text-sm font-medium text-red-700">Bounce Reason</label>
                         <p className="mt-1 text-sm text-red-900">{(selectedPayment as any).bounceReason}</p>
                       </div>
@@ -723,10 +756,11 @@ export default function PaymentsPage() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

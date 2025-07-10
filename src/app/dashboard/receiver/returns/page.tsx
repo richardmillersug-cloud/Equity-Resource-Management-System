@@ -837,293 +837,230 @@ export default function ReturnNotesPage() {
   const units = ['pcs', 'kg', 'lbs', 'boxes', 'cases', 'liters', 'meters', 'sets'];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100">
+      {/* Modern Hero Header */}
+      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+        <div className="relative p-8 text-white">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <ArrowLeft className="w-8 h-8 mr-3 text-blue-600" />
-                Return Notes Management
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage items returned to suppliers due to various reasons
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  Return Notes Management
+                </h1>
+                <p className="text-purple-100 text-lg">Create and manage return notes for suppliers</p>
+              </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button
                 onClick={handleRefresh}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
-                title="Refresh return notes list"
+                className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+                <RefreshCw className="w-5 h-5" />
+                Refresh Data
               </button>
-              
               <button
                 onClick={handleCreateReturnNoteClick}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
-                title="Create new return note"
+                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5" />
                 Create Return Note
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <label className="text-sm font-medium text-gray-700">Status:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                {RETURN_STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">Reason:</label>
-              <select
-                value={reasonFilter}
-                onChange={(e) => setReasonFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Reasons</option>
-                {RETURN_REASONS.map(reason => (
-                  <option key={reason} value={reason}>{reason}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search return notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
+      {/* Enhanced Stats Dashboard */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <Package className="w-8 h-8 text-blue-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Returns</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalReturns}</p>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Total Returns</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.totalReturns}</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-500">All time</span>
+                  </div>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Package className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <Clock className="w-8 h-8 text-yellow-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.pendingReturns}</p>
+
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">{stats.pendingReturns}</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-500">Awaiting pickup</span>
+                  </div>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Processed</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.processedReturns}</p>
+
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Completed</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{stats.completedReturns}</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-500">Successfully returned</span>
+                  </div>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6" title="Return notes that can be edited (Draft and Pending status only)">
-              <div className="flex items-center">
-                <Edit className="w-8 h-8 text-gray-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Editable Notes</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {returnNotes.filter(note => ['draft', 'pending'].includes(note.status)).length}
+
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
+                  <p className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    {new Intl.NumberFormat('en-UG', {
+                      style: 'currency',
+                      currency: 'UGX',
+                      minimumFractionDigits: 0
+                    }).format(stats.totalValue)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Draft & Pending only</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span className="text-xs text-gray-500">Return value</span>
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center">
-                <XCircle className="w-8 h-8 text-red-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Value</p>
-                  <p className="text-2xl font-bold text-gray-900">${stats.totalValue.toLocaleString()}</p>
+                <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-7 h-7 text-white" />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Return Notes List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Return Notes</h2>
-            {searchQuery && (
-              <p className="text-sm text-gray-600 mt-1">
-                Showing {filteredReturnNotes.length} of {returnNotes.length} return notes
-              </p>
-            )}
-          </div>
-          
-          <div className="p-6">
-            {filteredReturnNotes.length === 0 ? (
-              <div className="text-center py-12">
-                <ArrowLeft className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                {searchQuery ? (
-                  <>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No return notes found</h3>
-                    <p className="text-gray-600 mb-4">No return notes match your search criteria</p>
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Clear Search
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No return notes yet</h3>
-                    <p className="text-gray-600 mb-4">Create your first return note to start tracking returns</p>
-                    <button
-                      onClick={handleCreateReturnNoteClick}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center mx-auto"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create First Return Note
-                    </button>
-                  </>
-                )}
+        {/* Search and Filter Section */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search return notes by supplier, reason, or items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+            <div className="flex gap-4">
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="pl-10 pr-8 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white"
+                >
+                  <option value="all">All Status</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
               </div>
-            ) : (
-              <div className="grid gap-6">
-                {filteredReturnNotes.map((returnNote) => (
-                  <ReturnNoteCard
-                    key={returnNote.id}
-                    returnNote={returnNote}
-                    onView={handleViewReturnNote}
-                    onEdit={handleEditReturnNote}
-                    onDelete={handleDeleteReturnNote}
-                    onUpdateStatus={handleUpdateStatus}
-                  />
-                ))}
+              <div className="relative">
+                <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  value={reasonFilter}
+                  onChange={(e) => setReasonFilter(e.target.value)}
+                  className="pl-10 pr-8 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white"
+                >
+                  <option value="all">All Reasons</option>
+                  {RETURN_REASONS.map(reason => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                </select>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
-        {/* Add Return Note Modal */}
-        {showAddModal && (
-          <AddReturnNoteModal
-            newReturnNote={newReturnNote}
-            setNewReturnNote={setNewReturnNote}
-            suppliers={suppliers}
-            categories={categories}
-            units={units}
-            newItem={newItem}
-            setNewItem={setNewItem}
-            showItemModal={showItemModal}
-            setShowItemModal={setShowItemModal}
-            editingItemIndex={editingItemIndex}
-            onAddItem={handleAddItem}
-            onEditItem={handleEditItem}
-            onRemoveItem={handleRemoveItem}
-            onSubmit={handleAddReturnNote}
-            onClose={() => setShowAddModal(false)}
-            isSubmitting={isSubmitting}
-          />
-        )}
+        {/* Return Notes Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {returnNotes
+            .filter(returnNote => {
+              const matchesSearch = !searchQuery || 
+                returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                returnNote.items.some(item => 
+                  item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  item.reason.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+              
+              const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
+              const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
+              
+              return matchesSearch && matchesStatus && matchesReason;
+            })
+            .map((returnNote) => (
+              <ReturnNoteCard
+                key={returnNote.id}
+                returnNote={returnNote}
+                onView={handleViewReturnNote}
+                onEdit={handleEditReturnNote}
+                onDelete={handleDeleteReturnNote}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            ))}
+        </div>
 
-        {/* Delete Confirmation Modal */}
-        {showDeleteModal && selectedReturnNote && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirm Delete</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to delete return note "{selectedReturnNote.returnNoteNumber}"? This action cannot be undone.
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setSelectedReturnNote(null);
-                  }}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteReturnNote}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+        {returnNotes.length === 0 && (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 max-w-md mx-auto">
+              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Return Notes Yet</h3>
+              <p className="text-gray-500 mb-4">Start by creating your first return note</p>
+              <button
+                onClick={handleCreateReturnNoteClick}
+                className="bg-purple-600 text-white px-6 py-3 rounded-2xl hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto font-semibold"
+              >
+                <Plus className="w-5 h-5" />
+                Create First Return Note
+              </button>
             </div>
           </div>
         )}
 
-        {/* View Return Note Modal */}
-        {showViewModal && selectedReturnNote && (
-          <ViewReturnNoteModal
-            returnNote={selectedReturnNote}
-            onClose={() => {
-              setShowViewModal(false);
-              setSelectedReturnNote(null);
-            }}
-            onEdit={() => {
-              setShowViewModal(false);
-              handleEditReturnNote(selectedReturnNote);
-            }}
-            onUpdateStatus={handleUpdateStatus}
-          />
-        )}
-
-        {/* Edit Return Note Modal */}
-        {showEditModal && editingReturnNote && (
-          <AddReturnNoteModal
-            newReturnNote={newReturnNote}
-            setNewReturnNote={setNewReturnNote}
-            suppliers={suppliers}
-            categories={categories}
-            units={units}
-            newItem={newItem}
-            setNewItem={setNewItem}
-            showItemModal={showItemModal}
-            setShowItemModal={setShowItemModal}
-            editingItemIndex={editingItemIndex}
-            onAddItem={handleAddItem}
-            onEditItem={handleEditItem}
-            onRemoveItem={handleRemoveItem}
-            onSubmit={handleUpdateReturnNote}
-            onClose={handleCloseEdit}
-            isSubmitting={isSubmitting}
-            title="Edit Return Note"
-            submitButtonText="Update Return Note"
-          />
+        {searchQuery && returnNotes.filter(returnNote => {
+          const matchesSearch = returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            returnNote.items.some(item => 
+              item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              item.reason.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+          
+          const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
+          const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
+          
+          return matchesSearch && matchesStatus && matchesReason;
+        }).length === 0 && (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 max-w-md mx-auto">
+              <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Results Found</h3>
+              <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+            </div>
+          </div>
         )}
       </div>
     </div>

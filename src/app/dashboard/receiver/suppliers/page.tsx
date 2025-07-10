@@ -104,9 +104,9 @@ export default function SuppliersPage() {
   const filterSuppliers = () => {
     let filtered = suppliers;
 
-        // Search filter
+    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(supplier =>
+      filtered = filtered.filter(supplier => 
         (supplier.supplierName && supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (supplier.tinNumber && supplier.tinNumber.includes(searchTerm)) ||
         (supplier.phoneNumbers && supplier.phoneNumbers.some(phone => phone && phone.includes(searchTerm)))
@@ -583,114 +583,131 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100">
+      {/* Modern Hero Header */}
+      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+        <div className="relative p-8 text-white">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Suppliers Management</h1>
-              <p className="text-gray-600">Manage your supplier relationships and information</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Building className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  Suppliers Management
+                </h1>
+                <p className="text-purple-100 text-lg">Manage supplier information and relationships</p>
+              </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex space-x-4">
               <button
-                onClick={async () => {
-                  try {
-                    await initializeSuppliers();
-                    await loadSuppliers();
-                  } catch (error) {
-                    console.error('Error seeding:', error);
-                  }
-                }}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                onClick={loadSuppliers}
+                className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Seed Data
+                <Clock className="w-5 h-5" />
+                Refresh Data
               </button>
               <button
                 onClick={handleAddSupplier}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors duration-200 shadow-lg hover:shadow-xl"
+                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
                 <Plus className="w-5 h-5" />
-                <span className="font-medium">Add Supplier</span>
+                Add Supplier
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
+      {/* Enhanced Stats Dashboard */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Suppliers</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Suppliers</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.total}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All suppliers</span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Building className="w-6 h-6 text-purple-600" />
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Building className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Active</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Active</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{stats.active}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Currently active</span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <User className="w-6 h-6 text-green-600" />
+              <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <User className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-yellow-100">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">{stats.pending}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Awaiting approval</span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-yellow-600" />
+              <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Clock className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">This Month</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.thisMonth}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">This Month</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{stats.thisMonth}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">New registrations</span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-gray-600" />
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Calendar className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search suppliers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+        {/* Search and Filter Section */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search suppliers by name, TIN, or phone number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              />
             </div>
-
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Filter className="w-5 h-5 text-gray-500" />
+            <div className="flex gap-4">
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="pl-10 pr-8 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white"
                 >
                   <option value="All">All Status</option>
                   <option value="Active">Active</option>
@@ -698,178 +715,110 @@ export default function SuppliersPage() {
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
-
-              <button 
+              <button
                 onClick={exportSuppliers}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                className="bg-purple-50 text-purple-600 px-4 py-3 rounded-2xl hover:bg-purple-100 transition-colors flex items-center gap-2 font-medium"
               >
-                <Download className="w-4 h-4" />
-                <span>Export ({filteredSuppliers.length})</span>
+                <Download className="w-5 h-5" />
+                Export
               </button>
-
-              <button 
+              <button
                 onClick={printSuppliers}
-                className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                className="bg-gray-50 text-gray-600 px-4 py-3 rounded-2xl hover:bg-gray-100 transition-colors flex items-center gap-2 font-medium"
               >
-                <Printer className="w-4 h-4" />
-                <span>Print / PDF</span>
+                <Printer className="w-5 h-5" />
+                Print
               </button>
             </div>
           </div>
         </div>
 
-        {/* Suppliers Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-gray-600">Loading suppliers...</span>
+        {/* Suppliers Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredSuppliers.map((supplier) => (
+            <div key={supplier.id} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">{supplier.supplierName}</h3>
+                  <p className="text-sm text-gray-500">TIN: {supplier.tinNumber}</p>
+                </div>
+                <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(supplier.status)}`}>
+                  {supplier.status}
+                </span>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                  <span className="truncate">{supplier.address}</span>
+                </div>
+                
+                {supplier.emailAddress && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Mail className="w-4 h-4 mr-2 text-gray-400" />
+                    <span className="truncate">{supplier.emailAddress}</span>
+                  </div>
+                )}
+                
+                {supplier.phoneNumbers && supplier.phoneNumbers.length > 0 && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                    <span>{supplier.phoneNumbers[0]}</span>
+                    {supplier.phoneNumbers.length > 1 && (
+                      <span className="ml-1 text-xs text-gray-400">+{supplier.phoneNumbers.length - 1} more</span>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex items-center text-sm text-gray-600">
+                  <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>Registered: {supplier.dateOfRegistration.toDate().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleViewSupplier(supplier)}
+                  className="flex-1 bg-purple-50 text-purple-600 px-3 py-2 rounded-xl hover:bg-purple-100 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                >
+                  <Eye className="w-4 h-4" />
+                  View
+                </button>
+                <button
+                  onClick={() => handleEditSupplier(supplier)}
+                  className="flex-1 bg-gray-50 text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Supplier Info
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Registration
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Route Days
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Manager
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="flex items-center">
-                          <span className="font-medium text-gray-900">{supplier.supplierName}</span>
-                          {supplier.pendingEdits?.some(edit => edit.status === 'Pending') && (
-                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending Edit
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500">TIN: {supplier.tinNumber}</div>
-                        <div className="text-sm text-gray-500 flex items-center mt-1">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {supplier.address}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        {supplier.phoneNumbers.slice(0, 2).map((phone, index) => (
-                          <div key={index} className="flex items-center text-sm text-gray-600">
-                            <Phone className="w-3 h-3 mr-1" />
-                            {phone}
-                          </div>
-                        ))}
-                        {supplier.phoneNumbers.length > 2 && (
-                          <div className="text-xs text-gray-400">
-                            +{supplier.phoneNumbers.length - 2} more
-                          </div>
-                        )}
-                        {supplier.emailAddress && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail className="w-3 h-3 mr-1" />
-                            {supplier.emailAddress}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {supplier.dateOfRegistration.toDate().toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {supplier.routeDays && supplier.routeDays.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {supplier.routeDays.map((day, index) => (
-                            <span key={day} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              {day}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">No route days</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{getEmployeeName(supplier.employeeId)}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(supplier.status)}`}>
-                        {supplier.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => handleViewSupplier(supplier)}
-                          className="text-purple-600 hover:text-purple-900 p-1 rounded-lg hover:bg-purple-50 transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditSupplier(supplier)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded-lg hover:bg-blue-50 transition-colors"
-                          title="Edit Supplier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ))}
+        </div>
 
-          {!loading && filteredSuppliers.length === 0 && (
-            <div className="text-center py-12">
-              <Building className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No suppliers found</h3>
+        {filteredSuppliers.length === 0 && (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 max-w-md mx-auto">
+              <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Suppliers Found</h3>
               <p className="text-gray-500 mb-4">
                 {searchTerm || statusFilter !== 'All' 
-                  ? 'Try adjusting your search or filter criteria'
-                  : 'Get started by adding your first supplier'
+                  ? 'Try adjusting your search or filter criteria' 
+                  : 'Start by adding your first supplier'
                 }
               </p>
               {!searchTerm && statusFilter === 'All' && (
                 <button
                   onClick={handleAddSupplier}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
+                  className="bg-purple-600 text-white px-6 py-3 rounded-2xl hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto font-semibold"
                 >
+                  <Plus className="w-5 h-5" />
                   Add First Supplier
                 </button>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Supplier Details Modal */}

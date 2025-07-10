@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Invoice } from '../../lib/firebase/enhanced-invoice';
 import { QRCodeService } from '../../lib/utils/qr-code';
 import { authService } from '../../lib/firebase/auth';
+import { InvoicePayment, getInvoicePaymentHistory, Invoice as PMInvoice } from '../../lib/firebase/purchasing-manager-service';
 
 interface InvoicePrintViewProps {
   invoice: Invoice;
@@ -12,6 +13,9 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
   const [qrCodeSVG, setQrCodeSVG] = useState<string>('');
   const [loadingQR, setLoadingQR] = useState(false);
   const [receiverName, setReceiverName] = useState<string>('Receiver Name');
+  const [paymentHistory, setPaymentHistory] = useState<InvoicePayment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [purchasingManagerName, setPurchasingManagerName] = useState<string>('Purchasing Manager');
 
   useEffect(() => {
     // First try to use the stored QR code from the invoice
@@ -27,15 +31,43 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
   }, [invoice]);
 
   useEffect(() => {
-    // Get the current user's name for receiver
+    // Get the current user's name for receiver and purchasing manager
     const currentUser = authService.getCurrentUser();
     if (currentUser?.employee) {
       const fullName = `${currentUser.employee.firstName} ${currentUser.employee.lastName}`;
       setReceiverName(fullName);
+      setPurchasingManagerName(fullName); // Default to current user
     } else if (currentUser?.displayName) {
       setReceiverName(currentUser.displayName);
+      setPurchasingManagerName(currentUser.displayName);
     }
   }, []);
+
+  useEffect(() => {
+    // Load payment history for this invoice
+    const loadPaymentHistory = async () => {
+      if (invoice.id) {
+        try {
+          setLoadingPayments(true);
+          const payments = await getInvoicePaymentHistory(invoice.id);
+          // Sort payments in ascending order (oldest first)
+          const sortedPayments = (payments || []).sort((a, b) => {
+            const dateA = new Date(a.paymentDate).getTime();
+            const dateB = new Date(b.paymentDate).getTime();
+            return dateA - dateB; // Ascending order
+          });
+          setPaymentHistory(sortedPayments);
+        } catch (error) {
+          console.error('Error loading payment history for print view:', error);
+          setPaymentHistory([]);
+        } finally {
+          setLoadingPayments(false);
+        }
+      }
+    };
+
+    loadPaymentHistory();
+  }, [invoice.id]);
 
   const generateQRCode = async () => {
     try {
@@ -181,158 +213,30 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
           </div>
 
           {/* Title Section */}
-          <div className="text-center mb-4">
-            
-            <h3 className="text-base font-bold border border-gray-600 py-1">
-              GOODS RECEIVED NOTE
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-bold border border-gray-600 py-2">
+              PAYMENT HISTORY RECORD
             </h3>
-            <div className="text-right mt-1">
-              <span className="font-bold text-sm">#{invoice.invoiceNumber}</span>
+            <div className="text-right mt-2">
+              <span className="font-bold text-base">Invoice #{invoice.invoiceNumber}</span>
             </div>
-          </div>
-
-          {/* Invoice Details */}
-          <div className="grid grid-cols-2 gap-6 mb-4">
-            <div>
-              <div className="mb-3">
-                <span className="font-bold text-sm">RECEIVED FROM:</span>
-                <span className="ml-2 underline font-bold text-sm">{invoice.supplierName}</span>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-bold text-sm">Supplier:</span>
+                <span className="ml-2 text-sm">{invoice.supplierName}</span>
               </div>
-              <div className="mb-3">
-                <span className="font-bold text-sm">Description of goods:</span>
-                <span className="ml-2 underline text-sm">{invoice.description}</span>
-              </div>
-            </div>
-            <div>
-              <div className="mb-3">
+              <div>
                 <span className="font-bold text-sm">Date:</span>
-                <span className="ml-2 underline text-sm">{formatDate(invoice.date)}</span>
-              </div>
-              <div className="mb-3">
-                <span className="font-bold text-sm">FDN:</span>
-                <span className="ml-2 underline text-sm">{invoice.fdn}</span>
+                <span className="ml-2 text-sm">{formatDate(invoice.date || new Date())}</span>
               </div>
             </div>
           </div>
 
-          {/* Quantity Section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-sm">Quantity received according to order:</span>
-              <div className="flex space-x-3">
-                <label className="flex items-center">
-                  <input type="checkbox" checked={invoice.quantity > 0} readOnly className="mr-1" />
-                  <span className="text-sm">YES</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" checked={invoice.quantity === 0} readOnly className="mr-1" />
-                  <span className="text-sm">NO</span>
-                </label>
-              </div>
-            </div>
-            <div className="border border-gray-400 p-2 h-12">
-              <p className="text-xs">Quantity: {invoice.quantity}</p>
-              {invoice.quantity === 0 && <p className="text-xs italic">If No, Please specify reason above</p>}
-            </div>
-          </div>
-
-          {/* Transport Payment Section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-sm">Transport payment:</span>
-              <div className="flex space-x-3">
-                <label className="flex items-center">
-                  <input type="checkbox" defaultChecked className="mr-1" />
-                  <span className="text-sm">YES</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-1" />
-                  <span className="text-sm">NO</span>
-                </label>
-              </div>
-            </div>
-            <div className="border border-gray-400 p-2 h-10">
-              <p className="text-xs italic">If No, Please specify</p>
-            </div>
-          </div>
-
-          {/* Damages Section */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-sm">Damages:</span>
-              <div className="flex space-x-3">
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-1" />
-                  <span className="text-sm">YES</span>
-                </label>
-                <label className="flex items-center">
-                  <input type="checkbox" defaultChecked className="mr-1" />
-                  <span className="text-sm">NO</span>
-                </label>
-              </div>
-            </div>
-            <div className="border border-gray-400 p-2 h-12">
-              <p className="text-xs italic">If yes, Please specify</p>
-            </div>
-          </div>
-
-          {/* Signature and Payment Section */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-bold mb-3 underline text-sm">RECEIVED BY:</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-bold text-sm">Name:</span>
-                  <div className="border-b border-gray-400 h-6 flex items-end">
-                    <span className="text-sm font-medium">{receiverName}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Position:</span>
-                  <span className="ml-2 text-sm">Receiver</span>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Signature:</span>
-                  <div className="border-b border-gray-400 h-6"></div>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">STAMP:</span>
-                  <div className="border border-gray-400 h-8 w-20"></div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h3 className="font-bold mb-3 underline text-sm">CASH PAYMENT:</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-bold text-sm">Name:</span>
-                  <div className="border-b border-gray-400 h-6"></div>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Amount:</span>
-                  <span className="ml-2 font-bold text-base">{formatAmount(invoice.amount)}</span>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Amount in words:</span>
-                  <div className="border-b border-gray-400 h-6 flex items-end">
-                    <span className="text-xs font-medium">{convertNumberToWords(invoice.amount)}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Signature:</span>
-                  <div className="border-b border-gray-400 h-6"></div>
-                </div>
-                <div>
-                  <span className="font-bold text-sm">Tel Number:</span>
-                  <div className="border-b border-gray-400 h-6"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Plan Section */}
-          <div className="mt-6 mb-4">
-            <h3 className="font-bold mb-2 underline text-sm">PAYMENT PLAN:</h3>
+          {/* Payment History Section */}
+          <div className="mt-4 mb-4">
+            <h3 className="font-bold mb-4 underline text-lg text-center">
+              {paymentHistory.length > 0 ? 'PAYMENT HISTORY DETAILS' : 'PAYMENT PLAN TEMPLATE'}
+            </h3>
             <table className="w-full border-collapse border border-gray-400">
               <thead>
                 <tr className="bg-gray-100">
@@ -341,30 +245,90 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
                   <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-24">Amount (UGX)</th>
                   <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Bal</th>
                   <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-28">Transaction ID</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-32">Name</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Number</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-16">Signature</th>
+                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-32">Paid By</th>
+                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Received By</th>
+                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-16">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {invoice.paymentPlan && invoice.paymentPlan.length > 0 ? (
-                  invoice.paymentPlan.slice(0, 5).map((payment, index) => (
-                    <tr key={payment.id || index}>
-                      <td className="border border-gray-400 px-1 py-2 text-xs">{payment.installmentNumber}</td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                    </tr>
-                  ))
+                {paymentHistory.length > 0 ? (
+                  // Show actual payment history if available
+                  <>
+                    {paymentHistory.slice(0, 5).map((payment, index) => {
+                      // Calculate running total up to this payment (including this payment)
+                      const runningTotal = paymentHistory.slice(0, index + 1).reduce((sum, p) => sum + p.amount, 0);
+                      // Calculate remaining balance after this payment
+                      const remainingBalance = runningTotal >= invoice.amount ? 0 : Math.max(0, invoice.amount - runningTotal);
+                      
+                      // If invoice is fully paid, treat all payments as completed
+                      const isInvoiceFullyPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0) >= invoice.amount;
+                      const displayStatus = isInvoiceFullyPaid ? 'completed' : (payment.paymentStatus || 'completed');
+                      
+                      return (
+                        <tr key={payment.id || index}>
+                          <td className="border border-gray-400 px-1 py-2 text-xs font-medium">#{payment.installmentNumber}</td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs">
+                            {new Date(payment.paymentDate).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: '2-digit'
+                            })}
+                            <br />
+                            <span className="text-gray-600">
+                              {new Date(payment.paymentDate).toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs font-medium">
+                            {formatAmount(payment.amount)}
+                          </td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs">
+                            {formatAmount(remainingBalance)}
+                          </td>
+                        <td className="border border-gray-400 px-1 py-2 text-xs font-mono">
+                          {payment.paymentMethod.details.transactionId || 
+                           payment.paymentMethod.details.chequeNumber || 
+                           payment.paymentReference.slice(-8)}
+                        </td>
+                                                 <td className="border border-gray-400 px-1 py-2 text-xs">
+                           {payment.paidByName}
+                         </td>
+                         <td className="border border-gray-400 px-1 py-2 text-xs">
+                           {payment.approvedBy || receiverName}
+                         </td>
+                                                 <td className="border border-gray-400 px-1 py-2 text-xs">
+                           {displayStatus === 'completed' ? '✓ PAID' :
+                            displayStatus === 'pending' ? '⏳ PENDING' :
+                            displayStatus === 'failed' ? '✗ FAILED' :
+                            displayStatus === 'cancelled' ? '✗ CANCELLED' :
+                            '? UNKNOWN'}
+                         </td>
+                       </tr>
+                     );
+                     })}
+                    {/* Fill remaining rows if payment history has less than 5 items */}
+                    {paymentHistory.length < 5 && 
+                      Array.from({ length: 5 - paymentHistory.length }, (_, index) => (
+                        <tr key={`empty-${index}`}>
+                          <td className="border border-gray-400 px-1 py-2 text-xs">#{paymentHistory.length + index + 1}</td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
+                        </tr>
+                      ))
+                    }
+                  </>
                 ) : (
-                  // Default 5 empty rows when no payment plan exists
+                  // Default 5 empty rows when no payment history exists
                   Array.from({ length: 5 }, (_, index) => (
                     <tr key={index}>
-                      <td className="border border-gray-400 px-1 py-2 text-xs">{index + 1}</td>
+                      <td className="border border-gray-400 px-1 py-2 text-xs">#{index + 1}</td>
                       <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
                       <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
                       <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
@@ -375,23 +339,42 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
                     </tr>
                   ))
                 )}
-                {/* Fill remaining rows if payment plan has less than 5 items */}
-                {invoice.paymentPlan && invoice.paymentPlan.length > 0 && invoice.paymentPlan.length < 5 && 
-                  Array.from({ length: 5 - Math.min(invoice.paymentPlan.length, 5) }, (_, index) => (
-                    <tr key={`empty-${index}`}>
-                      <td className="border border-gray-400 px-1 py-2 text-xs">{(invoice.paymentPlan?.length || 0) + index + 1}</td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                    </tr>
-                  ))
-                }
               </tbody>
             </table>
+            
+            {/* Payment Summary for paid invoices */}
+            {paymentHistory.length > 0 && (
+              <div className="mt-3 p-2 bg-gray-50 border border-gray-300 rounded">
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div className="text-center">
+                    <span className="font-bold">Total Invoice:</span>
+                    <br />
+                    <span className="font-bold text-blue-600">{formatAmount(invoice.amount)}</span>
+                  </div>
+                                     <div className="text-center">
+                     <span className="font-bold">Total Paid:</span>
+                     <br />
+                     <span className="font-bold text-green-600">
+                       {formatAmount(paymentHistory.reduce((sum, p) => sum + p.amount, 0))}
+                     </span>
+                   </div>
+                   <div className="text-center">
+                     <span className="font-bold">Balance:</span>
+                     <br />
+                     <span className="font-bold text-red-600">
+                       {formatAmount(Math.max(0, invoice.amount - paymentHistory.reduce((sum, p) => sum + p.amount, 0)))}
+                     </span>
+                   </div>
+                 </div>
+                 <div className="mt-2 text-center text-xs text-gray-600">
+                   <span className="font-bold">Payment Status: </span>
+                   {paymentHistory.reduce((sum, p) => sum + p.amount, 0) >= invoice.amount ? 
+                     <span className="text-green-600 font-bold">FULLY PAID</span> : 
+                     <span className="text-orange-600 font-bold">PARTIAL PAYMENT</span>
+                   }
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Digital Verification Section */}

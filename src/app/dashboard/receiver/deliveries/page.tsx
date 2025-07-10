@@ -212,74 +212,79 @@ export default function DeliveriesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Truck className="h-8 w-8 text-blue-600 mr-3" />
-                Daily Deliveries
-              </h1>
-              <p className="text-gray-600 mt-1">
-                {getCurrentDayLabel()} • Last updated: {formatTime(lastUpdated.toLocaleTimeString())}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="text-sm text-gray-500">
-              {error ? (
-                <span className="text-red-600 flex items-center">
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  Connection Error
-                </span>
-              ) : (
-                <span className="text-green-600 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Live Updates
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Error Banner */}
-        {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
+      {/* Modern Hero Header */}
+      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
+        <div className="relative p-8 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.back()}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5 text-white" />
+              </button>
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Truck className="w-8 h-8 text-white" />
+              </div>
               <div>
-                <h3 className="text-sm font-medium text-red-800">Connection Error</h3>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
+                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  Daily Deliveries
+                </h1>
+                <p className="text-purple-100 text-lg">
+                  {getCurrentDayLabel()} • Last updated: {formatTime(lastUpdated.toLocaleTimeString())}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="text-sm text-purple-100">
+                {error ? (
+                  <span className="text-red-200 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Connection Error
+                  </span>
+                ) : (
+                  <span className="text-green-200 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Live Updates
+                  </span>
+                )}
               </div>
               <button
                 onClick={handleRefresh}
-                className="ml-auto px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                disabled={loading}
+                className="flex items-center space-x-2 px-6 py-3 bg-white text-purple-600 rounded-2xl hover:bg-purple-50 transition-all duration-300 disabled:opacity-50 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Retry
+                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Connection Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              className="ml-auto px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -288,7 +293,7 @@ export default function DeliveriesPage() {
             placeholder="Search suppliers, contacts, or items..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm"
           />
         </div>
         
@@ -296,7 +301,7 @@ export default function DeliveriesPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm"
           >
             <option value="all">All Status</option>
             <option value="on-time">On Time</option>
@@ -307,7 +312,7 @@ export default function DeliveriesPage() {
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm"
           >
             <option value="all">All Priority</option>
             <option value="urgent">Urgent</option>
@@ -318,51 +323,59 @@ export default function DeliveriesPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
+      {/* Enhanced Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Expected Suppliers</p>
-              <p className="text-2xl font-bold text-gray-900">{dailySuppliers.length}</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Expected Suppliers</p>
+              <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{dailySuppliers.length}</p>
             </div>
-            <Truck className="h-8 w-8 text-blue-600" />
+            <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Truck className="w-7 h-7 text-white" />
+            </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Items</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-gray-500 text-sm font-medium mb-1">Total Items</p>
+              <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
                 {dailySuppliers.reduce((sum, supplier) => sum + supplier.items, 0)}
               </p>
             </div>
-            <Package className="h-8 w-8 text-green-600" />
+            <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Package className="w-7 h-7 text-white" />
+            </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Urgent Restocks</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-gray-500 text-sm font-medium mb-1">Urgent Restocks</p>
+              <p className="text-3xl font-bold text-red-600 group-hover:text-red-700 transition-colors">
                 {restockItems.filter(item => item.priority === 'urgent').length}
               </p>
             </div>
-            <AlertTriangle className="h-8 w-8 text-red-600" />
+            <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <AlertTriangle className="w-7 h-7 text-white" />
+            </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg p-4 border border-gray-200">
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">On Time</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-gray-500 text-sm font-medium mb-1">On Time</p>
+              <p className="text-3xl font-bold text-green-600 group-hover:text-green-700 transition-colors">
                 {dailySuppliers.filter(supplier => supplier.status === 'on-time').length}
               </p>
             </div>
-            <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <CheckCircle className="w-7 h-7 text-white" />
+            </div>
           </div>
         </div>
       </div>
@@ -370,13 +383,13 @@ export default function DeliveriesPage() {
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Today's Expected Suppliers */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <Clock className="h-6 w-6 text-blue-600 mr-2" />
+              <Clock className="h-6 w-6 text-purple-600 mr-2" />
               Today's Expected Suppliers
             </h2>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 bg-purple-50 px-3 py-1 rounded-full">
               {filteredSuppliers.length} supplier{filteredSuppliers.length !== 1 ? 's' : ''} expected
             </span>
           </div>
