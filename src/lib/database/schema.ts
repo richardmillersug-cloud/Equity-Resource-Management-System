@@ -23,6 +23,10 @@ export interface Employee {
   salary?: number;
   hire_date: Date;
   is_active: boolean;
+  working_section?: string; // For customer service employees - supermarket section
+  passport_photo?: string; // URL to passport-sized photo
+  passport_photo_filename?: string; // Original filename
+  passport_photo_uploaded_at?: Date; // Upload timestamp
   created_at: Date;
   updated_at: Date;
 }
@@ -295,6 +299,9 @@ export interface Attendance {
   barcode_scan?: string;
   hours_worked?: number;
   overtime_hours?: number;
+  shift_start_total_scans?: number;
+  shift_end_total_scans?: number;
+  total_scans_during_shift?: number;
   created_at: Date;
   updated_at: Date;
 }

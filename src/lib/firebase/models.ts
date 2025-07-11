@@ -25,9 +25,13 @@ export interface Employee {
   employeeSalary: number;
   employmentStatus: 'Active' | 'Inactive' | 'Terminated';
   branchId: string; // Reference to Branch
+  workingSection?: string; // For customer service employees - supermarket section
   nextOfKinName?: string;
   nextOfKinNIN?: string;
   nextOfKinPhoneNumber?: string;
+  passportPhoto?: string; // URL to passport-sized photo
+  passportPhotoFilename?: string; // Original filename
+  passportPhotoUploadedAt?: Timestamp; // Upload timestamp
   // Auth handled by Firebase Auth, no password field needed
   roles: JobRole[]; // Embedded job roles
   createdAt: Timestamp;
@@ -310,6 +314,9 @@ export interface Attendance {
   hoursWorked?: number;
   overtimeHours?: number;
   barcodeScanned?: string;
+  shiftStartTotalScans?: number;
+  shiftEndTotalScans?: number;
+  totalScansDuringShift?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

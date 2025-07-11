@@ -5,6 +5,7 @@ import { enhancedBarcodeService, BarcodeItem, BarcodeStats } from '../../../../l
 import BarcodeService, { CodeType, BarcodeFormat } from '../../../../lib/services/barcode-service';
 import { authService } from '../../../../lib/firebase/auth';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
+import { hrService } from '../../../../lib/services/hr-service';
 import { QrCode, Plus, XCircle, BarChart3, Package, CheckCircle, Activity, Printer, Eye, Search } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
@@ -390,6 +391,16 @@ export default function BarcodePage() {
         fullPrintSettings
       );
 
+      // Record scan for shift tracking
+      if (currentUser?.employee?.employeeId) {
+        try {
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
+          console.log('Barcode print scan recorded:', scanResult);
+        } catch (scanError) {
+          console.log('Scan tracking not active for this user:', scanError);
+        }
+      }
+
       // Refresh items to update print history
       loadBarcodeItems();
       
@@ -424,6 +435,17 @@ export default function BarcodePage() {
       };
 
       await enhancedBarcodeService.addBarcodeItem(itemToAdd);
+      
+      // Record scan for shift tracking
+      if (currentUser?.employee?.employeeId) {
+        try {
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
+          console.log('Barcode creation scan recorded:', scanResult);
+        } catch (scanError) {
+          console.log('Scan tracking not active for this user:', scanError);
+        }
+      }
+      
       alert('Barcode item added successfully!');
       loadBarcodeItems();
       

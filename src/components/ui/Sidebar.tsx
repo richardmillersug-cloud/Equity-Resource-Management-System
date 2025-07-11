@@ -64,7 +64,7 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Dashboard', 
     path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor']
+    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
   },
   
   // Admin specific
@@ -79,7 +79,7 @@ const navigationItems: NavigationItem[] = [
     id: 'user-management', 
     icon: <UserCheck className="w-5 h-5" />, 
     label: 'User Management', 
-    path: '/admin/users',
+    path: '/dashboard/hr/employees',
     roles: ['Admin']
   },
   
@@ -94,8 +94,8 @@ const navigationItems: NavigationItem[] = [
   { 
     id: 'branches', 
     icon: <Building2 className="w-5 h-5" />, 
-    label: 'Branches', 
-    path: '/manager/branches',
+    label: 'Branch Management', 
+    path: '/dashboard/settings',
     roles: ['Manager', 'Admin']
   },
   
@@ -111,14 +111,14 @@ const navigationItems: NavigationItem[] = [
     id: 'expenses', 
     icon: <Receipt className="w-5 h-5" />, 
     label: 'Expenses', 
-    path: '/accountant/expenses',
+    path: '/dashboard/accountant/expenses',
     roles: ['Accountant', 'Admin']
   },
   { 
     id: 'financial-reports', 
     icon: <BarChart3 className="w-5 h-5" />, 
     label: 'Financial Reports', 
-    path: '/accountant/reports',
+    path: '/dashboard/accountant/reports',
     roles: ['Accountant', 'Manager', 'Admin']
   },
   
@@ -138,9 +138,9 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'expenses', 
+    id: 'pm-expenses', 
     icon: <Receipt className="w-5 h-5" />, 
-    label: 'Expenses', 
+    label: 'PM Expenses', 
     path: '/dashboard/purchase-manager/expenses',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
@@ -169,25 +169,93 @@ const navigationItems: NavigationItem[] = [
   
   // HR specific
   { 
+    id: 'hr-dashboard', 
+    icon: <Users className="w-5 h-5" />, 
+    label: 'HR Dashboard', 
+    path: '/dashboard/hr',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+  },
+  { 
     id: 'employees', 
     icon: <Users className="w-5 h-5" />, 
     label: 'Employees', 
-    path: '/dashboard/hr',
-    roles: ['HR', 'Manager', 'Admin']
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+    submenu: [
+      {
+        id: 'view-employees',
+        icon: <Eye className="w-4 h-4" />,
+        label: 'View All',
+        path: '/dashboard/hr/employees'
+      },
+      {
+        id: 'add-employee',
+        icon: <Plus className="w-4 h-4" />,
+        label: 'Add Employee',
+        path: '/dashboard/hr/employees/add'
+      }
+    ]
+  },
+  { 
+    id: 'attendance-tracking', 
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
+    label: 'Attendance Tracking', 
+    path: '/dashboard/hr/attendance-tracking',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
   },
   { 
     id: 'attendance', 
-    icon: <ClipboardList className="w-5 h-5" />, 
-    label: 'Attendance', 
-    path: '/hr/attendance',
-    roles: ['HR', 'Manager', 'Admin']
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📋</span>, 
+    label: 'Attendance Reports', 
+    path: '/dashboard/hr/attendance',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
   },
   { 
     id: 'leave-requests', 
-    icon: <FileText className="w-5 h-5" />, 
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📄</span>, 
     label: 'Leave Requests', 
-    path: '/hr/leave',
-    roles: ['HR', 'Manager', 'Admin']
+    path: '/dashboard/hr/leave-requests',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+  },
+  { 
+    id: 'leave-calendar', 
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
+    label: 'Leave Calendar', 
+    path: '/dashboard/hr/leave',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+  },
+  { 
+    id: 'payroll', 
+    icon: <Banknote className="w-5 h-5" />, 
+    label: 'Payroll', 
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+    submenu: [
+      {
+        id: 'payroll-processing',
+        icon: <Calculator className="w-4 h-4" />,
+        label: 'Processing',
+        path: '/dashboard/hr/payroll'
+      },
+      {
+        id: 'payroll-reports',
+        icon: <BarChart3 className="w-4 h-4" />,
+        label: 'Reports',
+        path: '/dashboard/hr/reports'
+      }
+    ]
+  },
+  { 
+    id: 'hr-barcodes', 
+    icon: <QrCode className="w-5 h-5" />, 
+    label: 'ID Cards & Barcodes', 
+    path: '/dashboard/hr/barcodes',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+  },
+  { 
+    id: 'employee-documents', 
+    icon: <FileText className="w-5 h-5" />, 
+    label: 'Documents', 
+    path: '/dashboard/hr/employee-documents',
+    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
   },
   
   // Stock Manager specific
@@ -202,7 +270,7 @@ const navigationItems: NavigationItem[] = [
     id: 'damage-reports', 
     icon: <AlertTriangle className="w-5 h-5" />, 
     label: 'Damage Reports', 
-    path: '/stock-manager/damages',
+    path: '/dashboard/receiver/damages',
     roles: ['Stock Manager', 'Manager', 'Admin']
   },
   
@@ -292,13 +360,56 @@ const navigationItems: NavigationItem[] = [
     roles: ['Auditor', 'Admin']
   },
   
+  // Customer Service specific
+  { 
+    id: 'customer-service-desk', 
+    icon: <Users className="w-5 h-5" />, 
+    label: 'Customer Service', 
+    path: '/dashboard/receiver/returns',
+    roles: ['Customer Service', 'Manager', 'Admin']
+  },
+  
+  // Cashier specific
+  { 
+    id: 'cashier-operations', 
+    icon: <CreditCard className="w-5 h-5" />, 
+    label: 'Cashier Operations', 
+    path: '/dashboard/purchase-manager/payments',
+    roles: ['Cashier', 'Manager', 'Admin']
+  },
+  
+  // Employee Self-Service (for all employee roles)
+  { 
+    id: 'my-attendance', 
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
+    label: 'My Attendance', 
+    path: '/dashboard/hr/attendance-tracking',
+    roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Purchasing Manager', 'Accountant']
+  },
+  { 
+    id: 'my-leave', 
+    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
+    label: 'My Leave Requests', 
+    path: '/dashboard/hr/leave-requests',
+    roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Purchasing Manager', 'Accountant']
+  },
+  
+  // Development/Testing
+  { 
+    id: 'offline-test', 
+    icon: <RefreshCw className="w-5 h-5" />, 
+    label: 'Offline Test', 
+    path: '/dashboard/offline-test',
+    roles: ['Admin']
+  },
+  
   // Settings - Available to all roles
   { 
     id: 'settings', 
     icon: <Settings className="w-5 h-5" />, 
     label: 'Settings', 
     path: '/dashboard/settings',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'Stock Manager', 'Receiver', 'Auditor', 'User', '*']
+    roles: ['*'] // All roles can access settings
   }
 ];
 
@@ -320,6 +431,15 @@ interface PMQuickAction {
   action: string;
 }
 
+interface HRQuickAction {
+  id: string;
+  title: string;
+  count: number;
+  type: 'pending-leave-requests' | 'attendance-alerts' | 'new-employees' | 'expired-documents' | 'birthday-reminders';
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -328,6 +448,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [pmQuickActions, setPMQuickActions] = useState<PMQuickAction[]>([]);
   const [loadingPMActions, setLoadingPMActions] = useState(false);
+  const [hrQuickActions, setHRQuickActions] = useState<HRQuickAction[]>([]);
+  const [loadingHRActions, setLoadingHRActions] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -346,6 +468,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       if (user && (userRole === 'Purchase Manager' || userRole === 'Purchasing Manager')) {
         loadPMQuickActions();
       }
+      // Load HR quick actions when user changes and is HR
+      if (user && userRole === 'HR') {
+        loadHRQuickActions();
+      }
     });
 
     // Load expected suppliers immediately if user is already a receiver
@@ -357,6 +483,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     const userRole = user?.employee?.roles?.[0]?.jobTitle;
     if (user && (userRole === 'Purchase Manager' || userRole === 'Purchasing Manager')) {
       loadPMQuickActions();
+    }
+
+    // Load HR quick actions immediately if user is already HR
+    if (user && userRole === 'HR') {
+      loadHRQuickActions();
     }
 
     return unsubscribe;
@@ -463,6 +594,65 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     }
   };
 
+  const loadHRQuickActions = async () => {
+    const userRole = getUserRole();
+    if (userRole !== 'HR') return;
+    
+    setLoadingHRActions(true);
+    try {
+      // Mock data for now - in real implementation, this would fetch from Firebase
+      const mockActions: HRQuickAction[] = [
+        {
+          id: 'pending-leave-requests',
+          title: 'Leave Requests',
+          count: 8,
+          type: 'pending-leave-requests',
+          priority: 'high',
+          action: 'Review & Approve'
+        },
+        {
+          id: 'attendance-alerts',
+          title: 'Late Check-ins',
+          count: 3,
+          type: 'attendance-alerts',
+          priority: 'medium',
+          action: 'Follow Up'
+        },
+        {
+          id: 'new-employees',
+          title: 'New Joiners',
+          count: 2,
+          type: 'new-employees',
+          priority: 'medium',
+          action: 'Complete Setup'
+        },
+        {
+          id: 'expired-documents',
+          title: 'Expired Docs',
+          count: 5,
+          type: 'expired-documents',
+          priority: 'high',
+          action: 'Update Required'
+        },
+        {
+          id: 'birthday-reminders',
+          title: 'Birthdays Today',
+          count: 4,
+          type: 'birthday-reminders',
+          priority: 'low',
+          action: 'Send Wishes'
+        }
+      ];
+      
+      setHRQuickActions(mockActions.filter(action => action.count > 0));
+    } catch (error) {
+      console.error('Error loading HR quick actions:', error);
+      setHRQuickActions([]);
+    } finally {
+      setLoadingHRActions(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'on-time': return 'bg-green-100 text-green-700 border-green-200';
@@ -514,6 +704,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       }
       setOpenDropdowns(newOpenDropdowns);
       // Still navigate to the main deliveries page
+      if (item.path) {
+        if (onItemClick) {
+          onItemClick(item.id);
+        } else {
+          router.push(item.path);
+        }
+      }
+    }
+    
+    // Special handling for hr-dashboard item for HR
+    else if (item.id === 'hr-dashboard' && getUserRole() === 'HR') {
+      // Toggle dropdown for HR quick actions
+      const newOpenDropdowns = new Set(openDropdowns);
+      if (newOpenDropdowns.has(item.id)) {
+        newOpenDropdowns.delete(item.id);
+      } else {
+        newOpenDropdowns.add(item.id);
+      }
+      setOpenDropdowns(newOpenDropdowns);
+      // Still navigate to the main HR dashboard page
       if (item.path) {
         if (onItemClick) {
           onItemClick(item.id);
@@ -864,6 +1074,100 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                   >
                     <RefreshCw className="w-3 h-3 text-orange-600 mr-2" />
                     <span className="text-xs font-medium text-orange-700">Refresh</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* HR Quick Actions List - Special for hr-dashboard when HR */}
+            {isExpanded && item.id === 'hr-dashboard' && getUserRole() === 'HR' && openDropdowns.has(item.id) && (
+              <div className="ml-6 mt-2 space-y-2">
+                {/* Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs font-semibold text-purple-900">HR Quick Actions</span>
+                  </div>
+                  <span className="text-xs text-purple-600 font-medium">{getCurrentTime()}</span>
+                </div>
+
+                {/* Loading State */}
+                {loadingHRActions && (
+                  <div className="px-3 py-4 text-center">
+                    <div className="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <span className="text-xs text-gray-500">Loading actions...</span>
+                  </div>
+                )}
+
+                {/* Quick Actions List */}
+                {!loadingHRActions && hrQuickActions.length > 0 && (
+                  <div className="max-h-64 overflow-y-auto space-y-1">
+                    {hrQuickActions.map((action) => (
+                      <div
+                        key={action.id}
+                        className="px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (action.type === 'pending-leave-requests') {
+                            router.push('/dashboard/hr/leave-requests');
+                          } else if (action.type === 'attendance-alerts') {
+                            router.push('/dashboard/hr/attendance-tracking');
+                          } else if (action.type === 'new-employees') {
+                            router.push('/dashboard/hr/employees/add');
+                          } else if (action.type === 'expired-documents') {
+                            router.push('/dashboard/hr/employee-documents');
+                          } else if (action.type === 'birthday-reminders') {
+                            router.push('/dashboard/hr/employees');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-1">
+                            <span className="text-xs">{getPriorityIcon(action.priority)}</span>
+                            <span className="text-xs font-medium text-gray-900 truncate" title={action.title}>
+                              {action.title.length > 12 ? action.title.substring(0, 12) + '...' : action.title}
+                            </span>
+                          </div>
+                          <span className="text-xs font-bold text-purple-600">{action.count}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-600">{action.action}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                            action.priority === 'high' ? 'bg-red-100 text-red-700 border-red-200' :
+                            action.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                            'bg-green-100 text-green-700 border-green-200'
+                          }`}>
+                            {action.priority.charAt(0).toUpperCase() + action.priority.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* No Actions */}
+                {!loadingHRActions && hrQuickActions.length === 0 && (
+                  <div className="px-3 py-4 text-center">
+                    <div className="text-gray-400 mb-2">✅</div>
+                    <span className="text-xs text-gray-500">All caught up!</span>
+                  </div>
+                )}
+
+                {/* Quick Actions Buttons */}
+                <div className="border-t border-gray-200 pt-2 space-y-1">
+                  <button
+                    onClick={() => router.push('/dashboard/hr')}
+                    className="w-full h-8 rounded-lg flex items-center px-3 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                  >
+                    <Eye className="w-3 h-3 text-emerald-600 mr-2" />
+                    <span className="text-xs font-medium text-emerald-700">View Dashboard</span>
+                  </button>
+                  <button
+                    onClick={() => loadHRQuickActions()}
+                    className="w-full h-8 rounded-lg flex items-center px-3 bg-purple-50 hover:bg-purple-100 transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3 text-purple-600 mr-2" />
+                    <span className="text-xs font-medium text-purple-700">Refresh</span>
                   </button>
                 </div>
               </div>
