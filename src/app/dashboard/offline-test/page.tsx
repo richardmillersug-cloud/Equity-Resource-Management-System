@@ -145,6 +145,13 @@ export default function OfflineTestPage() {
   };
 
   const clearTestResults = () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to clear all test results?\n\n' +
+      `This will remove ${testResults.length} test result entries.`
+    );
+
+    if (!confirmed) return;
+
     setTestResults([]);
     addTestResult('System', 'Test results cleared', 'info');
   };
@@ -263,7 +270,21 @@ export default function OfflineTestPage() {
           </button>
 
           <button
-            onClick={() => OfflineUtils.clearOfflineData()}
+            onClick={() => {
+              const confirmed = window.confirm(
+                'Are you sure you want to clear all offline cache data?\n\n' +
+                'This will remove:\n' +
+                '- Cached deliveries and inventory data\n' +
+                '- Pending offline operations\n' +
+                '- Local storage data\n\n' +
+                'This action cannot be undone.'
+              );
+              
+              if (confirmed) {
+                OfflineUtils.clearOfflineData();
+                addTestResult('System', 'Offline cache data cleared', 'warning');
+              }
+            }}
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
           >
             <Database className="h-4 w-4" />

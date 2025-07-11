@@ -10,6 +10,7 @@ import {
   LeaveType
 } from '../database/schema';
 import { businessRules } from '../business-rules';
+import { scanTrackingService } from './scan-tracking-service';
 
 export class HRService {
   
@@ -113,6 +114,38 @@ export class HRService {
   // ==================== ATTENDANCE TRACKING ====================
 
   /**
+   * Records a scan during the shift (e.g., barcode/QR code scan)
+   */
+  recordShiftScan(employeeId: string): {
+    currentScanCount: number;
+    scanStats: any;
+  } {
+    // Record the scan
+    scanTrackingService.recordScan(employeeId);
+    
+    // Get updated scan statistics
+    const scanStats = scanTrackingService.getScanStats(employeeId);
+    const currentScanCount = scanTrackingService.getCurrentScanCount(employeeId);
+    
+    return {
+      currentScanCount,
+      scanStats
+    };
+  }
+
+  /**
+   * Gets current scan statistics for an employee
+   */
+  getScanStats(employeeId: string): {
+    currentShiftScans: number;
+    lastScanTime?: Date;
+    shiftStartTime?: Date;
+    isShiftActive: boolean;
+  } {
+    return scanTrackingService.getScanStats(employeeId);
+  }
+
+  /**
    * Records employee check-in
    */
   async checkIn(
@@ -133,12 +166,16 @@ export class HRService {
       throw new Error('Employee already checked in today');
     }
 
+    // Record shift start and get current scan count
+    const shiftStartTotalScans = scanTrackingService.recordShiftStart(employeeId);
+
     const attendance: Attendance = {
       id: this.generateId(),
       employee_id: employeeId,
       check_in_time: new Date(),
       date: today,
       barcode_scan: barcodeScanned,
+      shift_start_total_scans: shiftStartTotalScans,
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -171,6 +208,9 @@ export class HRService {
       throw new Error('Employee already checked out today');
     }
 
+    // Record shift end and get scan totals
+    const shiftScanData = scanTrackingService.recordShiftEnd(employeeId);
+
     const checkOutTime = new Date();
     const hoursWorked = this.calculateHoursWorked(attendance.check_in_time, checkOutTime);
     const overtimeHours = Math.max(0, hoursWorked - 8); // Assuming 8-hour standard workday
@@ -179,6 +219,8 @@ export class HRService {
       check_out_time: checkOutTime,
       hours_worked: hoursWorked,
       overtime_hours: overtimeHours,
+      shift_end_total_scans: shiftScanData.shiftEndTotalScans,
+      total_scans_during_shift: shiftScanData.totalScansDuringShift,
       updated_at: new Date()
     });
   }

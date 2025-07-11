@@ -349,6 +349,18 @@ export default function AddInvoicePage() {
   };
 
   const removeDamage = (index: number) => {
+    const damage = formData.damages[index];
+    if (!damage) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove this damage entry?\n\n` +
+      `Item: ${damage.itemDescription}\n` +
+      `Damaged Quantity: ${damage.quantityDamaged}\n` +
+      `Estimated Value: ${damage.estimatedValue}`
+    );
+
+    if (!confirmed) return;
+
     setFormData(prev => ({
       ...prev,
       damages: prev.damages.filter((_, i) => i !== index)
@@ -377,6 +389,19 @@ export default function AddInvoicePage() {
   };
 
   const removePaymentInstallment = (index: number) => {
+    const installment = formData.paymentPlan[index];
+    if (!installment) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove this payment installment?\n\n` +
+      `Installment #${installment.installmentNumber}\n` +
+      `Amount: ${installment.amount}\n` +
+      `Due Date: ${installment.dueDate}\n` +
+      `Status: ${installment.status}`
+    );
+
+    if (!confirmed) return;
+
     setFormData(prev => ({
       ...prev,
       paymentPlan: prev.paymentPlan.filter((_, i) => i !== index)

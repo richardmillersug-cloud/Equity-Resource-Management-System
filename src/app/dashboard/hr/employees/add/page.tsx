@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '../../../../../lib/firebase/auth';
 import { firestoreServices } from '../../../../../lib/firebase/firestore-service';
+import { photoService } from '../../../../../lib/services/photo-service';
 import { 
   ArrowLeft, 
   Save, 
@@ -18,7 +19,10 @@ import {
   CreditCard,
   UserPlus,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Camera,
+  Upload,
+  X
 } from 'lucide-react';
 
 interface FormData {
@@ -35,9 +39,12 @@ interface FormData {
   branchId: string;
   jobTitle: string;
   baseSalary: string;
+  workingSection?: string;
   nextOfKinName: string;
   nextOfKinNIN: string;
   nextOfKinPhoneNumber: string;
+  passportPhoto?: string;
+  passportPhotoFilename?: string;
 }
 
 interface Branch {
@@ -53,7 +60,27 @@ const jobRoles = [
   { id: 'stock-manager', title: 'Stock Manager', defaultSalary: 1000000 },
   { id: 'receiver', title: 'Receiver', defaultSalary: 800000 },
   { id: 'supervisor', title: 'Supervisor', defaultSalary: 900000 },
-  { id: 'managing-director', title: 'Managing Director', defaultSalary: 5000000 }
+  { id: 'managing-director', title: 'Managing Director', defaultSalary: 5000000 },
+  { id: 'cashier', title: 'Cashier', defaultSalary: 220000 },
+  { id: 'customer-service', title: 'Customer Service', defaultSalary: 150000 }
+];
+
+const supermarketSections = [
+  'Fresh Produce',
+  'Dairy & Chilled',
+  'Meat & Poultry', 
+  'Bakery',
+  'Frozen Foods',
+  'Beverages',
+  'Snacks & Confectionery',
+  'Personal Care',
+  'Household Items',
+  'Electronics',
+  'Clothing & Accessories',
+  'Pharmacy',
+  'Customer Service Desk',
+  'Returns & Exchanges',
+  'General Floor'
 ];
 
 export default function AddEmployeePage() {
@@ -62,6 +89,13 @@ export default function AddEmployeePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  
+  // Photo upload state
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
@@ -77,9 +111,12 @@ export default function AddEmployeePage() {
     branchId: '',
     jobTitle: '',
     baseSalary: '',
+    workingSection: '',
     nextOfKinName: '',
     nextOfKinNIN: '',
-    nextOfKinPhoneNumber: ''
+    nextOfKinPhoneNumber: '',
+    passportPhoto: '',
+    passportPhotoFilename: ''
   });
 
   const [errors, setErrors] = useState<Partial<FormData>>({});
@@ -87,6 +124,15 @@ export default function AddEmployeePage() {
   useEffect(() => {
     loadBranches();
   }, []);
+
+  // Cleanup photo preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (photoPreview) {
+        photoService.revokePreviewUrl(photoPreview);
+      }
+    };
+  }, [photoPreview]);
 
   const loadBranches = async () => {
     try {
@@ -119,7 +165,9 @@ export default function AddEmployeePage() {
         setFormData(prev => ({ 
           ...prev, 
           baseSalary: selectedRole.defaultSalary.toString(),
-          employeeSalary: selectedRole.defaultSalary.toString()
+          employeeSalary: selectedRole.defaultSalary.toString(),
+          // Clear working section if not Customer Service
+          workingSection: value === 'Customer Service' ? prev.workingSection : ''
         }));
       }
     }
@@ -128,6 +176,50 @@ export default function AddEmployeePage() {
     if (name === 'baseSalary') {
       setFormData(prev => ({ ...prev, employeeSalary: value }));
     }
+  };
+
+  // Photo upload handlers
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPhotoError(null);
+
+    // Validate file
+    const validation = photoService.validateImageFile(file);
+    if (!validation.valid) {
+      setPhotoError(validation.error || 'Invalid file');
+      return;
+    }
+
+    setSelectedPhoto(file);
+    
+    // Create preview
+    const previewUrl = photoService.createPreviewUrl(file);
+    setPhotoPreview(previewUrl);
+  };
+
+  const handlePhotoRemove = () => {
+    if (photoPreview) {
+      photoService.revokePreviewUrl(photoPreview);
+    }
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
+    setPhotoError(null);
+    setFormData(prev => ({ 
+      ...prev, 
+      passportPhoto: '', 
+      passportPhotoFilename: '' 
+    }));
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerPhotoUpload = () => {
+    fileInputRef.current?.click();
   };
 
   const validateForm = (): boolean => {
@@ -147,6 +239,11 @@ export default function AddEmployeePage() {
     else if (isNaN(Number(formData.baseSalary)) || Number(formData.baseSalary) <= 0) {
       newErrors.baseSalary = 'Base salary must be a valid positive number';
     }
+    
+    // Validate working section for Customer Service employees
+    if (formData.jobTitle === 'Customer Service' && !formData.workingSection) {
+      newErrors.workingSection = 'Working section is required for Customer Service employees';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -164,6 +261,28 @@ export default function AddEmployeePage() {
     setError(null);
 
     try {
+      // Process photo upload if photo is selected
+      let photoData = {};
+      if (selectedPhoto) {
+        setPhotoUploading(true);
+        const photoResult = await photoService.handlePassportPhotoUpload(
+          selectedPhoto,
+          'temp_' + Date.now() // Temporary ID, will be replaced with actual employee ID
+        );
+        
+        if (photoResult.success) {
+          photoData = {
+            passportPhoto: photoResult.photoUrl,
+            passportPhotoFilename: photoResult.filename,
+            passportPhotoUploadedAt: new Date()
+          };
+        } else {
+          setPhotoUploading(false);
+          throw new Error(`Photo upload failed: ${photoResult.error}`);
+        }
+        setPhotoUploading(false);
+      }
+
       const signUpData = {
         email: formData.email,
         password: formData.password,
@@ -190,6 +309,12 @@ export default function AddEmployeePage() {
       if (formData.nextOfKinName) additionalData.nextOfKinName = formData.nextOfKinName;
       if (formData.nextOfKinNIN) additionalData.nextOfKinNIN = formData.nextOfKinNIN;
       if (formData.nextOfKinPhoneNumber) additionalData.nextOfKinPhoneNumber = formData.nextOfKinPhoneNumber;
+      if (formData.workingSection) additionalData.workingSection = formData.workingSection;
+      
+      // Add photo data if available
+      if (Object.keys(photoData).length > 0) {
+        Object.assign(additionalData, photoData);
+      }
 
       if (Object.keys(additionalData).length > 0) {
         await firestoreServices.employee.update(result.user.uid, additionalData);
@@ -404,6 +529,108 @@ export default function AddEmployeePage() {
               {errors.hireDate && <p className="text-red-500 text-xs mt-1">{errors.hireDate}</p>}
             </div>
           </div>
+
+          {/* Passport Photo Upload Section */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-md font-medium text-gray-900 mb-4 flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              Passport Photo
+            </h3>
+            
+            <div className="flex items-start space-x-6">
+              {/* Photo Preview */}
+              <div className="flex-shrink-0">
+                <div className="w-32 h-40 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+                  {photoPreview ? (
+                    <div className="relative w-full h-full">
+                      <img
+                        src={photoPreview}
+                        alt="Passport photo preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePhotoRemove}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">No photo</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Employee Photo
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Upload a passport-sized photo. Recommended size: 3.5cm × 4.5cm (JPEG/PNG, max 5MB)
+                    </p>
+                    
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                    
+                    <button
+                      type="button"
+                      onClick={triggerPhotoUpload}
+                      disabled={photoUploading}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:bg-gray-100 disabled:text-gray-500"
+                    >
+                      {photoUploading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      {photoUploading ? 'Processing...' : 'Choose Photo'}
+                    </button>
+                  </div>
+
+                  {/* Photo Error */}
+                  {photoError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex">
+                        <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="ml-2">
+                          <p className="text-sm text-red-700">{photoError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Photo Success */}
+                  {selectedPhoto && !photoError && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex">
+                        <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0 mt-0.5" />
+                        <div className="ml-2">
+                          <p className="text-sm text-green-700">
+                            Photo selected: {selectedPhoto.name}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            {(selectedPhoto.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Employment Information */}
@@ -471,6 +698,32 @@ export default function AddEmployeePage() {
               />
               {errors.baseSalary && <p className="text-red-500 text-xs mt-1">{errors.baseSalary}</p>}
             </div>
+
+            {/* Working Section - Only shown for Customer Service */}
+            {formData.jobTitle === 'Customer Service' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Working Section *
+                </label>
+                <select
+                  name="workingSection"
+                  value={formData.workingSection}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.workingSection ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select working section</option>
+                  {supermarketSections.map(section => (
+                    <option key={section} value={section}>{section}</option>
+                  ))}
+                </select>
+                {errors.workingSection && <p className="text-red-500 text-xs mt-1">{errors.workingSection}</p>}
+                <p className="text-xs text-gray-500 mt-1">
+                  Select the supermarket section where this employee will primarily work
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -536,15 +789,15 @@ export default function AddEmployeePage() {
           </Link>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || photoUploading}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
-            {loading ? (
+            {(loading || photoUploading) ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {loading ? 'Creating...' : 'Create Employee'}
+            {photoUploading ? 'Processing Photo...' : loading ? 'Creating...' : 'Create Employee'}
           </button>
         </div>
       </form>

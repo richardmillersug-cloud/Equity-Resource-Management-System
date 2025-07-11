@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { HRQueries } from '../../../../lib/firebase/role-based-queries';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { generateQRCode } from '../../../../lib/utils/qr-code';
+import { formatCompanyNameForId } from '../../../../config/company';
+import { hrService } from '../../../../lib/services/hr-service';
+import { authService } from '../../../../lib/firebase/auth';
 import { 
   QrCode, 
   User, 
@@ -56,6 +59,9 @@ export default function BarcodesPage() {
   const [selectedBarcode, setSelectedBarcode] = useState<BarcodeRecord | null>(null);
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>('');
+
+  // Get company information
+  const companyInfo = formatCompanyNameForId();
 
   useEffect(() => {
     loadData();
@@ -146,6 +152,18 @@ export default function BarcodesPage() {
       const qrCodeURL = await generateQRCode(qrData);
       setQrCodeDataURL(qrCodeURL);
       setSelectedBarcode(newBarcode);
+      
+      // Record scan for shift tracking
+      const currentUser = authService.getCurrentUser();
+      if (currentUser?.employee?.employeeId) {
+        try {
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
+          console.log('Employee barcode generation scan recorded:', scanResult);
+        } catch (scanError) {
+          console.log('Scan tracking not active for this user:', scanError);
+        }
+      }
+      
       setShowGenerateModal(false);
       setShowIDCardModal(true);
       
@@ -173,6 +191,17 @@ export default function BarcodesPage() {
   };
 
   const handleDeleteBarcode = async (barcodeId: string) => {
+    const record = barcodeRecords.find(r => r.id === barcodeId);
+    if (!record) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the barcode for ${record.employeeName}?\n\n` +
+      `Barcode Number: ${record.barcodeNumber}\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
     try {
       setBarcodeRecords(records => records.filter(record => record.id !== barcodeId));
     } catch (err) {
@@ -202,8 +231,8 @@ export default function BarcodesPage() {
               background: #f0f0f0;
             }
             .id-card {
-              width: 320px;
-              height: 200px;
+              width: 350px;
+              height: 220px;
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
               border-radius: 15px;
               padding: 20px;
@@ -211,16 +240,51 @@ export default function BarcodesPage() {
               position: relative;
               margin: 0 auto;
               box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+              display: flex;
+              flex-direction: column;
             }
             .company-name {
-              font-size: 14px;
+              font-size: 11px;
               font-weight: bold;
               text-align: center;
-              margin-bottom: 15px;
+              margin-bottom: 10px;
               opacity: 0.9;
+              line-height: 1.2;
+            }
+            .company-subtitle {
+              font-size: 10px;
+              text-align: center;
+              margin-bottom: 15px;
+              opacity: 0.8;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .main-content {
+              display: flex;
+              flex: 1;
+              gap: 15px;
+              align-items: flex-start;
+            }
+            .photo-section {
+              width: 70px;
+              height: 85px;
+              background: rgba(255, 255, 255, 0.2);
+              border: 2px dashed rgba(255, 255, 255, 0.5);
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+            .photo-placeholder {
+              font-size: 10px;
+              text-align: center;
+              opacity: 0.7;
+              line-height: 1.2;
             }
             .employee-info {
-              margin-bottom: 15px;
+              flex: 1;
+              margin-bottom: 0;
             }
             .employee-name {
               font-size: 18px;
@@ -256,11 +320,17 @@ export default function BarcodesPage() {
         </head>
         <body>
           <div class="id-card">
-            <div class="company-name">COMPANY NAME</div>
-            <div class="employee-info">
-              <div class="employee-name">${selectedBarcode.employeeName}</div>
-              <div class="employee-role">${employee?.roles?.[0]?.jobTitle || 'Employee'}</div>
-              <div class="employee-role">ID: ${selectedBarcode.barcodeNumber}</div>
+            <div class="company-name">${companyInfo.name}</div>
+            <div class="company-subtitle">${companyInfo.subtitle}</div>
+            <div class="main-content">
+              <div class="photo-section">
+                <div class="photo-placeholder">PHOTO</div>
+              </div>
+              <div class="employee-info">
+                <div class="employee-name">${selectedBarcode.employeeName}</div>
+                <div class="employee-role">${employee?.roles?.[0]?.jobTitle || 'Employee'}</div>
+                <div class="employee-role">ID: ${selectedBarcode.barcodeNumber}</div>
+              </div>
             </div>
             <div class="barcode-section">
               <img src="${qrCodeDataURL}" alt="QR Code" width="60" height="60">
@@ -583,15 +653,28 @@ export default function BarcodesPage() {
           <div className="bg-white rounded-lg p-6 max-w-lg w-full">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Employee ID Card Preview</h3>
             
-            <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg p-6 text-white mb-4 relative">
-              <div className="text-center text-sm font-bold mb-4 opacity-90">COMPANY NAME</div>
+            <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-lg p-6 text-white mb-4 relative flex flex-col">
+              <div className="text-center text-xs font-bold mb-2 opacity-90 leading-tight">
+                {companyInfo.name}
+              </div>
+              <div className="text-center text-xs mb-4 opacity-80 uppercase tracking-wide">
+                {companyInfo.subtitle}
+              </div>
               
-              <div className="mb-4">
-                <div className="text-xl font-bold mb-1">{selectedBarcode.employeeName}</div>
-                <div className="text-sm opacity-80">
-                  {employees.find(emp => emp.id === selectedBarcode.employeeId)?.roles?.[0]?.jobTitle || 'Employee'}
+              <div className="flex flex-1 gap-4 items-start">
+                <div className="w-16 h-20 bg-white bg-opacity-20 border-2 border-dashed border-white border-opacity-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div className="text-xs text-center opacity-70">
+                    PHOTO
+                  </div>
                 </div>
-                <div className="text-xs opacity-70 mt-1">ID: {selectedBarcode.barcodeNumber}</div>
+                
+                <div className="flex-1">
+                  <div className="text-lg font-bold mb-1">{selectedBarcode.employeeName}</div>
+                  <div className="text-sm opacity-80">
+                    {employees.find(emp => emp.id === selectedBarcode.employeeId)?.roles?.[0]?.jobTitle || 'Employee'}
+                  </div>
+                  <div className="text-xs opacity-70 mt-1">ID: {selectedBarcode.barcodeNumber}</div>
+                </div>
               </div>
               
               <div className="absolute bottom-4 right-4 bg-white p-2 rounded">

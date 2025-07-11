@@ -1,11 +1,36 @@
 import QRCode from 'qrcode';
 
+// Generic QR code generation function
+export async function generateQRCode(data: string, options?: {
+  width?: number;
+  margin?: number;
+  color?: { dark: string; light: string };
+  errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+}): Promise<string> {
+  try {
+    const qrCodeDataUrl = await QRCode.toDataURL(data, {
+      width: options?.width || 200,
+      margin: options?.margin || 2,
+      color: {
+        dark: options?.color?.dark || '#000000',
+        light: options?.color?.light || '#FFFFFF'
+      },
+      errorCorrectionLevel: options?.errorCorrectionLevel || 'M'
+    });
+    
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    throw new Error('Failed to generate QR code');
+  }
+}
+
 export class QRCodeService {
   // Generate QR code data URL for an invoice
   static async generateInvoiceQRCode(invoiceId: string, invoiceNumber: string): Promise<string> {
     try {
       // Create the URL that will be encoded in the QR code
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://equi-supply.com';
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://unison-technologies.com';
       const qrCodeUrl = `${baseUrl}/invoice/${invoiceId}?ref=${invoiceNumber}`;
       
       // Generate QR code as data URL
@@ -29,7 +54,7 @@ export class QRCodeService {
   // Generate QR code as SVG string for better print quality
   static async generateInvoiceQRCodeSVG(invoiceId: string, invoiceNumber: string): Promise<string> {
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://equi-supply.com';
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://unison-technologies.com';
       const qrCodeUrl = `${baseUrl}/invoice/${invoiceId}?ref=${invoiceNumber}`;
       
       const svgString = await QRCode.toString(qrCodeUrl, {
@@ -59,7 +84,7 @@ export class QRCodeService {
     date: string;
   }): Promise<string> {
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://equi-supply.com';
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://unison-technologies.com';
       
       // Create a more detailed URL with query parameters
       const shareUrl = new URL(`${baseUrl}/invoice/${invoiceData.id}`);
