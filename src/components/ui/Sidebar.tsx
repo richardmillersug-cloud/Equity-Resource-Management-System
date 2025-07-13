@@ -406,14 +406,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
       label: t('navigation.myAttendance', 'My Attendance'), 
       path: '/dashboard/hr/attendance-tracking',
-      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Accountant']
+      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager']
     },
     { 
       id: 'my-leave', 
       icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
       label: t('navigation.myLeave', 'My Leave Requests'), 
       path: '/dashboard/hr/leave-requests',
-      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Accountant']
+      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager']
     },
     
     // Development/Testing

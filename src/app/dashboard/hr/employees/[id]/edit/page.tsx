@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { HRQueries } from '../../../../../../lib/firebase/role-based-queries';
 import { firestoreServices } from '../../../../../../lib/firebase/firestore-service';
 import { PhotoService } from '../../../../../../lib/services/photo-service';
+import { Timestamp } from 'firebase/firestore';
 import { 
   ArrowLeft, 
   Save, 
@@ -127,7 +128,7 @@ export default function EmployeeEditPage() {
       const hireDate = foundEmployee.hireDate 
         ? (foundEmployee.hireDate.seconds 
             ? new Date(foundEmployee.hireDate.seconds * 1000).toISOString().split('T')[0]
-            : new Date(foundEmployee.hireDate).toISOString().split('T')[0])
+            : foundEmployee.hireDate.toDate ? foundEmployee.hireDate.toDate().toISOString().split('T')[0] : '')
         : '';
       
       setFormData({
@@ -192,14 +193,18 @@ export default function EmployeeEditPage() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        phone: formData.phone || null,
+        phone: formData.phone || undefined,
         employeeNIN: formData.employeeNIN,
         employmentStatus: formData.employmentStatus,
-        hireDate: new Date(formData.hireDate),
+        hireDate: Timestamp.fromDate(new Date(formData.hireDate)),
         employeeSalary: formData.employeeSalary,
         branchId: formData.branchId,
-        roles: formData.roles,
-        updatedAt: new Date()
+        roles: formData.roles.map(role => ({
+          ...role,
+          jobRoleId: `role_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          assignedDate: Timestamp.fromDate(new Date())
+        })),
+        updatedAt: Timestamp.fromDate(new Date())
       };
       
       await firestoreServices.employee.update(employee.id, updateData);

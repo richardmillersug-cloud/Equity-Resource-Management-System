@@ -111,6 +111,24 @@
       ]
     },
     {
+      "collectionGroup": "cashAllocations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "accountantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "allocationDate",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "employee_documents",
       "queryScope": "COLLECTION",
       "fields": [
