@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { HRQueries } from '../../../../lib/firebase/role-based-queries';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
+import { useLanguage } from '../../../../contexts/LanguageContext';
 import { 
   Users, 
   Plus, 
@@ -47,6 +48,7 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
+  const { t } = useLanguage();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,35 +226,35 @@ export default function EmployeesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
-          <p className="text-gray-500">Manage your workforce and employee records</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('hr.employeeManagement', 'Employee Management')}</h1>
+          <p className="text-gray-500">{t('hr.manageWorkforce', 'Manage your workforce and employee records')}</p>
         </div>
         <div className="flex space-x-3">
           <button 
             onClick={exportEmployees}
             className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            title="Export employee data to CSV"
+            title={t('forms.export', 'Export employee data to CSV')}
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            {t('forms.export', 'Export CSV')}
           </button>
           <button 
             onClick={loadEmployees}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            title="Refresh employee data"
+            title={t('forms.refresh', 'Refresh employee data')}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh
+            {t('forms.refresh', 'Refresh')}
           </button>
           <Link 
             href="/dashboard/hr/employees/add"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            title="Add new employee (Ctrl+N)"
+            title={t('employees.addEmployee', 'Add new employee (Ctrl+N)')}
           >
             <Plus className="h-4 w-4" />
-            Add Employee
+            {t('employees.addEmployee', 'Add Employee')}
           </Link>
         </div>
       </div>
@@ -290,7 +292,7 @@ export default function EmployeesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search employees..."
+              placeholder={t('forms.search', 'Search employees...')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -302,10 +304,10 @@ export default function EmployeesPage() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-            <option value="Terminated">Terminated</option>
+            <option value="all">{t('forms.allStatus', 'All Status')}</option>
+            <option value="Active">{t('forms.active', 'Active')}</option>
+            <option value="Inactive">{t('forms.inactive', 'Inactive')}</option>
+            <option value="Terminated">{t('forms.terminated', 'Terminated')}</option>
           </select>
 
           <select
@@ -313,7 +315,7 @@ export default function EmployeesPage() {
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
           >
-            <option value="all">All Roles</option>
+            <option value="all">{t('forms.allRoles', 'All Roles')}</option>
             {uniqueRoles.map(role => (
               <option key={role} value={role}>{role}</option>
             ))}

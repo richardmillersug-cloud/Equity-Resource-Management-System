@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { authService } from '@/lib/firebase/auth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -20,6 +21,7 @@ import {
 import { getPlaceholderData, mergeWithPlaceholders } from '@/lib/placeholders/accountant-data';
 
 export default function AccountantDashboard() {
+  const { t } = useLanguage();
   const [cashAllocations, setCashAllocations] = useState<any[]>([]);
   const [specialFunds, setSpecialFunds] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -323,7 +325,7 @@ export default function AccountantDashboard() {
     <div className="p-6 space-y-6">
       {/* Financial Overview Cards */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Financial Overview</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('accountant.financialManagement', 'Financial Overview')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -332,7 +334,7 @@ export default function AccountantDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Total Allocated</p>
+              <p className="text-sm text-gray-500 mb-1">{t('accountant.totalAllocated', 'Total Allocated')}</p>
               <p className="text-2xl font-bold text-gray-900">${dashboardData.summary.totalAllocated.toLocaleString()}</p>
             </div>
           </div>
@@ -344,7 +346,7 @@ export default function AccountantDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Total Expenses</p>
+              <p className="text-sm text-gray-500 mb-1">{t('accountant.expenseTracking', 'Total Expenses')}</p>
               <p className="text-2xl font-bold text-gray-900">${dashboardData.summary.totalExpenses.toLocaleString()}</p>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { authService, AuthUser } from '@/lib/firebase/auth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +13,7 @@ interface AuthContainerProps {
 }
 
 export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: AuthContainerProps) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -64,7 +66,7 @@ export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Checking authentication...</p>
+          <p className="text-gray-600">{t('auth.checkingAuth', 'Checking authentication...')}</p>
         </div>
       </div>
     );

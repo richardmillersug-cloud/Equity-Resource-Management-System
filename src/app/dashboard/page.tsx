@@ -10,6 +10,7 @@ import { cleanupPurchasingManagers, createNewPurchasingManager, getDatabaseStats
 import { fixAllPermissions, quickPermissionFix, getUpdatedFirestoreRules } from '../../lib/firebase/permissions-final-fix';
 import '../../lib/firebase/test-purchasing-manager';
 
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);

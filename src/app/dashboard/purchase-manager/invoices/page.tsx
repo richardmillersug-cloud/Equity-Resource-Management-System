@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../../../contexts/LanguageContext';
 import { 
   FileText, 
   Search, 
@@ -28,6 +29,7 @@ import { authService } from '../../../../lib/firebase/auth';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 
 export default function InvoicesPage() {
+  const { t } = useLanguage();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [invoicePayments, setInvoicePayments] = useState<InvoicePayment[]>([]);
@@ -578,9 +580,9 @@ export default function InvoicesPage() {
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
-                    Invoice Management
+                    {t('invoices.invoiceManagement', 'Invoice Management')}
                   </h1>
-                  <p className="text-purple-100 text-lg">Review, approve, and manage supplier invoices with ease</p>
+                  <p className="text-purple-100 text-lg">{t('invoices.reviewAndManage', 'Review, approve, and manage supplier invoices with ease')}</p>
                 </div>
               </div>
               <button 
@@ -588,7 +590,7 @@ export default function InvoicesPage() {
                 className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
                 <Plus className="w-5 h-5" />
-                <span>New Invoice</span>
+                <span>{t('invoices.createInvoice', 'New Invoice')}</span>
               </button>
             </div>
           </div>
@@ -599,11 +601,11 @@ export default function InvoicesPage() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">Total Invoices</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">{t('receiver.totalInvoices', 'Total Invoices')}</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{(invoices || []).length}</p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">All invoices</span>
+                  <span className="text-xs text-gray-500">{t('invoices.allInvoices', 'All invoices')}</span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
