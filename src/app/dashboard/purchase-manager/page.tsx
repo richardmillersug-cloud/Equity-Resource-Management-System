@@ -741,6 +741,37 @@ export default function PurchaseManagerDashboard() {
     ]
   };
 
+  // Cash Flow Chart Data
+  const cashFlowData = {
+    labels: ['Allocated', 'Used', 'Remaining'],
+    datasets: [
+      {
+        label: 'Cash Flow',
+        data: [
+          metrics.cashFlow.allocated,
+          metrics.cashFlow.used,
+          metrics.cashFlow.remaining
+        ],
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',   // Green for allocated
+          'rgba(239, 68, 68, 0.8)',   // Red for used
+          'rgba(59, 130, 246, 0.8)'   // Blue for remaining
+        ],
+        borderColor: [
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)',
+          'rgba(59, 130, 246, 1)'
+        ],
+        borderWidth: 2,
+        hoverBackgroundColor: [
+          'rgba(34, 197, 94, 0.9)',
+          'rgba(239, 68, 68, 0.9)',
+          'rgba(59, 130, 246, 0.9)'
+        ]
+      }
+    ]
+  };
+
   const expenseChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -800,6 +831,49 @@ export default function PurchaseManagerDashboard() {
     elements: {
       point: {
         hoverBackgroundColor: '#fff'
+      }
+    }
+  };
+
+  // Cash Flow Chart Options
+  const cashFlowChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12,
+            weight: '600'
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: 'rgba(139, 92, 246, 0.5)',
+        borderWidth: 1,
+        cornerRadius: 12,
+        displayColors: true,
+        callbacks: {
+          label: function(context: any) {
+            return `${context.label}: ${formatCurrency(context.parsed)}`;
+          }
+        }
+      }
+    },
+    scales: {
+      display: false
+    },
+    cutout: '50%',
+    elements: {
+      arc: {
+        borderWidth: 2,
+        hoverBorderWidth: 4
       }
     }
   };
@@ -987,30 +1061,7 @@ export default function PurchaseManagerDashboard() {
     }
   };
 
-  const cashFlowData = {
-    labels: ['Allocated', 'Used', 'Remaining'],
-    datasets: [
-      {
-        label: 'Cash Flow Analysis',
-        data: [
-          metrics.cashFlow.allocated,
-          metrics.cashFlow.used,
-          metrics.cashFlow.remaining
-        ],
-        backgroundColor: [
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(59, 130, 246, 0.8)'
-        ],
-        borderColor: [
-          'rgba(16, 185, 129, 1)',
-          'rgba(239, 68, 68, 1)',
-          'rgba(59, 130, 246, 1)'
-        ],
-        borderWidth: 2
-      }
-    ]
-  };
+
 
   const trendChartOptions = {
     responsive: true,
@@ -1311,46 +1362,17 @@ export default function PurchaseManagerDashboard() {
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Purchasing Analytics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {/* Weekly Purchases */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Daily Purchases */}
           <div className="group bg-gradient-to-r from-blue-500 to-blue-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">{t('common.weeklyPurchases', 'Weekly Purchases')}</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.weekly).replace('UGX', '').trim()}</p>
-                <p className="text-blue-100 text-xs">Last 7 days</p>
+                <p className="text-blue-100 text-sm font-medium mb-1">{t('common.dailyPurchases', 'Daily Purchases')}</p>
+                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.daily).replace('UGX', '').trim()}</p>
+                <p className="text-blue-100 text-xs">Today</p>
                 </div>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
                 <Calendar className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Monthly Purchases */}
-          <div className="group bg-gradient-to-r from-purple-500 to-purple-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer"
-               onClick={() => router.push('/dashboard/purchase-manager/invoices')}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium mb-1">{t('common.monthlyPurchases', 'Monthly Purchases')}</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.monthly).replace('UGX', '').trim()}</p>
-                <p className="text-purple-100 text-xs">Last 30 days</p>
-                </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Yearly Purchases */}
-          <div className="group bg-gradient-to-r from-green-500 to-green-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium mb-1">{t('common.yearlyPurchases', 'Yearly Purchases')}</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.yearly).replace('UGX', '').trim()}</p>
-                <p className="text-green-100 text-xs">Last 365 days</p>
-                </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
-                <TrendingUp className="w-5 h-5" />
               </div>
             </div>
           </div>
@@ -1405,6 +1427,14 @@ export default function PurchaseManagerDashboard() {
 
             <div className="h-80">
               <Line data={purchaseTrendsData} options={expenseChartOptions} />
+            </div>
+            
+            {/* Cash Flow Analysis */}
+            <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50 mt-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.cashFlowAnalysis', 'Cash Flow Analysis')}</h3>
+              <div className="h-72">
+                <Bar data={cashFlowData} options={trendChartOptions} />
+              </div>
             </div>
         </div>
 
@@ -1625,16 +1655,8 @@ export default function PurchaseManagerDashboard() {
           </div>
         </div>
 
-        {/* Cash Flow & Supplier Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Cash Flow Analysis */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-                            <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.cashFlowAnalysis', 'Cash Flow Analysis')}</h3>
-            <div className="h-72">
-              <Bar data={cashFlowData} options={trendChartOptions} />
-            </div>
-          </div>
-
+        {/* Supplier Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Suppliers */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
                             <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.topSuppliers', 'Top Suppliers')}</h3>
