@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 
 interface ActivityChartProps {
   data?: Array<{ day: string; amount: number }>;
