@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MetricCard } from '../../../components/ui/Card';
+import { MetricCard } from '../../../components/ui/card';
 import { AdminQueries } from '../../../lib/firebase/role-based-queries';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { 

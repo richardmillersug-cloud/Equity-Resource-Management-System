@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { HRQueries } from '../../../../lib/firebase/role-based-queries';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
+import { Timestamp } from 'firebase/firestore';
 import { useLanguage } from '../../../../contexts/LanguageContext';
 import { 
   Users, 
@@ -166,8 +167,8 @@ export default function EmployeesPage() {
       const employeeToUpdate = employees.find(emp => emp.id === employeeId);
       
       await firestoreServices.employee.update(employeeId, { 
-        employmentStatus: newStatus,
-        updatedAt: new Date()
+        employmentStatus: newStatus as 'Active' | 'Inactive' | 'Terminated',
+        updatedAt: Timestamp.fromDate(new Date())
       });
       
       // Update local state
