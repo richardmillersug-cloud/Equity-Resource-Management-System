@@ -597,7 +597,7 @@ export default function InvoicesPage() {
         </div>
 
         {/* Enhanced Stats Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
@@ -628,24 +628,6 @@ export default function InvoicesPage() {
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
                 <Clock className="w-7 h-7 text-white" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">Approved</p>
-                <p className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {(invoices || []).filter(i => i.status === 'approved').length}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">Ready for payment</span>
-                </div>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <CheckCircle className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>

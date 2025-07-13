@@ -155,8 +155,15 @@ export class PhotoService {
       const timestamp = Date.now();
       const processedFilename = `passport_${employeeId}_${timestamp}_${filename}`;
 
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update employee record with photo data
+      const { EmployeeService } = await import('../firebase/firestore-service');
+      const employeeService = new EmployeeService();
+      
+      await employeeService.update(employeeId, {
+        passportPhoto: dataUrl,
+        passportPhotoFilename: processedFilename,
+        passportPhotoUploadedAt: new Date()
+      });
 
       return {
         success: true,
