@@ -510,8 +510,8 @@ export default function AttendancePage() {
               <div>
                 <p className="text-gray-600 mb-4">Select an employee to check in:</p>
                 <select
-                  onChange={(e) => {
-                    const emp = employees.find(e => e.id === e.target.value);
+                  onChange={(event) => {
+                    const emp = employees.find(e => e.id === event.target.value);
                     setCurrentEmployee(emp || null);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
@@ -531,7 +531,11 @@ export default function AttendancePage() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => currentEmployee && handleCheckIn(currentEmployee.id)}
+                    onClick={() => {
+                      if (currentEmployee) {
+                        handleCheckIn((currentEmployee as Employee).id);
+                      }
+                    }}
                     disabled={!currentEmployee}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg"
                   >
