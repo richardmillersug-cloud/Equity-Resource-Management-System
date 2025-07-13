@@ -392,9 +392,9 @@ export default function BarcodePage() {
       );
 
       // Record scan for shift tracking
-      if (currentUser?.employee?.employeeId) {
+      if (currentUser?.employee?.id) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
           console.log('Barcode print scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);
@@ -437,9 +437,9 @@ export default function BarcodePage() {
       await enhancedBarcodeService.addBarcodeItem(itemToAdd);
       
       // Record scan for shift tracking
-      if (currentUser?.employee?.employeeId) {
+      if (currentUser?.employee?.id) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
           console.log('Barcode creation scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);

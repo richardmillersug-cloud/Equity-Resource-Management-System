@@ -173,11 +173,11 @@ export class EmployeeDocumentsService {
     documentType?: EmployeeDocument['documentType']
   ): Promise<EmployeeDocument[]> {
     try {
+      // Query without orderBy to avoid composite index requirement
       let q = query(
         collection(db, this.documentsCollection),
         where('employeeId', '==', employeeId),
-        where('isActive', '==', true),
-        orderBy('uploadDate', 'desc')
+        where('isActive', '==', true)
       );
 
       if (documentType) {
@@ -185,16 +185,20 @@ export class EmployeeDocumentsService {
           collection(db, this.documentsCollection),
           where('employeeId', '==', employeeId),
           where('documentType', '==', documentType),
-          where('isActive', '==', true),
-          orderBy('uploadDate', 'desc')
+          where('isActive', '==', true)
         );
       }
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      const documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as EmployeeDocument));
+
+      // Sort by upload date (client-side sorting)
+      return documents.sort((a, b) => {
+        return b.uploadDate.toDate().getTime() - a.uploadDate.toDate().getTime();
+      });
     } catch (error) {
       console.error('Error fetching employee documents:', error);
       throw new Error('Failed to fetch employee documents');
@@ -339,18 +343,17 @@ export class EmployeeDocumentsService {
     accessLevel?: EmployeeDocument['accessLevel']
   ): Promise<EmployeeDocument[]> {
     try {
+      // Query without orderBy to avoid composite index requirement
       let q = query(
         collection(db, this.documentsCollection),
-        where('isActive', '==', true),
-        orderBy('uploadDate', 'desc')
+        where('isActive', '==', true)
       );
 
       if (documentType) {
         q = query(
           collection(db, this.documentsCollection),
           where('documentType', '==', documentType),
-          where('isActive', '==', true),
-          orderBy('uploadDate', 'desc')
+          where('isActive', '==', true)
         );
       }
 
@@ -376,7 +379,10 @@ export class EmployeeDocumentsService {
         documents = documents.filter(doc => doc.accessLevel === accessLevel);
       }
 
-      return documents;
+      // Sort by upload date (client-side sorting)
+      return documents.sort((a, b) => {
+        return b.uploadDate.toDate().getTime() - a.uploadDate.toDate().getTime();
+      });
     } catch (error) {
       console.error('Error searching documents:', error);
       throw new Error('Failed to search documents');
@@ -389,11 +395,11 @@ export class EmployeeDocumentsService {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + daysAhead);
 
+      // Query without orderBy to avoid composite index requirement
       const snapshot = await getDocs(
         query(
           collection(db, this.documentsCollection),
-          where('isActive', '==', true),
-          orderBy('expiryDate', 'asc')
+          where('isActive', '==', true)
         )
       );
 
@@ -403,7 +409,11 @@ export class EmployeeDocumentsService {
           doc.expiryDate && 
           doc.expiryDate.toDate() <= futureDate &&
           doc.expiryDate.toDate() >= new Date()
-        );
+        )
+        .sort((a, b) => {
+          if (!a.expiryDate || !b.expiryDate) return 0;
+          return a.expiryDate.toDate().getTime() - b.expiryDate.toDate().getTime();
+        });
     } catch (error) {
       console.error('Error fetching expiring documents:', error);
       throw new Error('Failed to fetch expiring documents');

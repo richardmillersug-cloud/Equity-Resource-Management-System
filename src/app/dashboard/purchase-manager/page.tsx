@@ -28,8 +28,11 @@ import {
   Eye,
   TrendingDown,
   Activity,
-  Wallet
+  Wallet,
+  ChevronDown,
+  Check
 } from 'lucide-react';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
 import { CashTrackingInterface } from '../../../components/purchase-manager/CashTrackingInterface';
@@ -276,9 +279,24 @@ interface RecentActivity {
 
 export default function PurchaseManagerDashboard() {
   const router = useRouter();
+  const { locale, setLocale, t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+
+  // Language options
+  const languages = [
+    { code: 'en' as const, name: 'English', nativeName: 'English', flag: '🇬🇧' },
+    { code: 'lg' as const, name: 'Luganda', nativeName: 'Oluganda', flag: '🇺🇬' }
+  ];
+
+  const currentLanguage = languages.find(lang => lang.code === locale) || languages[0];
+
+  const handleLanguageChange = (newLocale: 'en' | 'lg') => {
+    setLocale(newLocale);
+    setIsLanguageOpen(false);
+  };
   
   // Real database data states
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -723,6 +741,37 @@ export default function PurchaseManagerDashboard() {
     ]
   };
 
+  // Cash Flow Chart Data
+  const cashFlowData = {
+    labels: ['Allocated', 'Used', 'Remaining'],
+    datasets: [
+      {
+        label: 'Cash Flow',
+        data: [
+          metrics.cashFlow.allocated,
+          metrics.cashFlow.used,
+          metrics.cashFlow.remaining
+        ],
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',   // Green for allocated
+          'rgba(239, 68, 68, 0.8)',   // Red for used
+          'rgba(59, 130, 246, 0.8)'   // Blue for remaining
+        ],
+        borderColor: [
+          'rgba(34, 197, 94, 1)',
+          'rgba(239, 68, 68, 1)',
+          'rgba(59, 130, 246, 1)'
+        ],
+        borderWidth: 2,
+        hoverBackgroundColor: [
+          'rgba(34, 197, 94, 0.9)',
+          'rgba(239, 68, 68, 0.9)',
+          'rgba(59, 130, 246, 0.9)'
+        ]
+      }
+    ]
+  };
+
   const expenseChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -782,6 +831,49 @@ export default function PurchaseManagerDashboard() {
     elements: {
       point: {
         hoverBackgroundColor: '#fff'
+      }
+    }
+  };
+
+  // Cash Flow Chart Options
+  const cashFlowChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12,
+            weight: '600'
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: 'rgba(139, 92, 246, 0.5)',
+        borderWidth: 1,
+        cornerRadius: 12,
+        displayColors: true,
+        callbacks: {
+          label: function(context: any) {
+            return `${context.label}: ${formatCurrency(context.parsed)}`;
+          }
+        }
+      }
+    },
+    scales: {
+      display: false
+    },
+    cutout: '50%',
+    elements: {
+      arc: {
+        borderWidth: 2,
+        hoverBorderWidth: 4
       }
     }
   };
@@ -969,30 +1061,7 @@ export default function PurchaseManagerDashboard() {
     }
   };
 
-  const cashFlowData = {
-    labels: ['Allocated', 'Used', 'Remaining'],
-    datasets: [
-      {
-        label: 'Cash Flow Analysis',
-        data: [
-          metrics.cashFlow.allocated,
-          metrics.cashFlow.used,
-          metrics.cashFlow.remaining
-        ],
-        backgroundColor: [
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(59, 130, 246, 0.8)'
-        ],
-        borderColor: [
-          'rgba(16, 185, 129, 1)',
-          'rgba(239, 68, 68, 1)',
-          'rgba(59, 130, 246, 1)'
-        ],
-        borderWidth: 2
-      }
-    ]
-  };
+
 
   const trendChartOptions = {
     responsive: true,
@@ -1190,7 +1259,7 @@ export default function PurchaseManagerDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
-          <p className="text-purple-600 font-medium">Loading Dashboard...</p>
+          <p className="text-purple-600 font-medium">{t('actions.loading', 'Loading Dashboard...')}</p>
         </div>
       </div>
     );
@@ -1201,13 +1270,13 @@ export default function PurchaseManagerDashboard() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Connection Error</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('messages.errorOccurred', 'Connection Error')}</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()} 
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
-            Retry
+            {t('actions.refresh', 'Retry')}
           </button>
         </div>
       </div>
@@ -1219,16 +1288,58 @@ export default function PurchaseManagerDashboard() {
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-purple-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-              <div>
-              <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
-              <p className="text-purple-600 font-medium">{formatDate(currentTime)}</p>
-              </div>
+                      <div className="flex items-center justify-between">
+                <div>
+                <h1 className="text-2xl font-bold text-gray-900">{t('navigation.overview', 'Overview')}</h1>
+                <p className="text-purple-600 font-medium">{formatDate(currentTime)}</p>
+                </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-white rounded-full px-4 py-2 shadow-sm border border-purple-100">
-                <span className="text-sm text-gray-600">EN</span>
-                <ArrowDownRight className="w-4 h-4 text-gray-400" />
-            </div>
+              {/* Language Switcher */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsLanguageOpen(!isLanguageOpen)}
+                  className="flex items-center space-x-2 bg-white rounded-full px-4 py-2 shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200"
+                >
+                  <span className="text-sm text-gray-600">{currentLanguage.code.toUpperCase()}</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isLanguageOpen ? 'transform rotate-180' : ''}`} />
+                </button>
+
+                {isLanguageOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setIsLanguageOpen(false)}
+                    />
+                    
+                    {/* Dropdown */}
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                      <div className="py-1">
+                        {languages.map((language) => (
+                          <button
+                            key={language.code}
+                            onClick={() => handleLanguageChange(language.code)}
+                            className={`flex items-center justify-between w-full px-4 py-2 text-sm text-left hover:bg-gray-50 transition-colors duration-200 ${
+                              locale === language.code ? 'bg-purple-50 text-purple-700' : 'text-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <span className="text-lg">{language.flag}</span>
+                              <div>
+                                <div className="font-medium">{language.nativeName}</div>
+                                <div className="text-xs text-gray-500">{language.name}</div>
+                              </div>
+                            </div>
+                            {locale === language.code && (
+                              <Check className="w-4 h-4 text-purple-600" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <button className="p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200">
                 <Bell className="w-5 h-5 text-gray-600" />
               </button>
@@ -1240,7 +1351,7 @@ export default function PurchaseManagerDashboard() {
                   <span className="text-white text-sm font-bold">PM</span>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">Purchase Manager</p>
+                  <p className="text-sm font-medium text-gray-900">{t('common.purchaseManager', 'Purchase Manager')}</p>
                   <p className="text-xs text-gray-500">Admin & Finance</p>
                 </div>
               </div>
@@ -1251,46 +1362,17 @@ export default function PurchaseManagerDashboard() {
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Purchasing Analytics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {/* Weekly Purchases */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Daily Purchases */}
           <div className="group bg-gradient-to-r from-blue-500 to-blue-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">Weekly Purchases</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.weekly).replace('UGX', '').trim()}</p>
-                <p className="text-blue-100 text-xs">Last 7 days</p>
+                <p className="text-blue-100 text-sm font-medium mb-1">{t('common.dailyPurchases', 'Daily Purchases')}</p>
+                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.daily).replace('UGX', '').trim()}</p>
+                <p className="text-blue-100 text-xs">Today</p>
                 </div>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
                 <Calendar className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Monthly Purchases */}
-          <div className="group bg-gradient-to-r from-purple-500 to-purple-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer"
-               onClick={() => router.push('/dashboard/purchase-manager/invoices')}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium mb-1">Monthly Purchases</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.monthly).replace('UGX', '').trim()}</p>
-                <p className="text-purple-100 text-xs">Last 30 days</p>
-                </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Yearly Purchases */}
-          <div className="group bg-gradient-to-r from-green-500 to-green-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium mb-1">Yearly Purchases</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalPurchases.yearly).replace('UGX', '').trim()}</p>
-                <p className="text-green-100 text-xs">Last 365 days</p>
-                </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
-                <TrendingUp className="w-5 h-5" />
               </div>
             </div>
           </div>
@@ -1299,7 +1381,7 @@ export default function PurchaseManagerDashboard() {
           <div className="group bg-gradient-to-r from-orange-500 to-orange-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium mb-1">Pending Invoices</p>
+                <p className="text-orange-100 text-sm font-medium mb-1">{t('common.pendingInvoices', 'Pending Invoices')}</p>
                 <p className="text-2xl font-bold">{metrics.invoiceMetrics.pending}</p>
                 <p className="text-orange-100 text-xs">{formatCurrency(metrics.invoiceMetrics.pendingAmount).replace('UGX', '').trim()}</p>
               </div>
@@ -1314,7 +1396,7 @@ export default function PurchaseManagerDashboard() {
                onClick={() => router.push('/dashboard/purchase-manager/cash-tracking')}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-pink-100 text-sm font-medium mb-1">Cash Utilization</p>
+                <p className="text-pink-100 text-sm font-medium mb-1">{t('common.cashUtilization', 'Cash Utilization')}</p>
                 <p className="text-2xl font-bold">{metrics.cashFlow.utilization.toFixed(1)}%</p>
                 <p className="text-pink-100 text-xs">of {formatCurrency(metrics.cashFlow.allocated).replace('UGX', '').trim()}</p>
                 </div>
@@ -1330,15 +1412,15 @@ export default function PurchaseManagerDashboard() {
           {/* Purchase Trends Line Chart */}
           <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Purchase Trends Analysis</h3>
+                              <h3 className="text-xl font-bold text-gray-900">{t('common.purchaseTrends', 'Purchase Trends Analysis')}</h3>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Amount</span>
+                                      <span className="text-sm text-gray-600">{t('common.amount', 'Amount')}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-pink-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Count</span>
+                                      <span className="text-sm text-gray-600">{t('common.count', 'Count')}</span>
                 </div>
         </div>
       </div>
@@ -1346,15 +1428,23 @@ export default function PurchaseManagerDashboard() {
             <div className="h-80">
               <Line data={purchaseTrendsData} options={expenseChartOptions} />
             </div>
+            
+            {/* Cash Flow Analysis */}
+            <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50 mt-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.cashFlowAnalysis', 'Cash Flow Analysis')}</h3>
+              <div className="h-72">
+                <Bar data={cashFlowData} options={trendChartOptions} />
+              </div>
+            </div>
         </div>
 
           {/* Cash Close Analysis Pie Chart */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Cash Close Analysis</h3>
+                              <h3 className="text-xl font-bold text-gray-900">{t('common.cashCloseAnalysis', 'Cash Close Analysis')}</h3>
               <div className="flex items-center space-x-2 bg-blue-50 rounded-full px-3 py-1">
                 <PieChart className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-600 font-medium">Live Data</span>
+                                  <span className="text-sm text-blue-600 font-medium">{t('common.liveData', 'Live Data')}</span>
               </div>
             </div>
             
@@ -1363,7 +1453,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-blue-700">Day Shift</span>
+                                      <span className="text-xs font-medium text-blue-700">{t('common.dayShift', 'Day Shift')}</span>
                 </div>
                 <p className="text-lg font-bold text-blue-800">
                   {formatCurrency(metrics.cashCloseMetrics.totalDayCash).replace('UGX', '').trim()}
@@ -1374,7 +1464,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-indigo-700">Night Shift</span>
+                                      <span className="text-xs font-medium text-indigo-700">{t('common.nightShift', 'Night Shift')}</span>
                 </div>
                 <p className="text-lg font-bold text-indigo-800">
                   {formatCurrency(metrics.cashCloseMetrics.totalNightCash).replace('UGX', '').trim()}
@@ -1385,23 +1475,23 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-green-700">Network Money</span>
+                                      <span className="text-xs font-medium text-green-700">{t('common.networkMoney', 'Network Money')}</span>
                 </div>
                 <p className="text-lg font-bold text-green-800">
                   {formatCurrency(metrics.cashCloseMetrics.totalNetworkMoney).replace('UGX', '').trim()}
                 </p>
-                <p className="text-xs text-green-600">Digital payments</p>
+                                  <p className="text-xs text-green-600">{t('common.digitalPayments', 'Digital payments')}</p>
               </div>
               
               <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-red-700">Discrepancies</span>
+                                      <span className="text-xs font-medium text-red-700">{t('common.discrepancies', 'Discrepancies')}</span>
                 </div>
                 <p className="text-lg font-bold text-red-800">
                   {formatCurrency(Math.abs(metrics.cashCloseMetrics.totalShortage - metrics.cashCloseMetrics.totalExcess)).replace('UGX', '').trim()}
                 </p>
-                <p className="text-xs text-red-600">Net variance</p>
+                                  <p className="text-xs text-red-600">{t('common.netVariance', 'Net variance')}</p>
               </div>
             </div>
             
@@ -1454,10 +1544,10 @@ export default function PurchaseManagerDashboard() {
           {/* Purchase Period Pie Chart */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Purchase Period Analysis</h3>
+                              <h3 className="text-xl font-bold text-gray-900">{t('common.periodAnalysis', 'Purchase Period Analysis')}</h3>
               <div className="flex items-center space-x-2 bg-purple-50 rounded-full px-3 py-1">
                 <PieChart className="w-4 h-4 text-purple-600" />
-                <span className="text-sm text-purple-600 font-medium">Period Breakdown</span>
+                                  <span className="text-sm text-purple-600 font-medium">{t('common.periodBreakdown', 'Period Breakdown')}</span>
                   </div>
                   </div>
             
@@ -1466,7 +1556,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-red-700">Daily</span>
+                                      <span className="text-sm font-medium text-red-700">{t('common.daily', 'Daily')}</span>
                 </div>
                 <p className="text-lg font-bold text-red-800 mt-1">
                   {formatCurrency(metrics.totalPurchases.daily).replace('UGX', '').trim()}
@@ -1475,7 +1565,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-teal-700">Weekly</span>
+                                      <span className="text-sm font-medium text-teal-700">{t('common.weekly', 'Weekly')}</span>
                 </div>
                 <p className="text-lg font-bold text-teal-800 mt-1">
                   {formatCurrency(metrics.totalPurchases.weekly).replace('UGX', '').trim()}
@@ -1484,7 +1574,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-blue-700">Monthly</span>
+                                      <span className="text-sm font-medium text-blue-700">{t('common.monthly', 'Monthly')}</span>
                 </div>
                 <p className="text-lg font-bold text-blue-800 mt-1">
                   {formatCurrency(metrics.totalPurchases.monthly).replace('UGX', '').trim()}
@@ -1493,7 +1583,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-green-700">Yearly</span>
+                                      <span className="text-sm font-medium text-green-700">{t('common.yearly', 'Yearly')}</span>
                 </div>
                 <p className="text-lg font-bold text-green-800 mt-1">
                   {formatCurrency(metrics.totalPurchases.yearly).replace('UGX', '').trim()}
@@ -1508,11 +1598,11 @@ export default function PurchaseManagerDashboard() {
 
           {/* Additional insights could go here */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Purchase Insights</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.purchaseInsights', 'Purchase Insights')}</h3>
             <div className="space-y-4">
               <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-purple-700">Highest Period</span>
+                                      <span className="text-sm font-medium text-purple-700">{t('common.highestPeriod', 'Highest Period')}</span>
                   <Activity className="w-4 h-4 text-purple-600" />
               </div>
                 <p className="text-lg font-bold text-purple-800">
@@ -1537,7 +1627,7 @@ export default function PurchaseManagerDashboard() {
               
               <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-orange-700">Total Volume</span>
+                                      <span className="text-sm font-medium text-orange-700">{t('common.totalVolume', 'Total Volume')}</span>
                   <BarChart3 className="w-4 h-4 text-orange-600" />
               </div>
                 <p className="text-lg font-bold text-orange-800">
@@ -1548,36 +1638,28 @@ export default function PurchaseManagerDashboard() {
                     metrics.totalPurchases.yearly
                   )}
                 </p>
-                <p className="text-sm text-orange-600 mt-1">Combined periods</p>
+                                  <p className="text-sm text-orange-600 mt-1">{t('common.combinedPeriods', 'Combined periods')}</p>
             </div>
 
               <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-emerald-700">Average Daily</span>
+                                      <span className="text-sm font-medium text-emerald-700">{t('common.averageDaily', 'Average Daily')}</span>
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
                 </div>
                 <p className="text-lg font-bold text-emerald-800">
                   {formatCurrency(metrics.totalPurchases.yearly / 365)}
                 </p>
-                <p className="text-sm text-emerald-600 mt-1">Based on yearly data</p>
+                                  <p className="text-sm text-emerald-600 mt-1">{t('common.basedOnYearly', 'Based on yearly data')}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Cash Flow & Supplier Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Cash Flow Analysis */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Cash Flow Analysis</h3>
-            <div className="h-72">
-              <Bar data={cashFlowData} options={trendChartOptions} />
-            </div>
-          </div>
-
+        {/* Supplier Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Suppliers */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Top Suppliers</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.topSuppliers', 'Top Suppliers')}</h3>
             <div className="space-y-4">
               {metrics.supplierMetrics.topSuppliers.map((supplier, index) => (
                 <div key={supplier.id} className="group hover:bg-purple-50 rounded-2xl p-3 transition-all duration-200">
@@ -1607,7 +1689,7 @@ export default function PurchaseManagerDashboard() {
               {metrics.supplierMetrics.topSuppliers.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No supplier data available</p>
+                  <p>{t('common.noSupplierData', 'No supplier data available')}</p>
           </div>
         )}
             </div>
@@ -1616,10 +1698,10 @@ export default function PurchaseManagerDashboard() {
           {/* Invoice Status Overview */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Invoice Status Overview</h3>
+                              <h3 className="text-xl font-bold text-gray-900">{t('common.invoiceStatus', 'Invoice Status')} {t('status.overview', 'Overview')}</h3>
               <div className="flex items-center space-x-2 bg-purple-50 rounded-full px-3 py-1">
                 <FileText className="w-4 h-4 text-purple-600" />
-                <span className="text-sm text-purple-600 font-medium">Live Status</span>
+                                  <span className="text-sm text-purple-600 font-medium">{t('common.liveStatus', 'Live Status')}</span>
               </div>
             </div>
             
@@ -1628,7 +1710,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-green-700">Paid</span>
+                                      <span className="text-xs font-medium text-green-700">{t('common.paid', 'Paid')}</span>
                 </div>
                 <p className="text-lg font-bold text-green-800">
                   {metrics.invoiceMetrics.paid}
@@ -1639,7 +1721,7 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-yellow-700">Pending</span>
+                                      <span className="text-xs font-medium text-yellow-700">{t('common.pending', 'Pending')}</span>
                 </div>
                 <p className="text-lg font-bold text-yellow-800">
                   {metrics.invoiceMetrics.pending}
@@ -1650,23 +1732,23 @@ export default function PurchaseManagerDashboard() {
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-blue-700">Approved</span>
+                                      <span className="text-xs font-medium text-blue-700">{t('common.approved', 'Approved')}</span>
                 </div>
                 <p className="text-lg font-bold text-blue-800">
                   {metrics.invoiceMetrics.approved}
                 </p>
-                <p className="text-xs text-blue-600">Ready for payment</p>
+                                  <p className="text-xs text-blue-600">{t('common.readyForPayment', 'Ready for payment')}</p>
               </div>
               
               <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-xs font-medium text-red-700">Overdue</span>
+                                      <span className="text-xs font-medium text-red-700">{t('common.overdue', 'Overdue')}</span>
                 </div>
                 <p className="text-lg font-bold text-red-800">
                   {metrics.invoiceMetrics.overdue}
                 </p>
-                <p className="text-xs text-red-600">Requires attention</p>
+                                  <p className="text-xs text-red-600">{t('common.requiresAttention', 'Requires attention')}</p>
               </div>
             </div>
             
@@ -1674,7 +1756,7 @@ export default function PurchaseManagerDashboard() {
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Payment Progress</span>
+                  <span className="text-gray-600">{t('common.paymentProgress', 'Payment Progress')}</span>
                   <span className="text-gray-800 font-medium">
                     {metrics.invoiceMetrics.totalAmount > 0 ? 
                       Math.round((metrics.invoiceMetrics.paidAmount / metrics.invoiceMetrics.totalAmount) * 100) : 0}%
@@ -1693,7 +1775,7 @@ export default function PurchaseManagerDashboard() {
               
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Invoice Completion</span>
+                  <span className="text-gray-600">{t('common.invoiceCompletion', 'Invoice Completion')}</span>
                   <span className="text-gray-800 font-medium">
                     {metrics.invoiceMetrics.total > 0 ? 
                       Math.round((metrics.invoiceMetrics.paid / metrics.invoiceMetrics.total) * 100) : 0}%
@@ -1742,7 +1824,7 @@ export default function PurchaseManagerDashboard() {
         {/* Cash Close Tracking Section */}
         <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Recent Cash Closes</h3>
+                            <h3 className="text-xl font-bold text-gray-900">{t('common.recentCashCloses', 'Recent Cash Closes')}</h3>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 bg-blue-50 rounded-full px-3 py-1">
                 <Clock className="w-4 h-4 text-blue-600" />
@@ -1753,7 +1835,7 @@ export default function PurchaseManagerDashboard() {
                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                                   >
                               <Eye className="w-4 h-4" />
-                <span>View All</span>
+                                  <span>{t('common.viewAll', 'View All')}</span>
                                 </button>
               </div>
           </div>
@@ -1762,11 +1844,11 @@ export default function PurchaseManagerDashboard() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Shift</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Amount</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Variance</th>
+                                  <th className="text-left py-3 px-4 font-medium text-gray-700">{t('common.date', 'Date')}</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">{t('common.shift', 'Shift')}</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">{t('common.amount', 'Amount')}</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">{t('common.status', 'Status')}</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">{t('common.variance', 'Variance')}</th>
                       </tr>
                     </thead>
               <tbody>
@@ -1835,7 +1917,7 @@ export default function PurchaseManagerDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Quick Actions */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Admin Panel</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.adminPanel', 'Admin Panel')}</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-purple-50 rounded-2xl hover:bg-purple-100 transition-colors cursor-pointer"
                    onClick={() => router.push('/dashboard/purchase-manager/invoices')}>
@@ -1844,8 +1926,8 @@ export default function PurchaseManagerDashboard() {
                     <FileText className="w-4 h-4 text-purple-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Manage Invoices</p>
-                    <p className="text-xs text-gray-500">Review and approve</p>
+                                      <p className="text-sm font-medium text-gray-900">{t('common.manageInvoices', 'Manage Invoices')}</p>
+                  <p className="text-xs text-gray-500">{t('common.reviewAndApprove', 'Review and approve')}</p>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-purple-600" />
@@ -1858,8 +1940,8 @@ export default function PurchaseManagerDashboard() {
                     <Users className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Supplier Management</p>
-                    <p className="text-xs text-gray-500">Add & manage suppliers</p>
+                                      <p className="text-sm font-medium text-gray-900">{t('common.supplierManagement', 'Supplier Management')}</p>
+                  <p className="text-xs text-gray-500">{t('common.addManageSuppliers', 'Add & manage suppliers')}</p>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-blue-600" />
@@ -1872,8 +1954,8 @@ export default function PurchaseManagerDashboard() {
                     <BarChart3 className="w-4 h-4 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Payment Reports</p>
-                    <p className="text-xs text-gray-500">View analytics</p>
+                                      <p className="text-sm font-medium text-gray-900">{t('common.paymentReports', 'Payment Reports')}</p>
+                  <p className="text-xs text-gray-500">{t('common.viewAnalytics', 'View analytics')}</p>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-green-600" />
@@ -1886,8 +1968,8 @@ export default function PurchaseManagerDashboard() {
                     <DollarSign className="w-4 h-4 text-orange-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Cash Tracking</p>
-                    <p className="text-xs text-gray-500">Monitor cash flow</p>
+                                      <p className="text-sm font-medium text-gray-900">{t('common.cashTracking', 'Cash Tracking')}</p>
+                  <p className="text-xs text-gray-500">{t('common.monitorCashFlow', 'Monitor cash flow')}</p>
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-orange-600" />
@@ -1897,7 +1979,7 @@ export default function PurchaseManagerDashboard() {
 
           {/* Recent Activities */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Recent Activities</h3>
+                            <h3 className="text-xl font-bold text-gray-900 mb-6">{t('common.recentActivities', 'Recent Activities')}</h3>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-2xl transition-colors">

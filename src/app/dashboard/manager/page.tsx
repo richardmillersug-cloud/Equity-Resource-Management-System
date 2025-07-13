@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ManagerQueries } from '../../../lib/firebase/role-based-queries';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Building2, 
   TrendingUp, 
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function ManagerDashboard() {
+  const { t } = useLanguage();
   const [branchPerformance, setBranchPerformance] = useState<any[]>([]);
   const [supplierPerformance, setSupplierPerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,7 @@ export default function ManagerDashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Management Overview</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('manager.performanceOverview', 'Management Overview')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -82,7 +84,7 @@ export default function ManagerDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Total Branches</p>
+              <p className="text-sm text-gray-500 mb-1">{t('manager.totalBranches', 'Total Branches')}</p>
               <p className="text-2xl font-bold text-gray-900">{totalBranches}</p>
             </div>
           </div>
@@ -94,7 +96,7 @@ export default function ManagerDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">Total Employees</p>
+              <p className="text-sm text-gray-500 mb-1">{t('manager.totalEmployees', 'Total Employees')}</p>
               <p className="text-2xl font-bold text-gray-900">{totalEmployees}</p>
             </div>
           </div>

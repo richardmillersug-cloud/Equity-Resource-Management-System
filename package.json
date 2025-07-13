@@ -10,7 +10,11 @@
     "create-hr": "ts-node src/scripts/create-hr-account.ts",
     "test-hr-db": "ts-node src/scripts/test-hr-database.ts",
     "test-hr-permissions": "ts-node src/scripts/test-hr-permissions.ts",
-    "deploy-rules": "firebase deploy --only firestore:rules"
+    "deploy-rules": "firebase deploy --only firestore:rules",
+    "deploy-indexes": "firebase deploy --only firestore:indexes",
+    "init-performance": "ts-node src/scripts/init-performance-collections.ts",
+    "verify-performance": "ts-node src/scripts/verify-performance-collections.ts",
+    "deploy-performance": "npm run deploy-rules && npm run deploy-indexes && npm run init-performance"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -26,14 +30,17 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^11.9.0",
+    "i18next": "^25.3.2",
     "jsbarcode": "^3.12.1",
     "lucide-react": "^0.513.0",
     "next": "15.3.3",
+    "next-i18next": "^15.4.2",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
+    "react-i18next": "^15.6.0",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"

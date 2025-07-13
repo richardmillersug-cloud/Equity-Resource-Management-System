@@ -9,7 +9,8 @@ import {
   Expense,
   ExpenseCategory,
   ExpenseStatus,
-  BusinessRules
+  BusinessRules,
+  PerformanceRating
 } from '../database/schema';
 
 export class RetailBusinessRules implements BusinessRules {
@@ -143,6 +144,72 @@ export class RetailBusinessRules implements BusinessRules {
     ].includes(employee.role);
   }
 
+  // ==================== PERFORMANCE MANAGEMENT ====================
+
+  /**
+   * Determines if employee can create performance targets
+   */
+  canCreatePerformanceTarget(employee: Employee): boolean {
+    return [
+      EmployeeRole.HR,
+      EmployeeRole.ADMIN,
+      EmployeeRole.SUPERVISOR,
+      EmployeeRole.MANAGING_DIRECTOR
+    ].includes(employee.role);
+  }
+
+  /**
+   * Determines if evaluator can evaluate the target employee
+   */
+  canEvaluateEmployee(evaluator: Employee, targetEmployee: Employee): boolean {
+    // Admin and HR can evaluate anyone
+    if ([EmployeeRole.ADMIN, EmployeeRole.HR].includes(evaluator.role)) {
+      return true;
+    }
+
+    // Supervisors can evaluate non-management employees
+    if (evaluator.role === EmployeeRole.SUPERVISOR) {
+      const nonManagementRoles = [
+        EmployeeRole.RECEIVER,
+        EmployeeRole.STOCK_MANAGER,
+        EmployeeRole.ACCOUNTANT_OPS
+      ];
+      return nonManagementRoles.includes(targetEmployee.role);
+    }
+
+    // Managing directors can evaluate management roles
+    if (evaluator.role === EmployeeRole.MANAGING_DIRECTOR) {
+      const managementRoles = [
+        EmployeeRole.HR,
+        EmployeeRole.ACCOUNTANT,
+        EmployeeRole.PURCHASING_MANAGER,
+        EmployeeRole.SUPERVISOR
+      ];
+      return managementRoles.includes(targetEmployee.role);
+    }
+
+    // Same branch evaluations (if branches are different, restrict access)
+    if (evaluator.branch_id !== targetEmployee.branch_id) {
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Validates performance rating consistency
+   */
+  validatePerformanceRating(rating: PerformanceRating): boolean {
+    const validRatings = [
+      PerformanceRating.OUTSTANDING,
+      PerformanceRating.EXCEEDS_EXPECTATIONS,
+      PerformanceRating.MEETS_EXPECTATIONS,
+      PerformanceRating.BELOW_EXPECTATIONS,
+      PerformanceRating.UNSATISFACTORY
+    ];
+    return validRatings.includes(rating);
+  }
+
   /**
    * Role-based permission matrix for various operations
    */
@@ -154,7 +221,8 @@ export class RetailBusinessRules implements BusinessRules {
         'employee.read', 'employee.create', 'employee.update',
         'payroll.read', 'payroll.create', 'payroll.process',
         'attendance.read', 'attendance.manage',
-        'leave.read', 'leave.approve'
+        'leave.read', 'leave.approve',
+        'performance.read', 'performance.create', 'performance.evaluate'
       ],
       
       [EmployeeRole.ACCOUNTANT]: [
@@ -191,12 +259,14 @@ export class RetailBusinessRules implements BusinessRules {
       ],
       
       [EmployeeRole.SUPERVISOR]: [
-        'analytics.read', 'reports.read'
+        'analytics.read', 'reports.read',
+        'performance.read', 'performance.evaluate'
       ],
       
       [EmployeeRole.MANAGING_DIRECTOR]: [
         'banking.read', 'financial_overview.read',
-        'cash_injection.approve', 'high_value_transactions.approve'
+        'cash_injection.approve', 'high_value_transactions.approve',
+        'performance.read', 'performance.evaluate'
       ]
     };
 

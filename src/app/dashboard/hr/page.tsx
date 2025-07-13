@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { HRQueries } from '../../../lib/firebase/role-based-queries';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Users, 
   Calendar, 
@@ -33,6 +34,7 @@ interface HRStats {
 }
 
 export default function HRDashboard() {
+  const { t } = useLanguage();
   const [employees, setEmployees] = useState<any[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [stats, setStats] = useState<HRStats>({
@@ -116,15 +118,15 @@ export default function HRDashboard() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">HR Dashboard</h1>
-          <p className="text-gray-500">Manage your workforce and HR operations</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('navigation.hrDashboard', 'HR Dashboard')}</h1>
+          <p className="text-gray-500">{t('hr.manageWorkforce', 'Manage your workforce and HR operations')}</p>
         </div>
         <Link 
           href="/dashboard/hr/employees/add"
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Add Employee
+          {t('hr.addEmployee', 'Add Employee')}
         </Link>
       </div>
 
@@ -137,7 +139,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Total Employees</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.totalEmployees', 'Total Employees')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
           </div>
         </div>
@@ -149,7 +151,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Active Employees</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.activeEmployees', 'Active Employees')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.activeEmployees}</p>
           </div>
         </div>
@@ -161,7 +163,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Pending Leave</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.pendingLeave', 'Pending Leave')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.pendingLeaves}</p>
           </div>
         </div>
@@ -173,7 +175,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Today's Attendance</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.todaysAttendance', 'Today\'s Attendance')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.todayAttendance}</p>
           </div>
         </div>
@@ -185,7 +187,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Pending Payroll</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.pendingPayroll', 'Pending Payroll')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.pendingPayroll}</p>
           </div>
         </div>
@@ -197,7 +199,7 @@ export default function HRDashboard() {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">New Hires (Month)</p>
+            <p className="text-sm text-gray-500 mb-1">{t('hr.newHiresMonth', 'New Hires (Month)')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.thisMonthHires}</p>
           </div>
         </div>
@@ -205,7 +207,7 @@ export default function HRDashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('hr.quickActions', 'Quick Actions')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link href="/dashboard/hr/employees">
             <div className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer">
@@ -214,8 +216,8 @@ export default function HRDashboard() {
                   <Users className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Manage Employees</h3>
-                  <p className="text-sm text-gray-500">Add, edit, or view employee records</p>
+                  <h3 className="font-medium text-gray-900">{t('hr.manageEmployees', 'Manage Employees')}</h3>
+                  <p className="text-sm text-gray-500">{t('hr.addEditViewRecords', 'Add, edit, or view employee records')}</p>
                 </div>
               </div>
             </div>
@@ -228,8 +230,8 @@ export default function HRDashboard() {
                   <UserCheck className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Attendance Tracking</h3>
-                  <p className="text-sm text-gray-500">Track daily attendance and hours</p>
+                  <h3 className="font-medium text-gray-900">{t('hr.attendanceTracking', 'Attendance Tracking')}</h3>
+                  <p className="text-sm text-gray-500">{t('hr.trackDailyAttendance', 'Track daily attendance and hours')}</p>
                 </div>
               </div>
             </div>
@@ -242,8 +244,8 @@ export default function HRDashboard() {
                   <Calendar className="h-5 w-5 text-yellow-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Leave Requests</h3>
-                  <p className="text-sm text-gray-500">Approve or reject leave applications</p>
+                  <h3 className="font-medium text-gray-900">{t('hr.leaveRequests', 'Leave Requests')}</h3>
+                  <p className="text-sm text-gray-500">{t('hr.approveRejectLeave', 'Approve or reject leave applications')}</p>
                 </div>
               </div>
             </div>

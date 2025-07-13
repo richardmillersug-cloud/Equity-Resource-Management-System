@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { authService, AuthUser } from '../../lib/firebase/auth';
 import { ReceiverQueries } from '../../lib/firebase/role-based-queries';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { 
   LayoutDashboard,
   DollarSign,
@@ -57,401 +58,409 @@ interface NavigationItem {
   }[];
 }
 
-const navigationItems: NavigationItem[] = [
-  // Dashboard - Available to all roles
-  { 
-    id: 'dashboard', 
-    icon: <LayoutDashboard className="w-5 h-5" />, 
-    label: 'Dashboard', 
-    path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
-  },
-  
-  // Admin specific
-  { 
-    id: 'system-overview', 
-    icon: <Shield className="w-5 h-5" />, 
-    label: 'System Overview', 
-    path: '/dashboard/admin',
-    roles: ['Admin']
-  },
-  { 
-    id: 'user-management', 
-    icon: <UserCheck className="w-5 h-5" />, 
-    label: 'User Management', 
-    path: '/dashboard/hr/employees',
-    roles: ['Admin']
-  },
-  
-  // Manager specific
-  { 
-    id: 'performance', 
-    icon: <TrendingUp className="w-5 h-5" />, 
-    label: 'Performance', 
-    path: '/dashboard/manager',
-    roles: ['Manager', 'Admin']
-  },
-  { 
-    id: 'branches', 
-    icon: <Building2 className="w-5 h-5" />, 
-    label: 'Branch Management', 
-    path: '/dashboard/settings',
-    roles: ['Manager', 'Admin']
-  },
-  
-  // Accountant specific
-  { 
-    id: 'cash-allocation', 
-    icon: <Calculator className="w-5 h-5" />, 
-    label: 'Cash Allocation', 
-    path: '/dashboard/accountant',
-    roles: ['Accountant', 'Admin']
-  },
-  { 
-    id: 'expenses', 
-    icon: <Receipt className="w-5 h-5" />, 
-    label: 'Expenses', 
-    path: '/dashboard/accountant/expenses',
-    roles: ['Accountant', 'Admin']
-  },
-  { 
-    id: 'financial-reports', 
-    icon: <BarChart3 className="w-5 h-5" />, 
-    label: 'Financial Reports', 
-    path: '/dashboard/accountant/reports',
-    roles: ['Accountant', 'Manager', 'Admin']
-  },
-  
-  // Purchase Manager specific
-  { 
-    id: 'pm-dashboard', 
-    icon: <LayoutDashboard className="w-5 h-5" />, 
-    label: 'PM Dashboard', 
-    path: '/dashboard/purchase-manager',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'invoices', 
-    icon: <FileText className="w-5 h-5" />, 
-    label: 'Invoices', 
-    path: '/dashboard/purchase-manager/invoices',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'pm-expenses', 
-    icon: <Receipt className="w-5 h-5" />, 
-    label: 'PM Expenses', 
-    path: '/dashboard/purchase-manager/expenses',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'payments', 
-    icon: <CreditCard className="w-5 h-5" />, 
-    label: 'Payments', 
-    path: '/dashboard/purchase-manager/payments',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'suppliers', 
-    icon: <Building2 className="w-5 h-5" />, 
-    label: 'Suppliers', 
-    path: '/dashboard/purchase-manager/suppliers',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'cash-tracking', 
-    icon: <Smartphone className="w-5 h-5" />, 
-    label: 'Cash Tracking', 
-    path: '/dashboard/purchase-manager/cash-tracking',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-
-  
-  // HR specific
-  { 
-    id: 'hr-dashboard', 
-    icon: <Users className="w-5 h-5" />, 
-    label: 'HR Dashboard', 
-    path: '/dashboard/hr',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
-  },
-  { 
-    id: 'employees', 
-    icon: <Users className="w-5 h-5" />, 
-    label: 'Employees', 
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
-    submenu: [
-      {
-        id: 'view-employees',
-        icon: <Eye className="w-4 h-4" />,
-        label: 'View All',
-        path: '/dashboard/hr/employees'
-      },
-      {
-        id: 'add-employee',
-        icon: <Plus className="w-4 h-4" />,
-        label: 'Add Employee',
-        path: '/dashboard/hr/employees/add'
-      }
-    ]
-  },
-  { 
-    id: 'attendance-tracking', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
-    label: 'Attendance Tracking', 
-    path: '/dashboard/hr/attendance-tracking',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
-  },
-  { 
-    id: 'attendance', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📋</span>, 
-    label: 'Attendance Reports', 
-    path: '/dashboard/hr/attendance',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
-  },
-  { 
-    id: 'leave-requests', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📄</span>, 
-    label: 'Leave Requests', 
-    path: '/dashboard/hr/leave-requests',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
-  },
-  { 
-    id: 'leave-calendar', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
-    label: 'Leave Calendar', 
-    path: '/dashboard/hr/leave',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
-  },
-  { 
-    id: 'payroll', 
-    icon: <Banknote className="w-5 h-5" />, 
-    label: 'Payroll', 
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
-    submenu: [
-      {
-        id: 'payroll-processing',
-        icon: <Calculator className="w-4 h-4" />,
-        label: 'Processing',
-        path: '/dashboard/hr/payroll'
-      },
-      {
-        id: 'payroll-reports',
-        icon: <BarChart3 className="w-4 h-4" />,
-        label: 'Reports',
-        path: '/dashboard/hr/reports'
-      }
-    ]
-  },
-  { 
-    id: 'hr-barcodes', 
-    icon: <QrCode className="w-5 h-5" />, 
-    label: 'ID Cards & Barcodes', 
-    path: '/dashboard/hr/barcodes',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
-  },
-  { 
-    id: 'employee-documents', 
-    icon: <FileText className="w-5 h-5" />, 
-    label: 'Documents', 
-    path: '/dashboard/hr/employee-documents',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
-  },
-  
-  // Stock Manager specific
-  { 
-    id: 'inventory', 
-    icon: <Package className="w-5 h-5" />, 
-    label: 'Inventory', 
-    path: '/dashboard/stock-manager',
-    roles: ['Stock Manager', 'Admin']
-  },
-  { 
-    id: 'damage-reports', 
-    icon: <AlertTriangle className="w-5 h-5" />, 
-    label: 'Damage Reports', 
-    path: '/dashboard/receiver/damages',
-    roles: ['Stock Manager', 'Manager', 'Admin']
-  },
-  
-  // Receiver specific
-  { 
-    id: 'deliveries', 
-    icon: <Truck className="w-5 h-5" />, 
-    label: 'Deliveries', 
-    path: '/dashboard/receiver/deliveries',
-    roles: ['Receiver', 'Admin']
-  },
-  { 
-    id: 'return-notes', 
-    icon: <FileText className="w-5 h-5" />, 
-    label: 'Return Notes', 
-    path: '/dashboard/receiver/returns',
-    roles: ['Receiver', 'Admin']
-  },
-  { 
-    id: 'suppliers', 
-    icon: <Factory className="w-5 h-5" />, 
-    label: 'Suppliers', 
-    roles: ['Receiver', 'Admin'],
-    submenu: [
-      {
-        id: 'add-supplier',
-        icon: <Plus className="w-4 h-4" />,
-        label: 'Add Supplier',
-        path: '/dashboard/receiver/suppliers/add'
-      },
-      {
-        id: 'view-suppliers',
-        icon: <Eye className="w-4 h-4" />,
-        label: 'View Suppliers',
-        path: '/dashboard/receiver/suppliers'
-      }
-    ]
-  },
-  { 
-    id: 'invoices', 
-    icon: <Receipt className="w-5 h-5" />, 
-    label: 'Invoices', 
-    roles: ['Receiver', 'Admin'],
-    submenu: [
-      {
-        id: 'add-invoice',
-        icon: <Plus className="w-4 h-4" />,
-        label: 'Add Invoice',
-        path: '/dashboard/receiver/invoices/add'
-      },
-      {
-        id: 'view-invoices',
-        icon: <Eye className="w-4 h-4" />,
-        label: 'View Invoices',
-        path: '/dashboard/receiver/invoices'
-      }
-    ]
-  },
-  { 
-    id: 'damages', 
-    icon: <AlertTriangle className="w-5 h-5" />, 
-    label: 'Damages', 
-    path: '/dashboard/receiver/damages',
-    roles: ['Receiver', 'Admin']
-  },
-  { 
-    id: 'barcode', 
-    icon: <QrCode className="w-5 h-5" />, 
-    label: 'Barcode', 
-    path: '/dashboard/receiver/barcode',
-    roles: ['Receiver', 'Admin']
-  },
-  { 
-    id: 'restocking', 
-    icon: <Package className="w-5 h-5" />, 
-    label: 'Restocking', 
-    path: '/dashboard/receiver/restocking',
-    roles: ['Receiver', 'Admin']
-  },
-  
-  // Auditor specific
-  { 
-    id: 'audit-reports', 
-    icon: <QrCode className="w-5 h-5" />, 
-    label: 'Audit Reports', 
-    path: '/dashboard/auditor',
-    roles: ['Auditor', 'Admin']
-  },
-  
-  // Customer Service specific
-  { 
-    id: 'customer-service-desk', 
-    icon: <Users className="w-5 h-5" />, 
-    label: 'Customer Service', 
-    path: '/dashboard/receiver/returns',
-    roles: ['Customer Service', 'Manager', 'Admin']
-  },
-  
-  // Cashier specific
-  { 
-    id: 'cashier-operations', 
-    icon: <CreditCard className="w-5 h-5" />, 
-    label: 'Cashier Operations', 
-    path: '/dashboard/purchase-manager/payments',
-    roles: ['Cashier', 'Manager', 'Admin']
-  },
-  
-  // Employee Self-Service (for all employee roles)
-  { 
-    id: 'my-attendance', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
-    label: 'My Attendance', 
-    path: '/dashboard/hr/attendance-tracking',
-    roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Purchasing Manager', 'Accountant']
-  },
-  { 
-    id: 'my-leave', 
-    icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
-    label: 'My Leave Requests', 
-    path: '/dashboard/hr/leave-requests',
-    roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Purchasing Manager', 'Accountant']
-  },
-  
-  // Development/Testing
-  { 
-    id: 'offline-test', 
-    icon: <RefreshCw className="w-5 h-5" />, 
-    label: 'Offline Test', 
-    path: '/dashboard/offline-test',
-    roles: ['Admin']
-  },
-  
-  // Settings - Available to all roles
-  { 
-    id: 'settings', 
-    icon: <Settings className="w-5 h-5" />, 
-    label: 'Settings', 
-    path: '/dashboard/settings',
-    roles: ['*'] // All roles can access settings
-  }
-];
-
-interface ExpectedSupplier {
-  id: string;
-  name: string;
-  expectedTime: string;
-  items: number;
-  status: 'on-time' | 'delayed' | 'early';
-  priority: 'high' | 'medium' | 'low';
-}
-
-interface PMQuickAction {
-  id: string;
-  title: string;
-  count: number;
-  type: 'pending-invoices' | 'overdue-payments' | 'cash-shortage';
-  priority: 'high' | 'medium' | 'low';
-  action: string;
-}
-
-interface HRQuickAction {
-  id: string;
-  title: string;
-  count: number;
-  type: 'pending-leave-requests' | 'attendance-alerts' | 'new-employees' | 'expired-documents' | 'birthday-reminders';
-  priority: 'high' | 'medium' | 'low';
-  action: string;
-}
-
 export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
+  const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [expectedSuppliers, setExpectedSuppliers] = useState<ExpectedSupplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [pmQuickActions, setPMQuickActions] = useState<PMQuickAction[]>([]);
   const [loadingPMActions, setLoadingPMActions] = useState(false);
   const [hrQuickActions, setHRQuickActions] = useState<HRQuickAction[]>([]);
   const [loadingHRActions, setLoadingHRActions] = useState(false);
+  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const router = useRouter();
   const pathname = usePathname();
+
+  const navigationItems: NavigationItem[] = [
+    // Dashboard - Available to all roles except Purchase Managers (they have their own PM Dashboard) and HR (they have their own HR Dashboard)
+    { 
+      id: 'dashboard', 
+      icon: <LayoutDashboard className="w-5 h-5" />, 
+      label: t('navigation.dashboard', 'Dashboard'), 
+      path: '/dashboard',
+      roles: ['Admin', 'Manager', 'Accountant', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+    },
+    
+    // Admin specific
+    { 
+      id: 'system-overview', 
+      icon: <Shield className="w-5 h-5" />, 
+      label: t('navigation.systemOverview', 'System Overview'), 
+      path: '/dashboard/admin',
+      roles: ['Admin']
+    },
+    { 
+      id: 'user-management', 
+      icon: <UserCheck className="w-5 h-5" />, 
+      label: t('navigation.userManagement', 'User Management'), 
+      path: '/dashboard/hr/employees',
+      roles: ['Admin']
+    },
+    
+    // Manager specific
+    { 
+      id: 'performance', 
+      icon: <TrendingUp className="w-5 h-5" />, 
+      label: t('navigation.performance', 'Performance'), 
+      path: '/dashboard/manager',
+      roles: ['Manager', 'Admin']
+    },
+    { 
+      id: 'branches', 
+      icon: <Building2 className="w-5 h-5" />, 
+      label: t('navigation.branchManagement', 'Branch Management'), 
+      path: '/dashboard/settings',
+      roles: ['Manager', 'Admin']
+    },
+    
+    // Accountant specific
+    { 
+      id: 'cash-allocation', 
+      icon: <Calculator className="w-5 h-5" />, 
+      label: t('accountant.financialManagement', 'Cash Allocation'), 
+      path: '/dashboard/accountant',
+      roles: ['Accountant', 'Admin']
+    },
+    { 
+      id: 'expenses', 
+      icon: <Receipt className="w-5 h-5" />, 
+      label: t('navigation.expenses', 'Expenses'), 
+      path: '/dashboard/accountant/expenses',
+      roles: ['Accountant', 'Admin']
+    },
+    { 
+      id: 'financial-reports', 
+      icon: <BarChart3 className="w-5 h-5" />, 
+      label: t('navigation.financialReports', 'Financial Reports'), 
+      path: '/dashboard/accountant/reports',
+      roles: ['Accountant', 'Manager', 'Admin']
+    },
+    
+    // Purchase Manager specific
+    { 
+      id: 'pm-dashboard', 
+      icon: <LayoutDashboard className="w-5 h-5" />, 
+      label: t('navigation.pmDashboard', 'PM Dashboard'), 
+      path: '/dashboard/purchase-manager',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+    { 
+      id: 'invoices', 
+      icon: <FileText className="w-5 h-5" />, 
+      label: t('navigation.invoices', 'Invoices'), 
+      path: '/dashboard/purchase-manager/invoices',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+    { 
+      id: 'pm-expenses', 
+      icon: <Receipt className="w-5 h-5" />, 
+      label: t('navigation.pmExpenses', 'PM Expenses'), 
+      path: '/dashboard/purchase-manager/expenses',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+    { 
+      id: 'payments', 
+      icon: <CreditCard className="w-5 h-5" />, 
+      label: t('navigation.payments', 'Payments'), 
+      path: '/dashboard/purchase-manager/payments',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+    { 
+      id: 'suppliers', 
+      icon: <Building2 className="w-5 h-5" />, 
+      label: t('navigation.suppliers', 'Suppliers'), 
+      path: '/dashboard/purchase-manager/suppliers',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+    { 
+      id: 'cash-tracking', 
+      icon: <Smartphone className="w-5 h-5" />, 
+      label: t('navigation.cashTracking', 'Cash Tracking'), 
+      path: '/dashboard/purchase-manager/cash-tracking',
+      roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    },
+
+    
+    // HR specific
+    { 
+      id: 'hr-dashboard', 
+      icon: <LayoutDashboard className="w-5 h-5" />, 
+      label: t('navigation.hrDashboard', 'HR Dashboard'), 
+      path: '/dashboard/hr',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    },
+    { 
+      id: 'employees', 
+      icon: <Users className="w-5 h-5" />, 
+      label: t('navigation.employees', 'Employees'), 
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+      submenu: [
+        {
+          id: 'view-employees',
+          icon: <Eye className="w-4 h-4" />,
+          label: t('actions.view', 'View All'),
+          path: '/dashboard/hr/employees'
+        },
+        {
+          id: 'add-employee',
+          icon: <Plus className="w-4 h-4" />,
+          label: t('hr.addEmployee', 'Add Employee'),
+          path: '/dashboard/hr/employees/add'
+        }
+      ]
+    },
+    { 
+      id: 'attendance-tracking', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
+      label: t('navigation.attendanceTracking', 'Attendance Tracking'), 
+      path: '/dashboard/hr/attendance-tracking',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    },
+    { 
+      id: 'attendance', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📋</span>, 
+      label: t('navigation.attendance', 'Attendance Reports'), 
+      path: '/dashboard/hr/attendance',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    },
+    { 
+      id: 'leave-requests', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📄</span>, 
+      label: t('navigation.leaveRequests', 'Leave Requests'), 
+      path: '/dashboard/hr/leave-requests',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    },
+    { 
+      id: 'leave-calendar', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
+      label: t('navigation.leave', 'Leave Calendar'), 
+      path: '/dashboard/hr/leave',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    },
+    { 
+      id: 'payroll', 
+      icon: <Banknote className="w-5 h-5" />, 
+      label: t('navigation.payroll', 'Payroll'), 
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+      submenu: [
+        {
+          id: 'payroll-processing',
+          icon: <Calculator className="w-4 h-4" />,
+          label: t('actions.processing', 'Processing'),
+          path: '/dashboard/hr/payroll'
+        },
+        {
+          id: 'payroll-reports',
+          icon: <BarChart3 className="w-4 h-4" />,
+          label: t('navigation.reports', 'Reports'),
+          path: '/dashboard/hr/reports'
+        }
+      ]
+    },
+    { 
+      id: 'hr-barcodes', 
+      icon: <QrCode className="w-5 h-5" />, 
+      label: t('navigation.barcodes', 'ID Cards & Barcodes'), 
+      path: '/dashboard/hr/barcodes',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    },
+    { 
+      id: 'employee-documents', 
+      icon: <FileText className="w-5 h-5" />, 
+      label: t('navigation.employeeDocuments', 'Documents'), 
+      path: '/dashboard/hr/employee-documents',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    },
+    { 
+      id: 'performance-management', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🎯</span>, 
+      label: t('navigation.performance', 'Performance Management'), 
+      path: '/dashboard/hr/performance',
+      roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    },
+    
+    // Stock Manager specific
+    { 
+      id: 'inventory', 
+      icon: <Package className="w-5 h-5" />, 
+      label: t('navigation.inventoryManagement', 'Inventory'), 
+      path: '/dashboard/stock-manager',
+      roles: ['Stock Manager', 'Admin']
+    },
+    { 
+      id: 'damage-reports', 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      label: t('navigation.damageReports', 'Damage Reports'), 
+      path: '/dashboard/receiver/damages',
+      roles: ['Stock Manager', 'Manager', 'Admin']
+    },
+    
+    // Receiver specific
+    { 
+      id: 'deliveries', 
+      icon: <Truck className="w-5 h-5" />, 
+      label: t('navigation.deliveries', 'Deliveries'), 
+      path: '/dashboard/receiver/deliveries',
+      roles: ['Receiver', 'Admin']
+    },
+    { 
+      id: 'return-notes', 
+      icon: <FileText className="w-5 h-5" />, 
+      label: t('navigation.returns', 'Return Notes'), 
+      path: '/dashboard/receiver/returns',
+      roles: ['Receiver', 'Admin']
+    },
+    { 
+      id: 'suppliers', 
+      icon: <Factory className="w-5 h-5" />, 
+      label: t('navigation.suppliers', 'Suppliers'), 
+      roles: ['Receiver', 'Admin'],
+      submenu: [
+        {
+          id: 'add-supplier',
+          icon: <Plus className="w-4 h-4" />,
+          label: t('actions.add', 'Add Supplier'),
+          path: '/dashboard/receiver/suppliers/add'
+        },
+        {
+          id: 'view-suppliers',
+          icon: <Eye className="w-4 h-4" />,
+          label: t('actions.view', 'View Suppliers'),
+          path: '/dashboard/receiver/suppliers'
+        }
+      ]
+    },
+    { 
+      id: 'invoices', 
+      icon: <Receipt className="w-5 h-5" />, 
+      label: t('navigation.invoices', 'Invoices'), 
+      roles: ['Receiver', 'Admin'],
+      submenu: [
+        {
+          id: 'add-invoice',
+          icon: <Plus className="w-4 h-4" />,
+          label: t('actions.add', 'Add Invoice'),
+          path: '/dashboard/receiver/invoices/add'
+        },
+        {
+          id: 'view-invoices',
+          icon: <Eye className="w-4 h-4" />,
+          label: t('actions.view', 'View Invoices'),
+          path: '/dashboard/receiver/invoices'
+        }
+      ]
+    },
+    { 
+      id: 'damages', 
+      icon: <AlertTriangle className="w-5 h-5" />, 
+      label: t('navigation.damages', 'Damages'), 
+      path: '/dashboard/receiver/damages',
+      roles: ['Receiver', 'Admin']
+    },
+    { 
+      id: 'barcode', 
+      icon: <QrCode className="w-5 h-5" />, 
+      label: t('navigation.barcode', 'Barcode'), 
+      path: '/dashboard/receiver/barcode',
+      roles: ['Receiver', 'Admin']
+    },
+    { 
+      id: 'restocking', 
+      icon: <Package className="w-5 h-5" />, 
+      label: t('navigation.restocking', 'Restocking'), 
+      path: '/dashboard/receiver/restocking',
+      roles: ['Receiver', 'Admin']
+    },
+    
+    // Auditor specific
+    { 
+      id: 'audit-reports', 
+      icon: <QrCode className="w-5 h-5" />, 
+      label: t('navigation.auditTrail', 'Audit Reports'), 
+      path: '/dashboard/auditor',
+      roles: ['Auditor', 'Admin']
+    },
+    
+    // Customer Service specific
+    { 
+      id: 'customer-service-desk', 
+      icon: <Users className="w-5 h-5" />, 
+      label: t('navigation.customerService', 'Customer Service'), 
+      path: '/dashboard/receiver/returns',
+      roles: ['Customer Service', 'Manager', 'Admin']
+    },
+    
+    // Cashier specific
+    { 
+      id: 'cashier-operations', 
+      icon: <CreditCard className="w-5 h-5" />, 
+      label: t('navigation.cashierOperations', 'Cashier Operations'), 
+      path: '/dashboard/purchase-manager/payments',
+      roles: ['Cashier', 'Manager', 'Admin']
+    },
+    
+    // Employee Self-Service (for all employee roles)
+    { 
+      id: 'my-attendance', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
+      label: t('navigation.myAttendance', 'My Attendance'), 
+      path: '/dashboard/hr/attendance-tracking',
+      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Accountant']
+    },
+    { 
+      id: 'my-leave', 
+      icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
+      label: t('navigation.myLeave', 'My Leave Requests'), 
+      path: '/dashboard/hr/leave-requests',
+      roles: ['Cashier', 'Customer Service', 'Receiver', 'Stock Manager', 'Accountant']
+    },
+    
+    // Development/Testing
+    { 
+      id: 'offline-test', 
+      icon: <RefreshCw className="w-5 h-5" />, 
+      label: t('navigation.offlineTest', 'Offline Test'), 
+      path: '/dashboard/offline-test',
+      roles: ['Admin']
+    },
+    
+    // Settings - Available to all roles
+    { 
+      id: 'settings', 
+      icon: <Settings className="w-5 h-5" />, 
+      label: t('navigation.settings', 'Settings'), 
+      path: '/dashboard/settings',
+      roles: ['*'] // All roles can access settings
+    }
+  ];
+
+  interface ExpectedSupplier {
+    id: string;
+    name: string;
+    expectedTime: string;
+    items: number;
+    status: 'on-time' | 'delayed' | 'early';
+    priority: 'high' | 'medium' | 'low';
+  }
+
+  interface PMQuickAction {
+    id: string;
+    title: string;
+    count: number;
+    type: 'pending-invoices' | 'overdue-payments' | 'cash-shortage';
+    priority: 'high' | 'medium' | 'low';
+    action: string;
+  }
+
+  interface HRQuickAction {
+    id: string;
+    title: string;
+    count: number;
+    type: 'pending-leave-requests' | 'attendance-alerts' | 'new-employees' | 'expired-documents' | 'birthday-reminders';
+    priority: 'high' | 'medium' | 'low';
+    action: string;
+  }
 
   useEffect(() => {
     const user = authService.getCurrentUser();
