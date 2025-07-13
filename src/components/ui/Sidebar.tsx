@@ -73,13 +73,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   const pathname = usePathname();
 
   const navigationItems: NavigationItem[] = [
-    // Dashboard - Available to all roles except Purchase Managers (they have their own PM Dashboard)
+    // Dashboard - Available to all roles except Purchase Managers (they have their own PM Dashboard) and HR (they have their own HR Dashboard)
     { 
       id: 'dashboard', 
       icon: <LayoutDashboard className="w-5 h-5" />, 
       label: t('navigation.dashboard', 'Dashboard'), 
       path: '/dashboard',
-      roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+      roles: ['Admin', 'Manager', 'Accountant', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
     },
     
     // Admin specific
@@ -185,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     // HR specific
     { 
       id: 'hr-dashboard', 
-      icon: <Users className="w-5 h-5" />, 
+      icon: <LayoutDashboard className="w-5 h-5" />, 
       label: t('navigation.hrDashboard', 'HR Dashboard'), 
       path: '/dashboard/hr',
       roles: ['HR', 'HR Manager', 'Manager', 'Admin']
