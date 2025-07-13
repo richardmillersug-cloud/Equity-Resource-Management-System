@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '../../../../../lib/firebase/auth';
 import { firestoreServices } from '../../../../../lib/firebase/firestore-service';
+import { Timestamp } from 'firebase/firestore';
 import { photoService } from '../../../../../lib/services/photo-service';
 import { CompanyDocumentsService, CompanyDocument } from '../../../../../lib/services/company-documents';
 import { 
@@ -588,7 +589,7 @@ export default function AddEmployeePage() {
           jobTitle: formData.jobTitle,
           baseSalary: Number(formData.baseSalary),
           description: `${formData.jobTitle} role`,
-          assignedDate: new Date()
+          assignedDate: Timestamp.fromDate(new Date())
         }]
       };
 
