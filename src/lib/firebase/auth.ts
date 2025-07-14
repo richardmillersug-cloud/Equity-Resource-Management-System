@@ -221,21 +221,42 @@ class FirebaseAuthService {
   async signOut(): Promise<void> {
     try {
       const currentUserId = this.currentUser?.uid;
+      
+      // Log the signout action BEFORE signing out (while user still has permissions)
+      if (currentUserId) {
+        try {
+          await firestoreServices.audit.logAction(
+            'employees',
+            'UPDATE',
+            currentUserId,
+            currentUserId,
+            { action: 'user_signout' },
+            'User signed out'
+          );
+        } catch (auditError) {
+          // Don't fail the signout if audit logging fails
+          console.warn('Failed to log signout action:', auditError);
+        }
+      }
+      
+      // Sign out from Firebase Auth
       await signOut(auth);
       
-      // Log the signout action
-      if (currentUserId) {
-        await firestoreServices.audit.logAction(
-          'employees',
-          'UPDATE',
-          currentUserId,
-          currentUserId,
-          { action: 'user_signout' },
-          'User signed out'
-        );
-      }
     } catch (error: any) {
       console.error('Signout error:', error);
+      throw this.handleAuthError(error);
+    }
+  }
+
+  // Emergency signout without audit logging (fallback method)
+  async forceSignOut(): Promise<void> {
+    try {
+      await signOut(auth);
+    } catch (error: any) {
+      console.error('Force signout error:', error);
+      // Even if Firebase signOut fails, clear local state
+      this.currentUser = null;
+      this.authStateListeners.forEach(listener => listener(null));
       throw this.handleAuthError(error);
     }
   }
@@ -360,38 +381,62 @@ class FirebaseAuthService {
   // Handle authentication errors
   private handleAuthError(error: any): AuthError {
     let message = 'An unexpected error occurred';
+    let code = 'unknown';
 
-    switch (error.code) {
-      case 'auth/user-not-found':
-        message = 'No account found with this email address';
-        break;
-      case 'auth/wrong-password':
-        message = 'Incorrect password';
-        break;
-      case 'auth/email-already-in-use':
-        message = 'An account with this email already exists';
-        break;
-      case 'auth/weak-password':
-        message = 'Password should be at least 6 characters';
-        break;
-      case 'auth/invalid-email':
-        message = 'Invalid email address';
-        break;
-      case 'auth/too-many-requests':
-        message = 'Too many failed attempts. Please try again later';
-        break;
-      case 'auth/network-request-failed':
-        message = 'Network error. Please check your connection';
-        break;
-      case 'auth/user-disabled':
-        message = 'This account has been disabled';
-        break;
-      default:
-        message = error.message || message;
+    // Handle Firebase Auth errors
+    if (error.code && error.code.startsWith('auth/')) {
+      code = error.code;
+      switch (error.code) {
+        case 'auth/user-not-found':
+          message = 'No account found with this email address';
+          break;
+        case 'auth/wrong-password':
+          message = 'Incorrect password';
+          break;
+        case 'auth/email-already-in-use':
+          message = 'An account with this email already exists';
+          break;
+        case 'auth/weak-password':
+          message = 'Password should be at least 6 characters';
+          break;
+        case 'auth/invalid-email':
+          message = 'Invalid email address';
+          break;
+        case 'auth/too-many-requests':
+          message = 'Too many failed attempts. Please try again later';
+          break;
+        case 'auth/network-request-failed':
+          message = 'Network error. Please check your connection';
+          break;
+        case 'auth/user-disabled':
+          message = 'This account has been disabled';
+          break;
+        default:
+          message = error.message || message;
+      }
+    } 
+    // Handle Firestore permission errors
+    else if (error.code && error.code.startsWith('permission-denied')) {
+      code = 'permission-denied';
+      message = 'Permission denied. Please check your access rights.';
+    }
+    // Handle other Firebase errors
+    else if (error.code) {
+      code = error.code;
+      message = error.message || message;
+    }
+    // Handle generic errors
+    else if (error.message) {
+      message = error.message;
+    }
+    // Handle empty error objects
+    else if (typeof error === 'object' && Object.keys(error).length === 0) {
+      message = 'An unknown error occurred during authentication';
+      code = 'empty-error';
     }
 
     return {
-      code: error.code || 'unknown',
+      code,
       message
     };
   }

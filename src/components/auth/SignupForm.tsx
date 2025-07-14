@@ -65,10 +65,24 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
       assignedDate: new Date() as any
     },
     { 
+      jobRoleId: 'purchasing-manager',
+      jobTitle: 'Purchasing Manager', 
+      baseSalary: 1100000,
+      description: 'Manages purchasing operations and supplier relationships',
+      assignedDate: new Date() as any
+    },
+    { 
       jobRoleId: 'accountant',
       jobTitle: 'Accountant', 
       baseSalary: 1200000,
       description: 'Handles all accounting and financial operations',
+      assignedDate: new Date() as any
+    },
+    { 
+      jobRoleId: 'hr',
+      jobTitle: 'HR', 
+      baseSalary: 1300000,
+      description: 'Manages human resources, employee relations, and payroll',
       assignedDate: new Date() as any
     }
   ]);

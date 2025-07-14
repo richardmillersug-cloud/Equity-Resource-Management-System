@@ -50,6 +50,9 @@ import {
   BusinessRuleContext
 } from './models';
 
+// Re-export COLLECTIONS for use in other services
+export { COLLECTIONS, SUBCOLLECTIONS } from './models';
+
 // ==================== BASE FIRESTORE SERVICE ====================
 
 export class FirestoreService<T extends { id: string }> {
@@ -310,26 +313,8 @@ export class InvoiceService extends FirestoreService<Invoice> {
     ]);
   }
 
-  async updateInvoiceStatus(invoiceId: string, paidAmount: number): Promise<void> {
-    const invoice = await this.getById(invoiceId);
-    if (!invoice) throw new Error('Invoice not found');
-
-    const remainingBalance = invoice.amount - paidAmount;
-    let status: Invoice['status'] = 'Pending';
-
-    if (remainingBalance <= 0) {
-      status = 'Paid';
-    } else if (paidAmount > 0) {
-      status = 'Partial';
-    } else if (invoice.dueDate && invoice.dueDate.toDate() < new Date()) {
-      status = 'Overdue';
-    }
-
-    await this.update(invoiceId, {
-      status,
-      remainingBalance: Math.max(0, remainingBalance)
-    });
-  }
+  // REMOVED: Old payment status update logic
+  // Use PurchasingManagerService.makeInvoicePayment() instead
 
   async getSupplierInvoices(supplierId: string): Promise<Invoice[]> {
     return this.getAll([
@@ -338,58 +323,8 @@ export class InvoiceService extends FirestoreService<Invoice> {
   }
 }
 
-export class PaymentService extends FirestoreService<Payment> {
-  constructor() {
-    super(COLLECTIONS.PAYMENTS);
-  }
-
-  async createPayment(paymentData: Omit<Payment, 'id' | 'createdAt'>): Promise<string> {
-    // Validate payment amount against invoice
-    if (paymentData.invoiceId) {
-      const invoiceService = new InvoiceService();
-      const invoice = await invoiceService.getById(paymentData.invoiceId);
-      
-      if (!invoice) {
-        throw new Error('Invoice not found');
-      }
-
-      if (paymentData.amount > invoice.remainingBalance) {
-        throw new Error('Payment amount exceeds remaining balance');
-      }
-
-      // Create payment
-      const paymentId = await this.create(paymentData);
-
-      // Update invoice status
-      const totalPaid = await this.getTotalPaidForInvoice(paymentData.invoiceId);
-      await invoiceService.updateInvoiceStatus(paymentData.invoiceId, totalPaid);
-
-      return paymentId;
-    }
-
-    return this.create(paymentData);
-  }
-
-  async getTotalPaidForInvoice(invoiceId: string): Promise<number> {
-    const payments = await this.getAll([
-      { field: 'invoiceId', operator: '==', value: invoiceId }
-    ]);
-
-    return payments.reduce((total, payment) => total + payment.amount, 0);
-  }
-
-  async getInvoicePayments(invoiceId: string): Promise<Payment[]> {
-    return this.getAll([
-      { field: 'invoiceId', operator: '==', value: invoiceId }
-    ], { orderBy: 'paymentDate', orderDirection: 'desc' });
-  }
-
-  async getSupplierPayments(supplierId: string): Promise<Payment[]> {
-    return this.getAll([
-      { field: 'supplierId', operator: '==', value: supplierId }
-    ], { orderBy: 'paymentDate', orderDirection: 'desc' });
-  }
-}
+// REMOVED: Old PaymentService class
+// Use PurchasingManagerService payment methods instead
 
 export class SupplierService extends FirestoreService<Supplier> {
   constructor() {
@@ -614,6 +549,181 @@ export class AuditService extends FirestoreService<AuditLog> {
   }
 }
 
+// ==================== HR SERVICES ====================
+
+export class PayrollService extends FirestoreService<Payroll> {
+  constructor() {
+    super(COLLECTIONS.PAYROLL);
+  }
+
+  async createPayroll(payrollData: Omit<Payroll, 'id' | 'createdAt'>): Promise<string> {
+    // Validate that net salary is calculated correctly
+    const calculatedNetSalary = payrollData.grossSalary - payrollData.deductions;
+    if (Math.abs(calculatedNetSalary - payrollData.netSalary) > 0.01) {
+      throw new Error('Net salary calculation is incorrect');
+    }
+
+    return this.create(payrollData);
+  }
+
+  async getEmployeePayroll(employeeId: string, year?: number, month?: number): Promise<Payroll[]> {
+    const filters: QueryFilters[] = [
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ];
+
+    if (year && month) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      filters.push(
+        { field: 'payPeriodStart', operator: '>=', value: Timestamp.fromDate(startDate) },
+        { field: 'payPeriodEnd', operator: '<=', value: Timestamp.fromDate(endDate) }
+      );
+    }
+
+    return this.getAll(filters, { orderBy: 'payPeriodStart', orderDirection: 'desc' });
+  }
+
+  async getPayrollByStatus(status: Payroll['status']): Promise<Payroll[]> {
+    return this.getAll([
+      { field: 'status', operator: '==', value: status }
+    ], { orderBy: 'payPeriodStart', orderDirection: 'desc' });
+  }
+
+  async processPayroll(payrollId: string, processedBy: string): Promise<void> {
+    await this.update(payrollId, {
+      status: 'processed',
+      processedBy
+    });
+  }
+
+  async markPayrollAsPaid(payrollId: string): Promise<void> {
+    await this.update(payrollId, {
+      status: 'paid',
+      paymentDate: Timestamp.now()
+    });
+  }
+}
+
+export class LeaveRequestService extends FirestoreService<LeaveRequest> {
+  constructor() {
+    super(COLLECTIONS.LEAVE_REQUESTS);
+  }
+
+  async createLeaveRequest(leaveData: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Promise<string> {
+    // Calculate days requested
+    const startDate = leaveData.startDate.toDate();
+    const endDate = leaveData.endDate.toDate();
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    const leaveRequest: Omit<LeaveRequest, 'id' | 'createdAt' | 'updatedAt'> = {
+      ...leaveData,
+      daysRequested: daysDiff,
+      status: 'Pending'
+    };
+
+    return this.create(leaveRequest);
+  }
+
+  async getEmployeeLeaveRequests(employeeId: string, status?: LeaveRequest['status']): Promise<LeaveRequest[]> {
+    const filters: QueryFilters[] = [
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ];
+
+    if (status) {
+      filters.push({ field: 'status', operator: '==', value: status });
+    }
+
+    return this.getAll(filters, { orderBy: 'startDate', orderDirection: 'desc' });
+  }
+
+  async getPendingLeaveRequests(): Promise<LeaveRequest[]> {
+    return this.getAll([
+      { field: 'status', operator: '==', value: 'Pending' }
+    ], { orderBy: 'startDate', orderDirection: 'asc' });
+  }
+
+  async approveLeaveRequest(leaveRequestId: string, approvedBy: string, comments?: string): Promise<void> {
+    await this.update(leaveRequestId, {
+      status: 'Approved',
+      approvedBy,
+      approvalDate: Timestamp.now(),
+      comments
+    });
+  }
+
+  async rejectLeaveRequest(leaveRequestId: string, approvedBy: string, comments: string): Promise<void> {
+    await this.update(leaveRequestId, {
+      status: 'Rejected',
+      approvedBy,
+      approvalDate: Timestamp.now(),
+      comments
+    });
+  }
+
+  async getLeaveBalance(employeeId: string, leaveType: LeaveRequest['leaveType'], year: number): Promise<number> {
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31);
+    
+    const approvedLeaves = await this.getAll([
+      { field: 'employeeId', operator: '==', value: employeeId },
+      { field: 'leaveType', operator: '==', value: leaveType },
+      { field: 'status', operator: '==', value: 'Approved' },
+      { field: 'startDate', operator: '>=', value: Timestamp.fromDate(startDate) },
+      { field: 'endDate', operator: '<=', value: Timestamp.fromDate(endDate) }
+    ]);
+
+    const usedDays = approvedLeaves.reduce((total, leave) => total + leave.daysRequested, 0);
+    
+    // Default annual leave allocation (could be configurable)
+    const annualAllocation = leaveType === 'Annual' ? 21 : 
+                           leaveType === 'Sick' ? 7 : 
+                           leaveType === 'Maternity' ? 84 : 
+                           leaveType === 'Paternity' ? 4 : 0;
+
+    return Math.max(0, annualAllocation - usedDays);
+  }
+}
+
+export class BarcodeService extends FirestoreService<Barcode> {
+  constructor() {
+    super(COLLECTIONS.BARCODES);
+  }
+
+  async createBarcode(barcodeData: Omit<Barcode, 'id' | 'createdAt'>): Promise<string> {
+    // Check if barcode number is unique
+    const existingBarcode = await this.getAll([
+      { field: 'barcodeNumber', operator: '==', value: barcodeData.barcodeNumber }
+    ]);
+
+    if (existingBarcode.length > 0) {
+      throw new Error('Barcode number already exists');
+    }
+
+    return this.create(barcodeData);
+  }
+
+  async getEmployeeBarcodes(employeeId: string): Promise<Barcode[]> {
+    return this.getAll([
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ], { orderBy: 'barcodeDate', orderDirection: 'desc' });
+  }
+
+  async getByBarcodeNumber(barcodeNumber: string): Promise<Barcode | null> {
+    const barcodes = await this.getAll([
+      { field: 'barcodeNumber', operator: '==', value: barcodeNumber }
+    ]);
+
+    return barcodes.length > 0 ? barcodes[0] : null;
+  }
+
+  async generateBarcodeNumber(): Promise<string> {
+    // Generate a unique barcode number
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substr(2, 5);
+    return `BC${timestamp}${random}`.toUpperCase();
+  }
+}
+
 // ==================== TRANSACTION SERVICE ====================
 
 export class TransactionService {
@@ -639,11 +749,14 @@ export const firestoreServices = {
   employee: new EmployeeService(),
   cashAllocation: new CashAllocationService(),
   invoice: new InvoiceService(),
-  payment: new PaymentService(),
+  // payment: REMOVED - Use PurchasingManagerService instead
   supplier: new SupplierService(),
   expense: new ExpenseService(),
   attendance: new AttendanceService(),
   cashClose: new CashCloseService(),
   audit: new AuditService(),
+  payroll: new PayrollService(),
+  leaveRequest: new LeaveRequestService(),
+  barcode: new BarcodeService(),
   transaction: new TransactionService()
 }; 

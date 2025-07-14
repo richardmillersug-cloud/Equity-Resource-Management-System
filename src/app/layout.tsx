@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "../contexts/ThemeContext";
+import { LanguageProvider } from "../contexts/LanguageContext";
+import DatabaseLoader from "../components/DatabaseLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Equity Retail Management System",
-  description: "Multi-branch retail and supply chain management platform",
+  description: "Multi-branch retail and supply chain management platform with real-time Firestore integration",
 };
 
 export default function RootLayout({
@@ -27,7 +30,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThemeProvider>
+          <LanguageProvider>
+            <DatabaseLoader />
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

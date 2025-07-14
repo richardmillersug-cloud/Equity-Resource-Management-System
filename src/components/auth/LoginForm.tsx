@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { authService, LoginData, AuthError } from '@/lib/firebase/auth';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 
 interface LoginFormProps {
@@ -10,6 +11,7 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProps) {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState<LoginData>({
     email: '',
     password: ''
@@ -47,15 +49,16 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
 
   const handleForgotPassword = async () => {
     if (!formData.email) {
-      setError('Please enter your email address first');
+      setError(t('auth.enterEmailFirst', 'Please enter your email address first'));
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+
     try {
-      await authService.resetPassword(formData.email);
+      await authService.sendPasswordResetEmail(formData.email);
       setShowForgotPassword(true);
-      setError(null);
     } catch (err: any) {
       const authError = err as AuthError;
       setError(authError.message);
@@ -68,13 +71,10 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
     return (
       <div className="w-full max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Check Your Email</h2>
-            <p className="text-gray-600 mt-2">
-              We've sent a password reset link to <strong>{formData.email}</strong>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('auth.resetPassword', 'Reset Password')}</h1>
+            <p className="text-gray-600">
+              {t('auth.resetPasswordSent', 'A password reset link has been sent to your email address.')}
             </p>
           </div>
           
@@ -82,7 +82,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
             onClick={() => setShowForgotPassword(false)}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
-            Back to Login
+            {t('auth.backToLogin', 'Back to Login')}
           </button>
         </div>
       </div>
@@ -93,8 +93,8 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your retail management account</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('auth.welcomeBack', 'Welcome Back')}</h1>
+          <p className="text-gray-600">{t('auth.signInToAccount', 'Sign in to your retail management account')}</p>
         </div>
 
         {error && (
@@ -107,7 +107,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              {t('forms.email', 'Email Address')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -119,7 +119,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
                 onChange={handleInputChange}
                 required
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="Enter your email"
+                placeholder={t('auth.enterEmail', 'Enter your email')}
                 disabled={isLoading}
               />
             </div>
@@ -127,7 +127,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Password
+              {t('forms.password', 'Password')}
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -139,7 +139,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
                 onChange={handleInputChange}
                 required
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="Enter your password"
+                placeholder={t('auth.enterPassword', 'Enter your password')}
                 disabled={isLoading}
               />
               <button
@@ -159,7 +159,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
                 type="checkbox"
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <span className="ml-2 text-sm text-gray-600">Remember me</span>
+              <span className="ml-2 text-sm text-gray-600">{t('auth.rememberMe', 'Remember me')}</span>
             </label>
             <button
               type="button"
@@ -167,7 +167,7 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               disabled={isLoading}
             >
-              Forgot password?
+              {t('auth.forgotPassword', 'Forgot password?')}
             </button>
           </div>
 
@@ -179,10 +179,10 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Signing In...
+                {t('auth.signingIn', 'Signing In...')}
               </>
             ) : (
-              'Sign In'
+              t('auth.signIn', 'Sign In')
             )}
           </button>
         </form>
@@ -190,13 +190,13 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
         {onSwitchToSignup && (
           <div className="mt-8 text-center">
             <p className="text-gray-600">
-              Don't have an account?{' '}
+              {t('auth.dontHaveAccount', 'Don\'t have an account?')}{' '}
               <button
                 onClick={onSwitchToSignup}
                 className="text-blue-600 hover:text-blue-700 font-medium"
                 disabled={isLoading}
               >
-                Sign up here
+                {t('auth.signUpHere', 'Sign up here')}
               </button>
             </p>
           </div>

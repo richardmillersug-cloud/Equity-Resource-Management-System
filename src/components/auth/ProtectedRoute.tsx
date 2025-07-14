@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { authService, AuthUser } from '@/lib/firebase/auth';
 import AuthContainer from './AuthContainer';
 import { Loader2 } from 'lucide-react';
@@ -19,6 +20,7 @@ export default function ProtectedRoute({
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const checkAuth = () => {
@@ -54,6 +56,8 @@ export default function ProtectedRoute({
         }
       } else {
         setHasAccess(false);
+        // Redirect to login when user is signed out
+        router.push('/auth/login');
       }
       
       setIsLoading(false);
@@ -62,7 +66,18 @@ export default function ProtectedRoute({
     checkAuth();
 
     return unsubscribe;
-  }, [requiredRoles]);
+  }, [requiredRoles, router]);
+
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+      // Redirect will be handled by the auth state change listener
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // If there's an error, still try to redirect
+      router.push('/auth/login');
+    }
+  };
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -78,7 +93,15 @@ export default function ProtectedRoute({
 
   // If user is not authenticated, show auth container
   if (!currentUser) {
-    return <AuthContainer onAuthSuccess={(user) => setCurrentUser(user)} />;
+    return (
+      <AuthContainer 
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          // Redirect to dashboard after successful login
+          router.push('/dashboard');
+        }} 
+      />
+    );
   }
 
   // If user doesn't have required roles, show access denied
@@ -96,7 +119,7 @@ export default function ProtectedRoute({
             You don't have permission to access this page. Required roles: {requiredRoles.join(', ')}
           </p>
           <button
-            onClick={() => authService.signOut()}
+            onClick={handleSignOut}
             className="bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
           >
             Sign Out
