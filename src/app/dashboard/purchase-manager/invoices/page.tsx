@@ -449,7 +449,7 @@ export default function InvoicesPage() {
             const row = [
               invoice.invoiceNumber || '',
               invoice.supplierName || '',
-              formatDate(invoice.date),
+              formatDate(invoice.createdAt),
               formatDate(invoice.dueDate),
               invoice.amount.toString(),
               invoice.status || '',
@@ -475,7 +475,7 @@ export default function InvoicesPage() {
           const row = [
             invoice.invoiceNumber || '',
             invoice.supplierName || '',
-            formatDate(invoice.date),
+            formatDate(invoice.createdAt),
             formatDate(invoice.dueDate),
             invoice.amount.toString(),
             invoice.status || '',

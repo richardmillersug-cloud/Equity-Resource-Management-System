@@ -25,6 +25,21 @@ import {
 } from 'lucide-react';
 import InvoiceDetailModal from './invoice-detail-modal';
 
+// Interface definitions
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  supplierName: string;
+  amount: number;
+  dueDate: Date;
+  status: string;
+  priority: string;
+  category: string;
+  createdAt: Date;
+  items: number;
+  fdn: string;
+}
+
 // Mock data for demonstration
 const mockInvoices = [
   {
@@ -37,7 +52,8 @@ const mockInvoices = [
     priority: 'high',
     category: 'Technology',
     createdAt: new Date('2024-01-15'),
-    items: 5
+    items: 5,
+    fdn: 'FDN-2024-001'
   },
   {
     id: '2',
@@ -49,31 +65,47 @@ const mockInvoices = [
     priority: 'medium',
     category: 'Office Supplies',
     createdAt: new Date('2024-01-18'),
-    items: 12
+    items: 3,
+    fdn: 'FDN-2024-002'
   },
   {
     id: '3',
     invoiceNumber: 'INV-2024-003',
-    supplierName: 'Construction Materials Inc',
-    amount: 5200000,
+    supplierName: 'Maintenance Services',
+    amount: 1200000,
     dueDate: new Date('2024-02-10'),
-    status: 'overdue',
-    priority: 'high',
-    category: 'Construction',
-    createdAt: new Date('2024-01-10'),
-    items: 8
+    status: 'paid',
+    priority: 'low',
+    category: 'Maintenance',
+    createdAt: new Date('2024-01-20'),
+    items: 2,
+    fdn: 'FDN-2024-003'
   },
   {
     id: '4',
     invoiceNumber: 'INV-2024-004',
-    supplierName: 'Marketing Agency Pro',
-    amount: 1200000,
+    supplierName: 'Equipment Rental Inc',
+    amount: 3200000,
+    dueDate: new Date('2024-02-05'),
+    status: 'overdue',
+    priority: 'high',
+    category: 'Equipment',
+    createdAt: new Date('2024-01-22'),
+    items: 1,
+    fdn: 'FDN-2024-004'
+  },
+  {
+    id: '5',
+    invoiceNumber: 'INV-2024-005',
+    supplierName: 'Food & Catering Ltd',
+    amount: 675000,
     dueDate: new Date('2024-02-25'),
-    status: 'paid',
+    status: 'rejected',
     priority: 'low',
-    category: 'Marketing',
-    createdAt: new Date('2024-01-20'),
-    items: 3
+    category: 'Catering',
+    createdAt: new Date('2024-01-25'),
+    items: 3,
+    fdn: 'FDN-2024-005'
   }
 ];
 
@@ -82,7 +114,7 @@ export default function ModernInvoiceManagement() {
   const [filteredInvoices, setFilteredInvoices] = useState(mockInvoices);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -104,7 +136,7 @@ export default function ModernInvoiceManagement() {
     setFilteredInvoices(filtered);
   }, [invoices, searchTerm, statusFilter]);
 
-  const handleInvoiceClick = (invoice) => {
+  const handleInvoiceClick = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setIsModalOpen(true);
   };
@@ -114,8 +146,8 @@ export default function ModernInvoiceManagement() {
     setSelectedInvoice(null);
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
+  const getStatusColor = (status: string) => {
+    const colors: { [key: string]: string } = {
       pending: 'bg-gradient-to-r from-yellow-400 to-orange-500',
       approved: 'bg-gradient-to-r from-blue-400 to-blue-600',
       paid: 'bg-gradient-to-r from-green-400 to-green-600',
@@ -125,13 +157,13 @@ export default function ModernInvoiceManagement() {
     return colors[status] || 'bg-gradient-to-r from-gray-400 to-gray-600';
   };
 
-  const getPriorityIcon = (priority) => {
+  const getPriorityIcon = (priority: string) => {
     if (priority === 'high') return <Zap className="w-4 h-4 text-red-500" />;
     if (priority === 'medium') return <TrendingUp className="w-4 h-4 text-yellow-500" />;
     return <Clock className="w-4 h-4 text-green-500" />;
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
@@ -413,7 +445,7 @@ export default function ModernInvoiceManagement() {
                       <td className="px-6 py-4">
                         <div className="text-gray-900">{invoice.dueDate.toLocaleDateString()}</div>
                         <div className="text-sm text-gray-500">
-                          {Math.ceil((invoice.dueDate - new Date()) / (1000 * 60 * 60 * 24))} days
+                          {Math.ceil((invoice.dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
                         </div>
                       </td>
                       <td className="px-6 py-4">

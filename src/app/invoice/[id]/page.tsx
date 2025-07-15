@@ -277,7 +277,7 @@ export default function PublicInvoicePage() {
                   <span className="text-gray-600">Date:</span>
                   <span className="font-medium flex items-center">
                     <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                    {formatDate(invoice.date)}
+                                            {formatDate(invoice.createdAt)}
                   </span>
                 </div>
                 <div className="flex justify-between">

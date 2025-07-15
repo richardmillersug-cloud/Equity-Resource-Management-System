@@ -160,7 +160,7 @@ export default function InvoicesPage() {
           invoiceNumber: invoice.invoiceNumber,
           supplierName: invoice.supplierName,
           amount: invoice.amount,
-          date: formatDate(invoice.date)
+          date: formatDate(invoice.createdAt)
         });
         setQrCodeUrl(qrUrl);
       }
@@ -494,7 +494,7 @@ export default function InvoicesPage() {
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 text-gray-400 mr-2" />
                           <div className="text-sm text-gray-900">
-                            {formatDate(invoice.date)}
+                            {formatDate(invoice.createdAt)}
                           </div>
                         </div>
                       </td>

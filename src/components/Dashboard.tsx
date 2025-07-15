@@ -122,7 +122,7 @@ export function Dashboard() {
                 description: invoice.title,
                 amount: invoice.amount,
                 status: invoice.status,
-                date: invoice.date.toDate()
+                date: invoice.createdAt.toDate()
               }));
             
             setRecentTransactions(recentInvoices);
