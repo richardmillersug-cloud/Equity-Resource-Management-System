@@ -85,7 +85,6 @@ export default function SuppliersPage() {
       
       // Calculate this month's registrations
       const thisMonth = allSuppliers.filter(supplier => {
-        if (!supplier.dateOfRegistration) return false;
         const registrationDate = supplier.dateOfRegistration.toDate();
         const now = new Date();
         return registrationDate.getMonth() === now.getMonth() && 
@@ -110,7 +109,7 @@ export default function SuppliersPage() {
       filtered = filtered.filter(supplier =>
         (supplier.supplierName && supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (supplier.tinNumber && supplier.tinNumber.includes(searchTerm)) ||
-        (supplier.phoneNumbers && Array.isArray(supplier.phoneNumbers) && supplier.phoneNumbers.some(phone => phone && phone.includes(searchTerm)))
+        (supplier.phoneNumbers && supplier.phoneNumbers.some(phone => phone && phone.includes(searchTerm)))
       );
     }
 
@@ -281,41 +280,29 @@ export default function SuppliersPage() {
 
       // Prepare CSV rows
       const csvRows = filteredSuppliers.map(supplier => {
-        const phoneNumbers = supplier.phoneNumbers && Array.isArray(supplier.phoneNumbers) 
-          ? supplier.phoneNumbers.join('; ') 
-          : 'N/A';
-        const routeDays = supplier.routeDays && Array.isArray(supplier.routeDays) 
-          ? supplier.routeDays.join(', ') 
-          : 'None';
-        const bankAccounts = supplier.bankAccounts && Array.isArray(supplier.bankAccounts)
-          ? supplier.bankAccounts.map(acc => 
-              `${acc.bankName} (${acc.accountNumber})`
-            ).join('; ') || 'None'
-          : 'None';
-        const mobilePayments = supplier.mobilePayments && Array.isArray(supplier.mobilePayments)
-          ? supplier.mobilePayments.map(payment => 
-              `${payment.provider}: ${payment.merchantCode} (${payment.phoneNumber})`
-            ).join('; ') || 'None'
-          : 'None';
+        const phoneNumbers = supplier.phoneNumbers.join('; ');
+        const routeDays = supplier.routeDays ? supplier.routeDays.join(', ') : 'None';
+        const bankAccounts = supplier.bankAccounts.map(acc => 
+          `${acc.bankName} (${acc.accountNumber})`
+        ).join('; ') || 'None';
+        const mobilePayments = supplier.mobilePayments.map(payment => 
+          `${payment.provider}: ${payment.merchantCode} (${payment.phoneNumber})`
+        ).join('; ') || 'None';
         const pendingEdits = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
 
         return [
-          supplier.supplierName || 'N/A',
-          supplier.tinNumber || 'N/A',
-          supplier.dateOfRegistration 
-            ? supplier.dateOfRegistration.toDate().toLocaleDateString() 
-            : 'N/A',
-          supplier.address || 'N/A',
+          supplier.supplierName,
+          supplier.tinNumber,
+          supplier.dateOfRegistration.toDate().toLocaleDateString(),
+          supplier.address,
           phoneNumbers,
           supplier.emailAddress || 'N/A',
           routeDays,
-          supplier.status || 'N/A',
+          supplier.status,
           getEmployeeName(supplier.employeeId),
           bankAccounts,
           mobilePayments,
-          supplier.createdAt 
-            ? supplier.createdAt.toDate().toLocaleDateString() 
-            : 'N/A',
+          supplier.createdAt.toDate().toLocaleDateString(),
           pendingEdits > 0 ? `${pendingEdits} pending` : 'None'
         ];
       });
@@ -549,9 +536,7 @@ export default function SuppliersPage() {
                     ` : ''}
                     
                     <div class="supplier-detail">
-                      <span class="detail-label">Registration:</span> ${supplier.dateOfRegistration 
-                        ? supplier.dateOfRegistration.toDate().toLocaleDateString() 
-                        : 'N/A'}
+                      <span class="detail-label">Registration:</span> ${supplier.dateOfRegistration.toDate().toLocaleDateString()}
                     </div>
                     
                     <div class="supplier-detail">
@@ -856,13 +841,13 @@ export default function SuppliersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        {supplier.phoneNumbers?.slice(0, 2).map((phone, index) => (
+                        {supplier.phoneNumbers.slice(0, 2).map((phone, index) => (
                           <div key={index} className="flex items-center text-sm text-gray-600">
                             <Phone className="w-3 h-3 mr-1" />
                             {phone}
                     </div>
                         ))}
-                        {supplier.phoneNumbers && supplier.phoneNumbers.length > 2 && (
+                        {supplier.phoneNumbers.length > 2 && (
                           <div className="text-xs text-gray-400">
                             +{supplier.phoneNumbers.length - 2} more
                   </div>
@@ -878,9 +863,7 @@ export default function SuppliersPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center text-sm text-gray-600">
                         <Calendar className="w-3 h-3 mr-1" />
-                        {supplier.dateOfRegistration 
-                          ? supplier.dateOfRegistration.toDate().toLocaleDateString() 
-                          : 'N/A'}
+                        {supplier.dateOfRegistration.toDate().toLocaleDateString()}
                   </div>
                     </td>
                     <td className="px-6 py-4">
@@ -1020,9 +1003,7 @@ export default function SuppliersPage() {
                       <label className="text-sm font-medium text-gray-500">Registration Date</label>
                       <p className="text-gray-900 flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
-                        {selectedSupplier.dateOfRegistration 
-                          ? selectedSupplier.dateOfRegistration.toDate().toLocaleDateString()
-                          : 'N/A'}
+                        {selectedSupplier.dateOfRegistration.toDate().toLocaleDateString()}
                       </p>
                       </div>
                     <div>
@@ -1140,19 +1121,12 @@ export default function SuppliersPage() {
                        </div>
                      ) : (
                        <div className="space-y-2">
-                         {selectedSupplier.phoneNumbers && selectedSupplier.phoneNumbers.length > 0 ? (
-                           selectedSupplier.phoneNumbers.map((phone, index) => (
-                             <div key={index} className="flex items-center text-gray-900">
-                               <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                               {phone}
-                             </div>
-                           ))
-                         ) : (
-                           <div className="flex items-center text-gray-500">
-                             <Phone className="w-4 h-4 mr-2" />
-                             No phone numbers provided
+                         {selectedSupplier.phoneNumbers.map((phone, index) => (
+                           <div key={index} className="flex items-center text-gray-900">
+                             <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                             {phone}
                            </div>
-                         )}
+                         ))}
                        </div>
                      )}
                    </div>
@@ -1194,8 +1168,8 @@ export default function SuppliersPage() {
                           <h4 className="font-medium text-gray-900 mb-2">Bank Account {index + 1}</h4>
                           <div className="space-y-1 text-sm">
                             <div><span className="text-gray-500">Bank:</span> {account.bankName}</div>
-                            <div><span className="text-gray-500">Account Name:</span> {account.accountName}</div>
-                            <div><span className="text-gray-500">Account Number:</span> {account.accountNumber}</div>
+                            <div><span className="text-gray-500">Account:</span> {account.accountNumber}</div>
+                            <div><span className="text-gray-500">Bank Code:</span> {account.bankNumber}</div>
                           </div>
                         </div>
                       ))}
@@ -1240,15 +1214,11 @@ export default function SuppliersPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                   <div>
                     <label className="text-gray-500">Created At</label>
-                    <p className="text-gray-900">{selectedSupplier.createdAt 
-                      ? selectedSupplier.createdAt.toDate().toLocaleString()
-                      : 'N/A'}</p>
+                    <p className="text-gray-900">{selectedSupplier.createdAt.toDate().toLocaleString()}</p>
                   </div>
                   <div>
                     <label className="text-gray-500">Last Updated</label>
-                    <p className="text-gray-900">{selectedSupplier.updatedAt 
-                      ? selectedSupplier.updatedAt.toDate().toLocaleString()
-                      : 'N/A'}</p>
+                    <p className="text-gray-900">{selectedSupplier.updatedAt.toDate().toLocaleString()}</p>
                   </div>
                 </div>
               </div>

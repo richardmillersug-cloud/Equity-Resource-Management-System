@@ -227,7 +227,7 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
               </div>
               <div>
                 <span className="font-bold text-sm">Date:</span>
-                <span className="ml-2 text-sm">{formatDate(invoice.createdAt || new Date())}</span>
+                <span className="ml-2 text-sm">{formatDate(invoice.date || new Date())}</span>
               </div>
             </div>
           </div>

@@ -13,7 +13,7 @@ import {
   Clock, 
   AlertTriangle,
   Download,
-  Printer,
+  Print,
   Edit,
   MessageSquare,
   Star,
@@ -33,7 +33,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
   if (!isOpen || !invoice) return null;
 
   const getStatusColor = (status: string) => {
-    const colors: { [key: string]: string } = {
+    const colors = {
       pending: 'bg-gradient-to-r from-yellow-400 to-orange-500',
       approved: 'bg-gradient-to-r from-blue-400 to-blue-600',
       paid: 'bg-gradient-to-r from-green-400 to-green-600',
@@ -96,7 +96,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                   <Download className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
-                  <Printer className="w-5 h-5" />
+                  <Print className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
                   <Edit className="w-5 h-5" />
@@ -187,7 +187,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                     <div>
                       <p className="text-orange-600 text-sm font-medium">Days Left</p>
                       <p className="text-2xl font-bold text-orange-900">
-                        {Math.ceil((new Date(invoice.dueDate.toDate ? invoice.dueDate.toDate() : invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
+                        {Math.ceil((invoice.dueDate - new Date()) / (1000 * 60 * 60 * 24))}
                       </p>
                     </div>
                   </div>

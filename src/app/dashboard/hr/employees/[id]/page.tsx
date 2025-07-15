@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { HRQueries } from '../../../../../lib/firebase/role-based-queries';
 import { EmployeeDocumentsService, EmployeeDocument } from '../../../../../lib/firebase/employee-documents-service';
 import PDFViewer, { PDFViewerModal, PDFPreview } from '../../../../../components/ui/PDFViewer';
-import { PhotoService } from '../../../../../lib/services/photo-service';
 import { 
   ArrowLeft, 
   Edit, 
@@ -76,13 +75,6 @@ export default function EmployeeViewPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'documents'>('overview');
-  
-  // Photo upload state
-  const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [photoUploadProgress, setPhotoUploadProgress] = useState(0);
 
   useEffect(() => {
     if (params.id) {
@@ -257,75 +249,6 @@ export default function EmployeeViewPage() {
       restricted: Shield
     };
     return icons[level] || Lock;
-  };
-
-  const handlePhotoUpload = async (file: File) => {
-    if (!employee?.id) return;
-    
-    setPhotoUploading(true);
-    setPhotoUploadProgress(0);
-    
-    try {
-      // Validate file
-      const validation = PhotoService.validateImageFile(file);
-      if (!validation.valid) {
-        alert(validation.error);
-        return;
-      }
-      
-      // Upload photo
-      const result = await PhotoService.handlePassportPhotoUpload(file, employee.id);
-      
-      if (result.success && result.photoUrl) {
-        // Update employee state
-        setEmployee(prev => prev ? {
-          ...prev,
-          passportPhoto: result.photoUrl,
-          passportPhotoFilename: result.filename,
-          passportPhotoUploadedAt: new Date()
-        } : null);
-        
-        // Close modal and cleanup
-        setShowPhotoModal(false);
-        setPhotoFile(null);
-        if (photoPreview) {
-          PhotoService.revokePreviewUrl(photoPreview);
-        }
-        setPhotoPreview(null);
-        
-        alert('Photo uploaded successfully!');
-      } else {
-        alert(result.error || 'Failed to upload photo');
-      }
-    } catch (error) {
-      console.error('Photo upload error:', error);
-      alert('Failed to upload photo. Please try again.');
-    } finally {
-      setPhotoUploading(false);
-      setPhotoUploadProgress(0);
-    }
-  };
-  
-  const handlePhotoSelect = (file: File) => {
-    setPhotoFile(file);
-    
-    // Cleanup previous preview
-    if (photoPreview) {
-      PhotoService.revokePreviewUrl(photoPreview);
-    }
-    
-    // Create new preview
-    const preview = PhotoService.createPreviewUrl(file);
-    setPhotoPreview(preview);
-  };
-  
-  const handlePhotoModalClose = () => {
-    setShowPhotoModal(false);
-    setPhotoFile(null);
-    if (photoPreview) {
-      PhotoService.revokePreviewUrl(photoPreview);
-    }
-    setPhotoPreview(null);
   };
 
   if (loading) {
@@ -566,16 +489,7 @@ export default function EmployeeViewPage() {
           <div className="space-y-6">
             {/* Employee Photo */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Employee Photo</h2>
-                <button
-                  onClick={() => setShowPhotoModal(true)}
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                >
-                  <Edit className="h-4 w-4" />
-                  {employee.passportPhoto ? 'Edit' : 'Add'}
-                </button>
-              </div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Employee Photo</h2>
               <div className="flex justify-center">
                 <div className="w-32 h-40 bg-gray-100 border-2 border-gray-200 rounded-lg overflow-hidden flex items-center justify-center">
                   {employee.passportPhoto ? (
@@ -847,20 +761,6 @@ export default function EmployeeViewPage() {
           }}
           documentUrl={selectedDocument.downloadUrl}
           documentName={selectedDocument.documentName}
-        />
-      )}
-
-      {/* Photo Upload Modal */}
-      {showPhotoModal && (
-        <PhotoUploadModal
-          employee={employee}
-          onClose={handlePhotoModalClose}
-          onUpload={handlePhotoUpload}
-          isUploading={photoUploading}
-          uploadProgress={photoUploadProgress}
-          photoFile={photoFile}
-          photoPreview={photoPreview}
-          onPhotoSelect={handlePhotoSelect}
         />
       )}
 
@@ -1187,218 +1087,6 @@ function DocumentUploadModal({ employee, onClose, onUpload, isUploading, uploadP
             </div>
           </form>
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface PhotoUploadModalProps {
-  employee: Employee | null;
-  onClose: () => void;
-  onUpload: (file: File) => void;
-  isUploading: boolean;
-  uploadProgress: number;
-  photoFile: File | null;
-  photoPreview: string | null;
-  onPhotoSelect: (file: File) => void;
-}
-
-function PhotoUploadModal({ 
-  employee, 
-  onClose, 
-  onUpload, 
-  isUploading, 
-  uploadProgress, 
-  photoFile, 
-  photoPreview, 
-  onPhotoSelect 
-}: PhotoUploadModalProps) {
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleFileSelect = (files: FileList | null) => {
-    if (files && files[0]) {
-      onPhotoSelect(files[0]);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragIn = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragOut = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (photoFile) {
-      onUpload(photoFile);
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {employee?.passportPhoto ? 'Update' : 'Upload'} Passport Photo
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            disabled={isUploading}
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Employee Info */}
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <p className="text-sm font-medium text-gray-900">
-              {employee?.firstName} {employee?.lastName}
-            </p>
-            <p className="text-xs text-gray-500">{employee?.email}</p>
-          </div>
-
-          {/* Photo Preview */}
-          {photoPreview && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Photo Preview</h4>
-              <div className="flex justify-center">
-                <div className="w-32 h-40 bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
-                  <img
-                    src={photoPreview}
-                    alt="Photo preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* File Upload */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Passport Photo
-            </label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                isDragging
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDragEnter={handleDragIn}
-              onDragLeave={handleDragOut}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-            >
-              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-2">
-                Drag and drop a photo here, or click to select
-              </p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleFileSelect(e.target.files)}
-                className="hidden"
-                id="photo-upload"
-                disabled={isUploading}
-              />
-              <label
-                htmlFor="photo-upload"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Select Photo
-              </label>
-            </div>
-            <p className="text-xs text-gray-500">
-              Supported formats: JPEG, PNG. Max size: 5MB
-            </p>
-          </div>
-
-          {/* Selected File Info */}
-          {photoFile && (
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{photoFile.name}</p>
-                  <p className="text-xs text-gray-500">{formatFileSize(photoFile.size)}</p>
-                </div>
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              </div>
-            </div>
-          )}
-
-          {/* Upload Progress */}
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Uploading...</span>
-                <span className="text-gray-600">{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              disabled={!photoFile || isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Upload Photo
-                </>
-              )}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );

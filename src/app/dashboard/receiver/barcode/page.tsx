@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { enhancedBarcodeService, BarcodeItem, BarcodeStats, CreateBarcodeItemInput } from '../../../../lib/firebase/enhanced-barcode';
+import { enhancedBarcodeService, BarcodeItem, BarcodeStats } from '../../../../lib/firebase/enhanced-barcode';
 import BarcodeService, { CodeType, BarcodeFormat } from '../../../../lib/services/barcode-service';
 import { authService } from '../../../../lib/firebase/auth';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
@@ -392,9 +392,9 @@ export default function BarcodePage() {
       );
 
       // Record scan for shift tracking
-      if (currentUser?.employee?.id) {
+      if (currentUser?.employee?.employeeId) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
           console.log('Barcode print scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);
@@ -417,29 +417,29 @@ export default function BarcodePage() {
       // Generate the code value
       const codeValue = BarcodeService.generateFormatSpecificCode(newItem.itemName, newItem.category, newItem.barcodeFormat);
       
-      const itemToAdd: CreateBarcodeItemInput = {
+      const itemToAdd: Omit<BarcodeItem, 'id' | 'createdAt' | 'updatedAt'> = {
         itemName: newItem.itemName,
         category: newItem.category,
         supplierName: newItem.supplierName,
-        receivedDate: new Date(newItem.receivedDate),
+        receivedDate: Timestamp.fromDate(new Date(newItem.receivedDate)),
         codeType: newItem.codeType,
         barcodeFormat: newItem.barcodeFormat,
-        printSettings: {
-          ...newItem.printSettings,
-          labelSize: newItem.printSettings.labelSize
-        },
+        labelSize: newItem.printSettings.labelSize,
         codeValue: codeValue,
         codeImageUrl: '',
-        notes: newItem.notes || '',
-        generatedBy: currentUser?.uid || ''
+        status: 'Active',
+        printSettings: newItem.printSettings,
+        printHistory: [],
+        itemDescription: newItem.notes || '',
+        userId: currentUser?.uid || ''
       };
 
-      await enhancedBarcodeService.createBarcodeItem(itemToAdd);
+      await enhancedBarcodeService.addBarcodeItem(itemToAdd);
       
       // Record scan for shift tracking
-      if (currentUser?.employee?.id) {
+      if (currentUser?.employee?.employeeId) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
           console.log('Barcode creation scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);

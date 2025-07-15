@@ -155,9 +155,9 @@ export default function BarcodesPage() {
       
       // Record scan for shift tracking
       const currentUser = authService.getCurrentUser();
-      if (currentUser?.employee?.id) {
+      if (currentUser?.employee?.employeeId) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
           console.log('Employee barcode generation scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);
@@ -326,10 +326,10 @@ export default function BarcodesPage() {
               <div class="photo-section">
                 <div class="photo-placeholder">PHOTO</div>
               </div>
-            <div class="employee-info">
-              <div class="employee-name">${selectedBarcode.employeeName}</div>
-              <div class="employee-role">${employee?.roles?.[0]?.jobTitle || 'Employee'}</div>
-              <div class="employee-role">ID: ${selectedBarcode.barcodeNumber}</div>
+              <div class="employee-info">
+                <div class="employee-name">${selectedBarcode.employeeName}</div>
+                <div class="employee-role">${employee?.roles?.[0]?.jobTitle || 'Employee'}</div>
+                <div class="employee-role">ID: ${selectedBarcode.barcodeNumber}</div>
               </div>
             </div>
             <div class="barcode-section">
@@ -670,10 +670,10 @@ export default function BarcodesPage() {
                 
                 <div className="flex-1">
                   <div className="text-lg font-bold mb-1">{selectedBarcode.employeeName}</div>
-                <div className="text-sm opacity-80">
-                  {employees.find(emp => emp.id === selectedBarcode.employeeId)?.roles?.[0]?.jobTitle || 'Employee'}
-                </div>
-                <div className="text-xs opacity-70 mt-1">ID: {selectedBarcode.barcodeNumber}</div>
+                  <div className="text-sm opacity-80">
+                    {employees.find(emp => emp.id === selectedBarcode.employeeId)?.roles?.[0]?.jobTitle || 'Employee'}
+                  </div>
+                  <div className="text-xs opacity-70 mt-1">ID: {selectedBarcode.barcodeNumber}</div>
                 </div>
               </div>
               
