@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  i18n: {
-    locales: ['en', 'lg'], // 'en' for English, 'lg' for Luganda
-    defaultLocale: 'en',
-    localeDetection: false, // We'll handle language switching manually
-  },
+  // Remove i18n configuration as it's now handled by middleware
 };
 
 export default nextConfig;

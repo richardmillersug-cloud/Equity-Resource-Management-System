@@ -1,12 +1,17 @@
-import { appWithTranslation } from 'next-i18next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { cookies } from 'next/headers'
 
-export { appWithTranslation, serverSideTranslations };
+export const locales = ['en', 'lg'] as const
+export type Locale = (typeof locales)[number]
+export const defaultLocale: Locale = 'en'
 
-export const defaultNamespace = 'common';
-export const namespaces = ['common'];
+export function getLocale(): Locale {
+  const cookieStore = cookies()
+  const localeCookie = cookieStore.get('NEXT_LOCALE')
+  return (localeCookie?.value as Locale) || defaultLocale
+}
 
-export const i18n = {
-  defaultLocale: 'en',
-  locales: ['en', 'lg'],
-}; 
+// Helper to generate paths with locale
+export function localePath(path: string, locale?: Locale): string {
+  const actualLocale = locale || getLocale()
+  return `/${actualLocale}${path.startsWith('/') ? path : `/${path}`}`
+} 
