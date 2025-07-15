@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { StockManagerQueries } from '../../../lib/firebase/role-based-queries';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Package, 
   AlertTriangle, 
@@ -17,7 +16,6 @@ import {
 } from 'lucide-react';
 
 export default function StockManagerDashboard() {
-  const { t } = useLanguage();
   const [inventory, setInventory] = useState<any[]>([]);
   const [damageReports, setDamageReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +110,7 @@ export default function StockManagerDashboard() {
     <div className="p-6 space-y-6">
       {/* Inventory Overview Cards */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('stockManager.inventoryControl', 'Inventory Overview')}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Inventory Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -121,7 +119,7 @@ export default function StockManagerDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('stockManager.outOfStock', 'Out of Stock')}</p>
+              <p className="text-sm text-gray-500 mb-1">Out of Stock</p>
               <p className="text-2xl font-bold text-gray-900">{outOfStockItems}</p>
             </div>
           </div>
@@ -133,7 +131,7 @@ export default function StockManagerDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('stockManager.criticalStock', 'Critical Stock')}</p>
+              <p className="text-sm text-gray-500 mb-1">Critical Stock</p>
               <p className="text-2xl font-bold text-gray-900">{criticalItems}</p>
             </div>
           </div>
@@ -145,7 +143,7 @@ export default function StockManagerDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('stockManager.lowStockItems', 'Low Stock')}</p>
+              <p className="text-sm text-gray-500 mb-1">Low Stock</p>
               <p className="text-2xl font-bold text-gray-900">{lowStockItems}</p>
             </div>
           </div>

@@ -6,8 +6,8 @@ import { COLLECTIONS } from './models';
 export interface BankAccount {
   id: string;
   bankName: string;
-  accountName: string;
   accountNumber: string;
+  bankNumber: string;
 }
 
 export interface MobilePayment {
@@ -33,7 +33,6 @@ export interface EnhancedSupplier {
   id: string;
   supplierName: string;
   tinNumber: string; // Unique
-  brnNumber?: string; // Business Registration Number (Optional)
   dateOfRegistration: Timestamp;
   address: string;
   emailAddress?: string;
@@ -52,7 +51,6 @@ export interface EnhancedSupplier {
 export interface CreateSupplierInput {
   supplierName: string;
   tinNumber: string;
-  brnNumber?: string; // Business Registration Number (Optional)
   dateOfRegistration: Date;
   address: string;
   emailAddress?: string;
@@ -82,7 +80,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
       id: Math.random().toString(36).substr(2, 9)
     }));
 
-    const supplierData: any = {
+    const supplierData = {
       supplierName: data.supplierName,
       tinNumber: data.tinNumber,
       dateOfRegistration: Timestamp.fromDate(data.dateOfRegistration),
@@ -92,17 +90,9 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
       bankAccounts: bankAccountsWithIds,
       mobilePayments: mobilePaymentsWithIds,
       employeeId: data.employeeId,
-      status: 'Active' as const
+      status: 'Active' as const,
+      routeDays: data.routeDays && data.routeDays.length > 0 ? data.routeDays : undefined
     };
-
-    // Add optional fields only if they have values
-    if (data.brnNumber?.trim()) {
-      supplierData.brnNumber = data.brnNumber;
-    }
-
-    if (data.routeDays && data.routeDays.length > 0) {
-      supplierData.routeDays = data.routeDays;
-    }
 
     return this.create(supplierData);
   }
@@ -138,7 +128,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     await this.update(supplierId, { status });
   }
 
-  // Search suppliers by name, TIN, or BRN
+  // Search suppliers by name or TIN
   async searchSuppliers(searchTerm: string): Promise<EnhancedSupplier[]> {
     // Note: Firestore doesn't support full-text search natively
     // This is a simple implementation - for production, consider Algolia or similar
@@ -146,7 +136,6 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     return allSuppliers.filter(supplier => 
       supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       supplier.tinNumber.includes(searchTerm) ||
-      (supplier.brnNumber && supplier.brnNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
       supplier.phoneNumbers.some(phone => phone.includes(searchTerm))
     );
   }
@@ -204,7 +193,6 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
       {
         supplierName: "TechFlow Solutions Ltd",
         tinNumber: "1001234567",
-        brnNumber: "BRN80001234567",
         dateOfRegistration: new Date('2024-01-15'),
         address: "Plot 45, Industrial Area, Kampala, Uganda",
         emailAddress: "contact@techflow.co.ug",
@@ -212,13 +200,13 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
         bankAccounts: [
           {
             bankName: "Stanbic Bank Uganda",
-            accountName: "TechFlow Solutions Ltd",
-            accountNumber: "1234567890123"
+            accountNumber: "1234567890123",
+            bankNumber: "001234"
           },
           {
             bankName: "DFCU Bank",
-            accountName: "TechFlow Solutions Ltd",
-            accountNumber: "9876543210987"
+            accountNumber: "9876543210987",
+            bankNumber: "005678"
           }
         ],
         mobilePayments: [
@@ -234,7 +222,6 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
       {
         supplierName: "Green Valley Supplies",
         tinNumber: "1001234568",
-        brnNumber: "BRN80002345678",
         dateOfRegistration: new Date('2024-02-20'),
         address: "Jinja Road, Industrial Park, Mukono",
         emailAddress: "info@greenvalley.co.ug",
@@ -242,8 +229,8 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
         bankAccounts: [
           {
             bankName: "Centenary Bank",
-            accountName: "Green Valley Supplies",
-            accountNumber: "5555666677778888"
+            accountNumber: "5555666677778888",
+            bankNumber: "002345"
           }
         ],
         mobilePayments: [
@@ -265,8 +252,8 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
         bankAccounts: [
           {
             bankName: "Equity Bank Uganda",
-            accountName: "Metro Construction Materials",
-            accountNumber: "1111222233334444"
+            accountNumber: "1111222233334444",
+            bankNumber: "003456"
           }
         ],
         mobilePayments: [
@@ -312,13 +299,13 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
         bankAccounts: [
           {
             bankName: "Bank of Africa Uganda",
-            accountName: "Highland Coffee Exports",
-            accountNumber: "9999888877776666"
+            accountNumber: "9999888877776666",
+            bankNumber: "004567"
           },
           {
             bankName: "Housing Finance Bank",
-            accountName: "Highland Coffee Exports",
-            accountNumber: "7777666655554444"
+            accountNumber: "7777666655554444",
+            bankNumber: "006789"
           }
         ],
         mobilePayments: [

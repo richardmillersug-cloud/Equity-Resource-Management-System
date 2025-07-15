@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { enhancedSupplierService, CreateSupplierInput } from '../../../../../lib/firebase/enhanced-supplier';
-import { authService } from '../../../../../lib/firebase/auth';
 import { 
   Save, 
   ArrowLeft, 
@@ -25,8 +24,8 @@ import {
 interface BankAccount {
   id: string;
   BankName: string;
-  AccountName: string;
   AccountNumber: string;
+  BankNumber: string;
 }
 
 interface MobilePayment {
@@ -39,7 +38,6 @@ interface MobilePayment {
 interface SupplierFormData {
   SupplierName: string;
   TinNumber: string;
-  BrnNumber: string;
   DateOfRegistration: string;
   Address: string;
   EmailAddress: string;
@@ -58,12 +56,10 @@ export default function AddSupplierPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [currentUserEmployee, setCurrentUserEmployee] = useState<string>('');
 
   const [formData, setFormData] = useState<SupplierFormData>({
     SupplierName: '',
     TinNumber: '',
-    BrnNumber: '',
     DateOfRegistration: new Date().toISOString().split('T')[0],
     Address: '',
     EmailAddress: '',
@@ -75,55 +71,6 @@ export default function AddSupplierPage() {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-
-  // Load current user's employee data on component mount
-  useEffect(() => {
-    const loadCurrentUser = () => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        if (currentUser?.employee) {
-          const employeeId = currentUser.employee.id;
-          const employeeName = `${currentUser.employee.firstName} ${currentUser.employee.lastName}`;
-          
-          setCurrentUserEmployee(`${employeeId} - ${employeeName}`);
-          
-          // Auto-populate the EmployeeID field
-          setFormData(prev => ({
-            ...prev,
-            EmployeeID: employeeId
-          }));
-        } else {
-          console.warn('No current user or employee data found - auth may still be loading');
-          setCurrentUserEmployee('Loading current user...');
-        }
-      } catch (error) {
-        console.error('Error loading current user:', error);
-        setCurrentUserEmployee('Error loading user data');
-      }
-    };
-
-    // Load immediately
-    loadCurrentUser();
-
-    // Also listen for auth state changes in case user data loads later
-    const unsubscribe = authService.onAuthStateChange((user) => {
-      if (user?.employee) {
-        const employeeId = user.employee.id;
-        const employeeName = `${user.employee.firstName} ${user.employee.lastName}`;
-        
-        setCurrentUserEmployee(`${employeeId} - ${employeeName}`);
-        
-        // Auto-populate the EmployeeID field
-        setFormData(prev => ({
-          ...prev,
-          EmployeeID: employeeId
-        }));
-      }
-    });
-
-    // Cleanup listener on unmount
-    return () => unsubscribe();
-  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -137,11 +84,6 @@ export default function AddSupplierPage() {
       newErrors.TinNumber = 'TIN number is required';
     } else if (!/^\d{9,15}$/.test(formData.TinNumber)) {
       newErrors.TinNumber = 'TIN number must be 9-15 digits';
-    }
-
-    // Optional BRN validation
-    if (formData.BrnNumber.trim() && !/^[A-Z0-9]{8,20}$/.test(formData.BrnNumber)) {
-      newErrors.BrnNumber = 'BRN must be 8-20 alphanumeric characters';
     }
 
     if (!formData.DateOfRegistration) {
@@ -165,7 +107,7 @@ export default function AddSupplierPage() {
     }
 
     if (!formData.EmployeeID.trim()) {
-      newErrors.EmployeeID = 'Unable to determine current user. Please refresh the page.';
+      newErrors.EmployeeID = 'Managing employee is required';
     }
 
     // Optional fields validation (if provided)
@@ -181,8 +123,8 @@ export default function AddSupplierPage() {
       if (account.AccountNumber && account.AccountNumber.length < 8) {
         newErrors[`BankAccounts_${index}_AccountNumber`] = 'Account number must be at least 8 digits';
       }
-      if (account.BankName && !account.AccountName) {
-        newErrors[`BankAccounts_${index}_AccountName`] = 'Account name is required when bank name is provided';
+      if (account.BankNumber && account.BankNumber.length < 3) {
+        newErrors[`BankAccounts_${index}_BankNumber`] = 'Bank number must be at least 3 digits';
       }
     });
 
@@ -232,15 +174,14 @@ export default function AddSupplierPage() {
       const supplierInput: CreateSupplierInput = {
         supplierName: formData.SupplierName,
         tinNumber: formData.TinNumber,
-        brnNumber: formData.BrnNumber || undefined,
         dateOfRegistration: new Date(formData.DateOfRegistration),
         address: formData.Address,
         emailAddress: formData.EmailAddress || undefined,
         phoneNumbers: formData.PhoneNumbers.filter(phone => phone.trim() !== ''),
         bankAccounts: formData.BankAccounts.map(account => ({
           bankName: account.BankName,
-          accountName: account.AccountName,
-          accountNumber: account.AccountNumber
+          accountNumber: account.AccountNumber,
+          bankNumber: account.BankNumber
         })),
         mobilePayments: formData.MobilePayments.map(payment => ({
           provider: payment.provider,
@@ -305,8 +246,8 @@ export default function AddSupplierPage() {
     const newAccount: BankAccount = {
       id: Math.random().toString(36).substr(2, 9),
       BankName: '',
-      AccountName: '',
-      AccountNumber: ''
+      AccountNumber: '',
+      BankNumber: ''
     };
     setFormData(prev => ({
       ...prev,
@@ -465,34 +406,6 @@ export default function AddSupplierPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  BRN Number <span className="text-gray-400">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    name="BrnNumber"
-                    value={formData.BrnNumber}
-                    onChange={handleInputChange}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                      errors.BrnNumber ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Business registration number"
-                  />
-                </div>
-                {errors.BrnNumber && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.BrnNumber}
-                  </p>
-                )}
-                <p className="mt-1 text-sm text-gray-500">
-                  Business Registration Number (8-20 alphanumeric characters)
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Registration Date <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -517,18 +430,21 @@ export default function AddSupplierPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Managing Employee <span className="text-green-600">(Auto-assigned)</span>
+                  Managing Employee ID <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600 w-4 h-4" />
-                  <div className="w-full pl-10 pr-4 py-2 border rounded-lg bg-green-50 border-green-200 text-green-800 font-medium">
-                    {currentUserEmployee || 'Loading current user...'}
-                  </div>
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    name="EmployeeID"
+                    value={formData.EmployeeID}
+                    onChange={handleInputChange}
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                      errors.EmployeeID ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="Employee ID"
+                  />
                 </div>
-                <p className="mt-1 text-sm text-green-600 flex items-center">
-                  <Check className="w-3 h-3 mr-1" />
-                  You are automatically assigned as the managing employee for this supplier
-                </p>
                 {errors.EmployeeID && (
                   <p className="mt-1 text-sm text-red-600 flex items-center">
                     <AlertCircle className="w-4 h-4 mr-1" />
@@ -745,27 +661,6 @@ export default function AddSupplierPage() {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Account Name
-                            </label>
-                            <input
-                              type="text"
-                              value={account.AccountName}
-                              onChange={(e) => updateBankAccount(index, 'AccountName', e.target.value)}
-                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                                errors[`BankAccounts_${index}_AccountName`] ? 'border-red-300' : 'border-gray-300'
-                              }`}
-                              placeholder="Account name"
-                            />
-                            {errors[`BankAccounts_${index}_AccountName`] && (
-                              <p className="mt-1 text-sm text-red-600 flex items-center">
-                                <AlertCircle className="w-3 h-3 mr-1" />
-                                {errors[`BankAccounts_${index}_AccountName`]}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
                               Account Number
                             </label>
                             <input
@@ -781,6 +676,27 @@ export default function AddSupplierPage() {
                               <p className="mt-1 text-sm text-red-600 flex items-center">
                                 <AlertCircle className="w-3 h-3 mr-1" />
                                 {errors[`BankAccounts_${index}_AccountNumber`]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Bank Number
+                            </label>
+                            <input
+                              type="text"
+                              value={account.BankNumber}
+                              onChange={(e) => updateBankAccount(index, 'BankNumber', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                                errors[`BankAccounts_${index}_BankNumber`] ? 'border-red-300' : 'border-gray-300'
+                              }`}
+                              placeholder="Bank number"
+                            />
+                            {errors[`BankAccounts_${index}_BankNumber`] && (
+                              <p className="mt-1 text-sm text-red-600 flex items-center">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                {errors[`BankAccounts_${index}_BankNumber`]}
                               </p>
                             )}
                           </div>

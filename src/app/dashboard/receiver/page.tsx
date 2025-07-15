@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Package, 
   TrendingUp, 
@@ -148,7 +147,6 @@ interface RestockItem {
 
 export default function ReceiverDashboard() {
   const router = useRouter();
-  const { t } = useLanguage();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('monthly');
   const [dateSelectionMode, setDateSelectionMode] = useState<DateSelectionMode>('preset');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -429,9 +427,9 @@ export default function ReceiverDashboard() {
               </div>
               <div>
                 <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
-                  {t('navigation.receiverDashboard', 'Receiver Dashboard')}
+                  Receiver Dashboard
                 </h1>
-                <p className="text-purple-100 text-lg">{t('receiver.analyticsOverview', 'Real-time data from Firestore • Track deliveries, returns, and inventory')}</p>
+                <p className="text-purple-100 text-lg">Real-time data from Firestore • Track deliveries, returns, and inventory</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -440,11 +438,11 @@ export default function ReceiverDashboard() {
                 className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
                 <RefreshCw className="w-5 h-5" />
-                {t('receiver.dataRefresh', 'Refresh Data')}
+                Refresh Data
               </button>
               <button className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5">
                 <Download className="w-5 h-5" />
-                {t('receiver.generateReport', 'Export Report')}
+                Export Report
               </button>
             </div>
           </div>
@@ -457,11 +455,11 @@ export default function ReceiverDashboard() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">{t('receiver.totalDeliveries', 'Deliveries')}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Deliveries</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{analyticsData.deliveries.total}</p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">{analyticsData.deliveries.onTime} {t('receiver.onTime', 'on time')} • {analyticsData.deliveries.late} {t('receiver.late', 'late')}</span>
+                  <span className="text-xs text-gray-500">{analyticsData.deliveries.onTime} on time • {analyticsData.deliveries.late} late</span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -473,11 +471,11 @@ export default function ReceiverDashboard() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">{t('receiver.totalReturns', 'Return Notes')}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Return Notes</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{analyticsData.returnNotes.total}</p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">{formatCurrency(analyticsData.returnNotes.totalValue)} {t('receiver.totalValue', 'value')}</span>
+                  <span className="text-xs text-gray-500">{formatCurrency(analyticsData.returnNotes.totalValue)} value</span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -489,11 +487,11 @@ export default function ReceiverDashboard() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">{t('receiver.totalDamages', 'Damages')}</p>
+                <p className="text-gray-500 text-sm font-medium mb-1">Damages</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">{analyticsData.damages.total}</p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">{formatCurrency(analyticsData.damages.totalCost)} {t('receiver.totalCost', 'cost')}</span>
+                  <span className="text-xs text-gray-500">{formatCurrency(analyticsData.damages.totalCost)} cost</span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">

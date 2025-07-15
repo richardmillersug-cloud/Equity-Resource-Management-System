@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MetricCard } from '../../../components/ui/card';
+import { MetricCard } from '../../../components/ui/Card';
 import { AdminQueries } from '../../../lib/firebase/role-based-queries';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Users, 
   Building2, 
@@ -35,7 +34,6 @@ interface SecurityOverview {
 }
 
 export default function AdminDashboard() {
-  const { t } = useLanguage();
   const [systemOverview, setSystemOverview] = useState<SystemOverview[]>([]);
   const [securityOverview, setSecurityOverview] = useState<SecurityOverview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +110,7 @@ export default function AdminDashboard() {
     <div className="p-6 space-y-6">
       {/* System Overview Cards */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('admin.systemOverview', 'System Overview')}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">System Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {systemOverview.map((item) => {
             const IconComponent = getEntityIcon(item.entityType);
@@ -142,7 +140,7 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('receiver.quickActions', 'Quick Actions')}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
             <div className="flex items-center space-x-3">
@@ -150,8 +148,8 @@ export default function AdminDashboard() {
                 <Users className="h-5 w-5 text-blue-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">{t('admin.manageUsers', 'Manage Users')}</h3>
-                <p className="text-sm text-gray-500">{t('admin.manageUsers', 'Add, edit, or deactivate users')}</p>
+                <h3 className="font-medium text-gray-900">Manage Users</h3>
+                <p className="text-sm text-gray-500">Add, edit, or deactivate users</p>
               </div>
             </div>
           </button>
@@ -162,8 +160,8 @@ export default function AdminDashboard() {
                 <Settings className="h-5 w-5 text-green-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">{t('admin.systemSettings', 'System Settings')}</h3>
-                <p className="text-sm text-gray-500">{t('admin.configureSystem', 'Configure system parameters')}</p>
+                <h3 className="font-medium text-gray-900">System Settings</h3>
+                <p className="text-sm text-gray-500">Configure system parameters</p>
               </div>
             </div>
           </button>
@@ -174,8 +172,8 @@ export default function AdminDashboard() {
                 <Shield className="h-5 w-5 text-purple-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">{t('admin.securityAlerts', 'Security Audit')}</h3>
-                <p className="text-sm text-gray-500">{t('admin.viewReports', 'Review security logs')}</p>
+                <h3 className="font-medium text-gray-900">Security Audit</h3>
+                <p className="text-sm text-gray-500">Review security logs</p>
               </div>
             </div>
           </button>

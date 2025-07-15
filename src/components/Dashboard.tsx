@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './ui/Sidebar';
-import { MetricCard } from './ui/card';
+import { MetricCard } from './ui/Card';
 import { ActivityChart } from './dashboard/ActivityChart';
 import { TransactionsList } from './dashboard/TransactionsList';
 import { QuickActions } from './dashboard/QuickActions';
