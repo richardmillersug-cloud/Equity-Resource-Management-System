@@ -783,7 +783,7 @@ export default function PurchaseManagerDashboard() {
           padding: 20,
           font: {
             size: 12,
-            weight: '600'
+            weight: 600
           }
         }
       },
@@ -809,7 +809,7 @@ export default function PurchaseManagerDashboard() {
         },
         ticks: {
           font: {
-            weight: '500'
+            weight: 500
           }
         }
       },
@@ -823,7 +823,7 @@ export default function PurchaseManagerDashboard() {
             return formatCurrency(value).replace('UGX', '').trim() + 'K';
           },
           font: {
-            weight: '500'
+            weight: 500
           }
         }
       }
@@ -937,7 +937,7 @@ export default function PurchaseManagerDashboard() {
           padding: 15,
           font: {
             size: 12,
-            weight: '600'
+            weight: 600
           },
           generateLabels: function(chart: any) {
             const data = chart.data;
@@ -971,11 +971,11 @@ export default function PurchaseManagerDashboard() {
         displayColors: true,
         titleFont: {
           size: 14,
-          weight: 'bold'
+          weight: 'bold' as const
         },
         bodyFont: {
           size: 13,
-          weight: '500'
+          weight: 500
         },
         padding: 12,
         callbacks: {
@@ -1004,7 +1004,7 @@ export default function PurchaseManagerDashboard() {
       animateRotate: true,
       animateScale: true,
       duration: 1000,
-      easing: 'easeOutQuart'
+      easing: 'easeOutQuart' as const
     }
   };
 
@@ -1074,7 +1074,7 @@ export default function PurchaseManagerDashboard() {
           padding: 15,
           font: {
             size: 11,
-            weight: '600'
+            weight: 600
           }
         }
       },
@@ -1099,7 +1099,7 @@ export default function PurchaseManagerDashboard() {
         },
         ticks: {
           font: {
-            weight: '500'
+            weight: 500
           }
         }
       },
@@ -1113,7 +1113,7 @@ export default function PurchaseManagerDashboard() {
             return formatCurrency(value).replace('UGX', '').trim() + 'M';
           },
           font: {
-            weight: '500'
+            weight: 500
           }
         }
       }
@@ -1163,7 +1163,7 @@ export default function PurchaseManagerDashboard() {
           padding: 15,
           font: {
             size: 12,
-            weight: '600'
+            weight: 600
           },
           generateLabels: function(chart: any) {
             const data = chart.data;
@@ -1197,11 +1197,11 @@ export default function PurchaseManagerDashboard() {
         displayColors: true,
         titleFont: {
           size: 14,
-          weight: 'bold'
+          weight: 'bold' as const
         },
         bodyFont: {
           size: 13,
-          weight: '500'
+          weight: 500
         },
         padding: 12,
         callbacks: {
@@ -1250,7 +1250,7 @@ export default function PurchaseManagerDashboard() {
       animateRotate: true,
       animateScale: true,
       duration: 1000,
-      easing: 'easeOutQuart'
+      easing: 'easeOutQuart' as const
     }
   };
 

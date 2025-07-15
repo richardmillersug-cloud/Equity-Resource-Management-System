@@ -187,7 +187,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                     <div>
                       <p className="text-orange-600 text-sm font-medium">Days Left</p>
                       <p className="text-2xl font-bold text-orange-900">
-                        {Math.ceil((invoice.dueDate - new Date()) / (1000 * 60 * 60 * 24))}
+                        {Math.ceil((new Date(invoice.dueDate.toDate ? invoice.dueDate.toDate() : invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
                       </p>
                     </div>
                   </div>

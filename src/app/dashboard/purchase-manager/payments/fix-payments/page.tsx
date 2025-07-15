@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { subscribeToInvoicePayments, subscribeToInvoices } from '@/lib/firebase/purchasing-manager-service';
+import { subscribeToInvoicePayments, subscribeToInvoices, InvoicePayment, Invoice } from '@/lib/firebase/purchasing-manager-service';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 export default function FixPaymentsPage() {
-  const [invoices, setInvoices] = useState([]);
-  const [invoicePayments, setInvoicePayments] = useState([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicePayments, setInvoicePayments] = useState<InvoicePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [fixing, setFixing] = useState(false);
-  const [fixResults, setFixResults] = useState(null);
+  const [fixResults, setFixResults] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribeInvoices = subscribeToInvoices((invoices) => {
@@ -68,7 +68,7 @@ export default function FixPaymentsPage() {
       console.error('Error fixing invoices:', error);
       setFixResults({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         message: 'Failed to fix invoices'
       });
     } finally {

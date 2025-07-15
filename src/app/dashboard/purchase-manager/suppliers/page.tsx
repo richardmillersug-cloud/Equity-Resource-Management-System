@@ -1194,8 +1194,8 @@ export default function SuppliersPage() {
                           <h4 className="font-medium text-gray-900 mb-2">Bank Account {index + 1}</h4>
                           <div className="space-y-1 text-sm">
                             <div><span className="text-gray-500">Bank:</span> {account.bankName}</div>
-                            <div><span className="text-gray-500">Account:</span> {account.accountNumber}</div>
-                            <div><span className="text-gray-500">Bank Code:</span> {account.bankNumber}</div>
+                            <div><span className="text-gray-500">Account Name:</span> {account.accountName}</div>
+                            <div><span className="text-gray-500">Account Number:</span> {account.accountNumber}</div>
                           </div>
                         </div>
                       ))}

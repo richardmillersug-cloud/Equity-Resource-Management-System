@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { enhancedBarcodeService, BarcodeItem, BarcodeStats } from '../../../../lib/firebase/enhanced-barcode';
+import { enhancedBarcodeService, BarcodeItem, BarcodeStats, CreateBarcodeItemInput } from '../../../../lib/firebase/enhanced-barcode';
 import BarcodeService, { CodeType, BarcodeFormat } from '../../../../lib/services/barcode-service';
 import { authService } from '../../../../lib/firebase/auth';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
@@ -417,24 +417,24 @@ export default function BarcodePage() {
       // Generate the code value
       const codeValue = BarcodeService.generateFormatSpecificCode(newItem.itemName, newItem.category, newItem.barcodeFormat);
       
-      const itemToAdd: Omit<BarcodeItem, 'id' | 'createdAt' | 'updatedAt'> = {
+      const itemToAdd: CreateBarcodeItemInput = {
         itemName: newItem.itemName,
         category: newItem.category,
         supplierName: newItem.supplierName,
-        receivedDate: Timestamp.fromDate(new Date(newItem.receivedDate)),
+        receivedDate: new Date(newItem.receivedDate),
         codeType: newItem.codeType,
         barcodeFormat: newItem.barcodeFormat,
-        labelSize: newItem.printSettings.labelSize,
+        printSettings: {
+          ...newItem.printSettings,
+          labelSize: newItem.printSettings.labelSize
+        },
         codeValue: codeValue,
         codeImageUrl: '',
-        status: 'Active',
-        printSettings: newItem.printSettings,
-        printHistory: [],
-        itemDescription: newItem.notes || '',
-        userId: currentUser?.uid || ''
+        notes: newItem.notes || '',
+        generatedBy: currentUser?.uid || ''
       };
 
-      await enhancedBarcodeService.addBarcodeItem(itemToAdd);
+      await enhancedBarcodeService.createBarcodeItem(itemToAdd);
       
       // Record scan for shift tracking
       if (currentUser?.employee?.id) {
