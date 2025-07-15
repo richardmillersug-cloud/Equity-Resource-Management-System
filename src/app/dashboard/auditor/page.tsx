@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuditorQueries } from '../../../lib/firebase/role-based-queries';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { 
   Shield, 
   AlertTriangle, 
@@ -14,7 +13,6 @@ import {
 } from 'lucide-react';
 
 export default function AuditorDashboard() {
-  const { t } = useLanguage();
   const [auditTrail, setAuditTrail] = useState<any[]>([]);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +75,7 @@ export default function AuditorDashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('auditor.auditDashboard', 'Audit Overview')}</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Audit Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -86,7 +84,7 @@ export default function AuditorDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('auditor.auditTrail', 'Total Audit Logs')}</p>
+              <p className="text-sm text-gray-500 mb-1">Total Audit Logs</p>
               <p className="text-2xl font-bold text-gray-900">{auditTrail.length}</p>
             </div>
           </div>
@@ -98,7 +96,7 @@ export default function AuditorDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('admin.recentActivity', 'Recent Activity (24h)')}</p>
+              <p className="text-sm text-gray-500 mb-1">Recent Activity (24h)</p>
               <p className="text-2xl font-bold text-gray-900">{recentAudits}</p>
             </div>
           </div>
@@ -110,7 +108,7 @@ export default function AuditorDashboard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t('auditor.auditFindings', 'Discrepancies Found')}</p>
+              <p className="text-sm text-gray-500 mb-1">Discrepancies Found</p>
               <p className="text-2xl font-bold text-gray-900">{totalDiscrepancies}</p>
             </div>
           </div>

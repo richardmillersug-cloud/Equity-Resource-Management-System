@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from '../../components/ui/Sidebar';
 import { authService, AuthUser } from '../../lib/firebase/auth';
 import { LogOut, User, ChevronDown } from 'lucide-react';
-import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 
 export default function DashboardLayout({
   children,
@@ -117,11 +116,6 @@ export default function DashboardLayout({
                     <p className="font-medium">{getUserRole()}</p>
                     <p className="text-gray-500">{currentUser?.email}</p>
                   </div>
-                  
-                  <div className="px-4 py-2 border-b">
-                    <LanguageSwitcher />
-                  </div>
-                  
                   <button
                     onClick={handleSignOut}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

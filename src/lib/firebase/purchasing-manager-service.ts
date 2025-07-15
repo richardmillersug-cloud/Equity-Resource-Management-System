@@ -63,7 +63,7 @@ export interface Invoice {
   rejectedBy?: string;
   rejectionReason?: string;
   paymentCount: number; // Number of payments made
-  fdn: string; // Fiscal Document Number (Unique)
+  installmentPlan?: InstallmentPlan;
   notes?: string;
   attachments?: string[];
 }

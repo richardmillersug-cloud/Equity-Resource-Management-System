@@ -50,9 +50,6 @@ import {
   BusinessRuleContext
 } from './models';
 
-// Re-export COLLECTIONS for use in other services
-export { COLLECTIONS, SUBCOLLECTIONS } from './models';
-
 // ==================== BASE FIRESTORE SERVICE ====================
 
 export class FirestoreService<T extends { id: string }> {

@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { subscribeToInvoicePayments, subscribeToInvoices, InvoicePayment, Invoice } from '@/lib/firebase/purchasing-manager-service';
+import { subscribeToInvoicePayments, subscribeToInvoices } from '@/lib/firebase/purchasing-manager-service';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 export default function InvoiceDebugPage() {
-  const [targetInvoice, setTargetInvoice] = useState<Invoice | null>(null);
-  const [invoicePayments, setInvoicePayments] = useState<InvoicePayment[]>([]);
-  const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
+  const [targetInvoice, setTargetInvoice] = useState(null);
+  const [invoicePayments, setInvoicePayments] = useState([]);
+  const [allInvoices, setAllInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchInvoiceNumber, setSearchInvoiceNumber] = useState('INV-2025-06-11-6927');
 
-  const searchInvoice = async (invoiceNumber: string) => {
+  const searchInvoice = async (invoiceNumber) => {
     setLoading(true);
     try {
       // Get all invoices first
@@ -21,7 +21,7 @@ export default function InvoiceDebugPage() {
         
         // Find the specific invoice
         const foundInvoice = invoices.find(inv => inv.invoiceNumber === invoiceNumber);
-        setTargetInvoice(foundInvoice || null);
+        setTargetInvoice(foundInvoice);
         
         if (foundInvoice) {
           console.log('Found invoice:', foundInvoice);
@@ -55,10 +55,10 @@ export default function InvoiceDebugPage() {
     searchInvoice(searchInvoiceNumber);
   }, [searchInvoiceNumber]);
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSearch = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const invoiceNum = formData.get('invoiceNumber') as string;
+    const formData = new FormData(e.target);
+    const invoiceNum = formData.get('invoiceNumber');
     setSearchInvoiceNumber(invoiceNum);
   };
 
@@ -160,10 +160,10 @@ export default function InvoiceDebugPage() {
                       <div>✅ Has paidAt timestamp: {targetInvoice.paidAt.toLocaleString()}</div>
                     )}
                     {targetInvoice.paidAmount >= targetInvoice.amount && (
-                      <div>✅ Paid amount ({targetInvoice.paidAmount?.toLocaleString()}) &gt;= Total amount ({targetInvoice.amount?.toLocaleString()})</div>
+                      <div>✅ Paid amount ({targetInvoice.paidAmount?.toLocaleString()}) >= Total amount ({targetInvoice.amount?.toLocaleString()})</div>
                     )}
                     {(!targetInvoice.paidAmount || targetInvoice.paidAmount < targetInvoice.amount) && (
-                      <div className="text-orange-600">⚠️ Paid amount ({targetInvoice.paidAmount?.toLocaleString() || '0'}) is &lt; total amount ({targetInvoice.amount?.toLocaleString()})</div>
+                      <div className="text-orange-600">⚠️ Paid amount ({targetInvoice.paidAmount?.toLocaleString() || '0'}) is less than total amount ({targetInvoice.amount?.toLocaleString()})</div>
                     )}
                   </div>
                 )}

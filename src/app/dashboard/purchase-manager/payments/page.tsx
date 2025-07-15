@@ -267,7 +267,23 @@ export default function PaymentsPage() {
         </div>
 
         {/* Enhanced Stats Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Payments</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{totalPayments}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All transactions</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Receipt className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>

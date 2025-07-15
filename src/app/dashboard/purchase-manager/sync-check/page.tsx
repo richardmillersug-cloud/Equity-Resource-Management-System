@@ -263,14 +263,14 @@ export default function SyncCheckPage() {
                 <div key={expense.id} className="mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{expense.description}</p>
-                      <p className="text-sm text-gray-600">{expense.submittedBy}</p>
+                      <p className="font-medium">{expense.name}</p>
+                      <p className="text-sm text-gray-600">{expense.employeeName}</p>
                       <p className="text-sm text-gray-500">Type: {expense.type}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{formatCurrency(expense.amount)}</p>
                       <p className="text-sm text-gray-600">Status: {expense.status}</p>
-                      <p className="text-sm text-gray-500">{formatDate(expense.createdAt)}</p>
+                      <p className="text-sm text-gray-500">{formatDate(expense.requestDate)}</p>
                     </div>
                   </div>
                 </div>
