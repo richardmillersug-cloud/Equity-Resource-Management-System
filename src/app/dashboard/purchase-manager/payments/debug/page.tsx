@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { subscribeToInvoicePayments, subscribeToInvoices, InvoicePayment, Invoice } from '@/lib/firebase/purchasing-manager-service';
+import { subscribeToInvoicePayments, subscribeToInvoices } from '@/lib/firebase/purchasing-manager-service';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 export default function PaymentsDebugPage() {
-  const [invoicePayments, setInvoicePayments] = useState<InvoicePayment[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [oldPayments, setOldPayments] = useState<any[]>([]);
+  const [invoicePayments, setInvoicePayments] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [oldPayments, setOldPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

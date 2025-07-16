@@ -18,7 +18,6 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Expense, subscribeToExpenses } from '../../../../lib/firebase/purchasing-manager-service';
-import { formatSafeDate } from '@/lib/utils';
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -72,7 +71,47 @@ export default function ExpensesPage() {
   };
 
   const formatDate = (date: any) => {
-    return formatSafeDate(date);
+    // Handle null, undefined, or empty values
+    if (!date || date === null || date === undefined) {
+      return 'N/A';
+    }
+    
+    try {
+      let dateObj: Date;
+      
+      // Handle different date formats
+      if (date instanceof Date) {
+        dateObj = date;
+      } else if (typeof date === 'string') {
+        dateObj = new Date(date);
+      } else if (typeof date === 'number') {
+        dateObj = new Date(date);
+      } else if (date.toDate && typeof date.toDate === 'function') {
+        // Firestore timestamp
+        dateObj = date.toDate();
+      } else if (date.seconds) {
+        // Firestore timestamp object
+        dateObj = new Date(date.seconds * 1000);
+      } else {
+        console.warn('Unknown date format:', date);
+        return 'Invalid Date';
+      }
+      
+      // Check if the date is valid
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        console.warn('Invalid date object:', dateObj, 'from:', date);
+        return 'Invalid Date';
+      }
+      
+      return new Intl.DateTimeFormat('en-UG', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).format(dateObj);
+    } catch (error) {
+      console.error('Error formatting date:', error, 'Date value:', date);
+      return 'Invalid Date';
+    }
   };
 
   const getStatusColor = (status: string) => {

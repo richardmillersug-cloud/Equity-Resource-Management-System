@@ -17,9 +17,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Equity Retail Management System",
   description: "Multi-branch retail and supply chain management platform with real-time Firestore integration",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({

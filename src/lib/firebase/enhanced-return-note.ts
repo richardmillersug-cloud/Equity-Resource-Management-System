@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { FirestoreService } from './firestore-service';
-import { COLLECTIONS } from './models';
 
 export interface ReturnItem {
   id: string;
@@ -91,7 +90,7 @@ export const RETURN_STATUSES = [
 
 export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
   constructor() {
-    super(COLLECTIONS.RETURN_NOTES);
+    super('returnNotes');
   }
 
   // Generate return note number
@@ -221,8 +220,9 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
   async getRecentReturnNotes(limitCount: number = 10): Promise<ReturnNote[]> {
     return await this.getAll([], { 
       orderBy: 'createdAt', 
-      orderDirection: 'desc' 
-    }, limitCount);
+      orderDirection: 'desc',
+      limit: limitCount
+    });
   }
 
   // Get return notes by reason

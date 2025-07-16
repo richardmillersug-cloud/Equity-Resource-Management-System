@@ -19,7 +19,6 @@ import {
 import { db } from './config';
 import { authService } from './auth';
 import { logger } from '../utils/logger';
-import { toSafeDate } from '../utils';
 import { 
   CashAllocation, 
   FundAcknowledgment, 
@@ -399,7 +398,7 @@ export class ReceiverQueries {
 
   private static calculateDaysUntilDue(dueDate: Timestamp): number {
     const now = new Date();
-          const due = toSafeDate(dueDate);
+    const due = dueDate.toDate();
     const diffTime = due.getTime() - now.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
@@ -437,7 +436,7 @@ export class ReceiverQueries {
       const todaysDeliveries = allDeliveries.filter((delivery: any) => {
         if (!delivery.scheduledDate) return false;
         
-        const deliveryDate = toSafeDate(delivery.scheduledDate);
+        const deliveryDate = delivery.scheduledDate.toDate();
         return deliveryDate >= today && deliveryDate < tomorrow;
       });
 
@@ -479,7 +478,7 @@ export class ReceiverQueries {
       // Sort by scheduled time on client-side to avoid complex index
       todaysDeliveries.sort((a, b) => {
         // First sort by date, then by time
-        const dateCompare = toSafeDate(a.scheduledDate).getTime() - toSafeDate(b.scheduledDate).getTime();
+        const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
         if (dateCompare !== 0) return dateCompare;
         
         // Then sort by time
@@ -549,13 +548,13 @@ export class ReceiverQueries {
 
         return {
           id: delivery.id,
-          name: supplierData.supplierName || supplierData.name || 'Unknown Supplier',
+          name: supplierData.supplierName || 'Unknown Supplier',
           expectedTime: delivery.scheduledTime || '00:00',
           status,
           priority: delivery.priority || 'medium',
           items: delivery.itemCount || delivery.deliveryItems?.length || 0,
-          contactPerson: delivery.contactPerson || supplierData.contactPerson || 'N/A',
-          phone: delivery.contactPhone || supplierData.phone || 'N/A',
+          contactPerson: delivery.contactPerson || 'N/A',
+          phone: delivery.contactPhone || supplierData.phoneNumber || 'N/A',
           deliveryItems: delivery.deliveryItems || [],
           totalValue: delivery.totalValue || 0,
           trackingNumber: delivery.trackingNumber,
@@ -722,12 +721,12 @@ export class ReceiverQueries {
       orderBy('createdAt', 'desc')
     );
     const invoicesSnapshot = await getDocs(invoicesQuery);
-    const invoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const invoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice & { id: string }));
 
     // Get suppliers data
     const suppliersQuery = query(collection(db, 'suppliers'));
     const suppliersSnapshot = await getDocs(suppliersQuery);
-    const suppliers = suppliersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const suppliers = suppliersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier & { id: string }));
 
     // Get return notes data
     const returnNotesQuery = query(
@@ -736,7 +735,7 @@ export class ReceiverQueries {
       orderBy('createdAt', 'desc')
     );
     const returnNotesSnapshot = await getDocs(returnNotesQuery);
-    const returnNotes = returnNotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const returnNotes = returnNotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReturnNote & { id: string }));
 
     // Get damages data
     const damagesQuery = query(
@@ -745,13 +744,13 @@ export class ReceiverQueries {
       orderBy('createdAt', 'desc')
     );
     const damagesSnapshot = await getDocs(damagesQuery);
-    const damages = damagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const damages = damagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Damage & { id: string }));
 
     // Calculate analytics
     const invoiceStats = {
       total: invoices.length,
       pending: invoices.filter(inv => inv.status === 'Pending').length,
-      approved: invoices.filter(inv => inv.status === 'Approved').length,
+      approved: invoices.filter(inv => inv.status === 'Partial').length,
       paid: invoices.filter(inv => inv.status === 'Paid').length,
       totalAmount: invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0),
       averageAmount: invoices.length > 0 ? invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) / invoices.length : 0
@@ -759,7 +758,7 @@ export class ReceiverQueries {
 
     const supplierStats = {
       total: suppliers.length,
-      active: suppliers.filter(sup => sup.status === 'Active').length,
+      active: suppliers.filter(sup => sup.isActive === true).length,
       newThisMonth: suppliers.filter(sup => {
         const created = sup.createdAt?.toDate() || new Date(2020, 0, 1);
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -769,16 +768,16 @@ export class ReceiverQueries {
 
     const returnNoteStats = {
       total: returnNotes.length,
-      pending: returnNotes.filter(rn => rn.status === 'Pending').length,
-      completed: returnNotes.filter(rn => rn.status === 'Completed').length,
-      totalValue: returnNotes.reduce((sum, rn) => sum + (rn.totalValue || 0), 0)
+      pending: returnNotes.filter(rn => rn.status === 'pending').length,
+      completed: returnNotes.filter(rn => rn.status === 'processed').length,
+              totalValue: returnNotes.reduce((sum, rn) => sum + (rn.totalReturnValue || 0), 0)
     };
 
     const damageStats = {
       total: damages.length,
-      resolved: damages.filter(dmg => dmg.status === 'Resolved').length,
-      pending: damages.filter(dmg => dmg.status === 'Pending').length,
-      totalCost: damages.reduce((sum, dmg) => sum + (dmg.estimatedCost || 0), 0)
+      resolved: damages.filter(dmg => dmg.status === 'resolved').length,
+      pending: damages.filter(dmg => dmg.status === 'reported').length,
+              totalCost: damages.reduce((sum, dmg) => sum + (dmg.totalDamageCost || 0), 0)
     };
 
     // Calculate delivery stats based on invoices
@@ -916,13 +915,13 @@ export class ReceiverQueries {
 
           return {
             id: delivery.id,
-            name: supplierData.supplierName || supplierData.name || 'Unknown Supplier',
+            name: supplierData.supplierName || 'Unknown Supplier',
             expectedTime: delivery.scheduledTime || '00:00',
             status,
             priority: delivery.priority || 'medium',
             items: delivery.itemCount || delivery.deliveryItems?.length || 0,
-            contactPerson: delivery.contactPerson || supplierData.contactPerson || 'N/A',
-            phone: delivery.contactPhone || supplierData.phone || 'N/A',
+            contactPerson: delivery.contactPerson || 'N/A',
+            phone: delivery.contactPhone || supplierData.phoneNumber || 'N/A',
             deliveryItems: delivery.deliveryItems || [],
             totalValue: delivery.totalValue || 0,
             trackingNumber: delivery.trackingNumber,

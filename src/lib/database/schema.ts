@@ -372,7 +372,7 @@ export interface BusinessRules {
   canProcessPayment: (employee: Employee) => boolean;
   
   // Data Integrity
-  validateUniqueConstraints: (entity: any, field: string, value: any) => boolean;
-  validateReferentialIntegrity: (entity: any) => boolean;
-  validateBusinessLogicConstraints: (entity: any) => boolean;
+  validateUniqueConstraints: (entity: unknown, field: string, value: unknown) => boolean;
+  validateReferentialIntegrity: (entity: Record<string, unknown>) => boolean;
+  validateBusinessLogicConstraints: (entity: Record<string, unknown>) => boolean;
 } 

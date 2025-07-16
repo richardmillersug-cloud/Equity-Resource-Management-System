@@ -104,7 +104,7 @@ export default function SuppliersPage() {
     } catch (error) {
       console.error('Error loading suppliers:', error);
       setSuppliers([]); // Set empty array as fallback
-      setStats({ total: 0, active: 0, pending: 0, inactive: 0, thisMonth: 0 }); // Set default stats
+      setStats({ total: 0, active: 0, pending: 0, thisMonth: 0 }); // Set default stats
       alert('Error loading suppliers. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -168,7 +168,7 @@ export default function SuppliersPage() {
       supplierName: supplier.supplierName,
       address: supplier.address,
       emailAddress: supplier.emailAddress || '',
-      phoneNumbers: [...(supplier.phoneNumbers || [])],
+      phoneNumbers: [...supplier.phoneNumbers],
       routeDays: [...(supplier.routeDays || [])]
     });
   };
@@ -1131,7 +1131,7 @@ export default function SuppliersPage() {
                        </div>
                      ) : (
                        <div className="space-y-2">
-                                                   {(selectedSupplier.phoneNumbers || []).map((phone, index) => (
+                         {selectedSupplier.phoneNumbers.map((phone, index) => (
                            <div key={index} className="flex items-center text-gray-900">
                              <Phone className="w-4 h-4 mr-2 text-gray-400" />
                              {phone}

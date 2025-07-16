@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './ui/Sidebar';
-import { MetricCard } from './ui/Card';
+// import { MetricCard } from './ui/Card';
 import { ActivityChart } from './dashboard/ActivityChart';
 import { TransactionsList } from './dashboard/TransactionsList';
 import { QuickActions } from './dashboard/QuickActions';
@@ -33,7 +33,7 @@ export function Dashboard() {
     todayCashCloses: 0
   });
 
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -217,7 +217,7 @@ export function Dashboard() {
             onClick={() => window.location.reload()} 
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            Retry
+//   Retry
           </button>
         </div>
       </div>

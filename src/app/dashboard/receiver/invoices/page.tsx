@@ -5,28 +5,27 @@ import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 import { QRCodeService } from '../../../../lib/utils/qr-code';
-import { Timestamp } from 'firebase/firestore';
-import { 
-  FileText, 
-  Plus, 
-  Search, 
-  Filter,
-  Calendar,
-  DollarSign,
-  User,
-  Package,
-  Eye,
-  Edit,
-  Trash2,
-  Download,
-  Printer,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertTriangle,
-  QrCode,
-  Save
-} from 'lucide-react';
+// import {
+//   FileText,
+//   Plus,
+//   Search,
+//   Filter,
+//   Calendar,
+//   DollarSign,
+//   User,
+//   Package,
+//   Eye,
+//   Edit,
+//   Trash2,
+//   Download,
+//   Printer,
+//   CheckCircle,
+//   XCircle,
+//   Clock,
+//   AlertTriangle,
+//   QrCode,
+//   Save,
+// } from 'lucide-react';
 
 interface InvoiceStats {
   total: number;
@@ -228,7 +227,7 @@ export default function InvoicesPage() {
     }).format(amount);
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: unknown) => {
     return timestamp?.toDate?.()?.toLocaleDateString() || 'N/A';
   };
 
@@ -431,19 +430,19 @@ export default function InvoicesPage() {
                       Invoice Details
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Supplier
+//   Supplier
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Amount & Details
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+//   Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+//   Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+//   Actions
                     </th>
                   </tr>
                 </thead>
@@ -664,7 +663,7 @@ export default function InvoicesPage() {
                       onClick={handleCloseQRModal}
                       className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                     >
-                      Close
+//   Close
                     </button>
                   </div>
                 </div>
@@ -801,7 +800,7 @@ export default function InvoicesPage() {
                     onClick={() => setSelectedInvoiceForDetails(null)}
                     className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                   >
-                    Close
+//   Close
                   </button>
                 </div>
               </div>
@@ -841,7 +840,7 @@ export default function InvoicesPage() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
-                                     const updates: any = {
+                                     const updates: unknown = {
                      amount: parseFloat(formData.get('amount') as string),
                      quantity: parseInt(formData.get('quantity') as string),
                      description: formData.get('description') as string,
@@ -959,7 +958,7 @@ export default function InvoicesPage() {
                               defaultChecked={selectedInvoiceForEdit.goodsReceivedAsInvoiced}
                               className="mr-2"
                             />
-                            Yes
+//   Yes
                           </label>
                           <label className="flex items-center">
                             <input
@@ -969,7 +968,7 @@ export default function InvoicesPage() {
                               defaultChecked={!selectedInvoiceForEdit.goodsReceivedAsInvoiced}
                               className="mr-2"
                             />
-                            No
+//   No
                           </label>
                         </div>
                       </div>
@@ -985,7 +984,7 @@ export default function InvoicesPage() {
                               defaultChecked={selectedInvoiceForEdit.hasTransportPayment}
                               className="mr-2"
                             />
-                            Yes
+//   Yes
                           </label>
                           <label className="flex items-center">
                             <input
@@ -995,7 +994,7 @@ export default function InvoicesPage() {
                               defaultChecked={!selectedInvoiceForEdit.hasTransportPayment}
                               className="mr-2"
                             />
-                            No
+//   No
                           </label>
                         </div>
                       </div>
@@ -1023,7 +1022,7 @@ export default function InvoicesPage() {
                               defaultChecked={selectedInvoiceForEdit.hasDamages}
                               className="mr-2"
                             />
-                            Yes
+//   Yes
                           </label>
                           <label className="flex items-center">
                             <input
@@ -1033,7 +1032,7 @@ export default function InvoicesPage() {
                               defaultChecked={!selectedInvoiceForEdit.hasDamages}
                               className="mr-2"
                             />
-                            No
+//   No
                           </label>
                         </div>
                       </div>
@@ -1090,7 +1089,7 @@ export default function InvoicesPage() {
                       onClick={() => setSelectedInvoiceForEdit(null)}
                       className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                     >
-                      Cancel
+//   Cancel
                     </button>
                   </div>
                 </form>

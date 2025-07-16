@@ -194,7 +194,10 @@ export class EnhancedRestockingService {
   async deleteRestockingItem(itemId: string): Promise<void> {
     try {
       const itemRef = doc(db, this.collectionName, itemId);
-      await updateDoc(itemRef, { deletedAt: Timestamp.now() });
+      await updateDoc(itemRef, {
+        status: 'deleted' as any,
+        updatedAt: Timestamp.now()
+      });
     } catch (error) {
       console.error('Error deleting restocking item:', error);
       throw error;
@@ -219,14 +222,18 @@ export class EnhancedRestockingService {
   async getRestockingItemById(itemId: string): Promise<RestockingItem | null> {
     try {
       const itemRef = doc(db, this.collectionName, itemId);
-      const docSnap = await getDoc(itemRef);
+      const itemDoc = await getDoc(itemRef);
       
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as RestockingItem;
+      if (!itemDoc.exists()) {
+        return null;
       }
-      return null;
+      
+      return {
+        id: itemDoc.id,
+        ...itemDoc.data()
+      } as RestockingItem;
     } catch (error) {
-      console.error('Error getting restocking item:', error);
+      console.error('Error getting restocking item by ID:', error);
       throw error;
     }
   }

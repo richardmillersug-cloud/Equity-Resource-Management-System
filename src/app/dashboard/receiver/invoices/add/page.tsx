@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, CreateInvoiceInput } from '../../../../../lib/firebase/enhanced-invoice';
 import { enhancedSupplierService, EnhancedSupplier } from '../../../../../lib/firebase/enhanced-supplier';
 import { authService } from '../../../../../lib/firebase/auth';
-import { Timestamp } from 'firebase/firestore';
 import { 
   Save, 
   ArrowLeft, 
@@ -211,7 +210,7 @@ export default function AddInvoicePage() {
     } catch (error) {
       console.error('=== Supplier loading failed ===');
       console.error('Error details:', error);
-      console.error('Error stack:', (error as Error).stack);
+      console.error('Error stack:', error.stack);
       alert('Failed to load suppliers. Please check the console for details and try refreshing the page.');
     } finally {
       setLoadingSuppliers(false);
@@ -476,12 +475,12 @@ export default function AddInvoicePage() {
         amountInDigits: formData.amountInDigits,
         paymentPlan: userRole === 'Purchase Manager' ? formData.paymentPlan.map(plan => ({
           installmentNumber: plan.installmentNumber,
-          dueDate: Timestamp.fromDate(new Date(plan.dueDate)),
+          dueDate: new Date(plan.dueDate),
           amount: plan.amount,
           status: plan.status
         })) : [{
           installmentNumber: 1,
-          dueDate: Timestamp.fromDate(new Date()),
+          dueDate: new Date(),
           amount: formData.amount,
           status: 'Pending'
         }],
@@ -771,13 +770,13 @@ export default function AddInvoicePage() {
                       {selectedSupplier.phoneNumbers && selectedSupplier.phoneNumbers.length > 0 && (
                         <div>
                           <span className="font-medium text-gray-700">Phone:</span>
-                          <span className="ml-2 text-gray-600">{selectedSupplier.phoneNumbers?.[0] || 'No phone'}</span>
+                          <span className="ml-2 text-gray-600">{selectedSupplier.phoneNumbers[0]}</span>
                         </div>
                       )}
-                      {selectedSupplier.emailAddress && (
+                      {selectedSupplier.email && (
                         <div>
                           <span className="font-medium text-gray-700">Email:</span>
-                          <span className="ml-2 text-gray-600">{selectedSupplier.emailAddress}</span>
+                          <span className="ml-2 text-gray-600">{selectedSupplier.email}</span>
                         </div>
                       )}
                       {selectedSupplier.routeDays && selectedSupplier.routeDays.length > 0 && (
@@ -798,9 +797,9 @@ export default function AddInvoicePage() {
                         <div className="md:col-span-2">
                           <span className="font-medium text-gray-700">Primary Bank:</span>
                           <div className="ml-2 text-gray-600">
-                            <span>{selectedSupplier.bankAccounts?.[0]?.bankName || 'No bank'}</span>
+                            <span>{selectedSupplier.bankAccounts[0].bankName}</span>
                             <span className="mx-2">•</span>
-                            <span>{selectedSupplier.bankAccounts?.[0]?.accountNumber || 'N/A'}</span>
+                            <span>{selectedSupplier.bankAccounts[0].accountNumber}</span>
                           </div>
                         </div>
                       )}
@@ -823,7 +822,13 @@ export default function AddInvoicePage() {
                         </div>
                       )}
                       
-                      {/* Contact Person not available in current supplier interface */}
+                      {/* Additional Contact Person */}
+                      {selectedSupplier.contactPerson && (
+                        <div>
+                          <span className="font-medium text-gray-700">Contact Person:</span>
+                          <span className="ml-2 text-gray-600">{selectedSupplier.contactPerson}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

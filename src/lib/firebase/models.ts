@@ -428,7 +428,7 @@ export interface FirestoreDocument {
 
 export interface PaginationOptions {
   limit?: number;
-  startAfter?: any;
+  startAfter?: unknown;
   orderBy?: string;
   orderDirection?: 'asc' | 'desc';
 }
@@ -436,7 +436,7 @@ export interface PaginationOptions {
 export interface QueryFilters {
   field: string;
   operator: '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in' | 'not-in' | 'array-contains' | 'array-contains-any';
-  value: any;
+  value: unknown;
 }
 
 // ==================== BUSINESS RULE TYPES ====================
@@ -449,7 +449,7 @@ export interface ValidationResult {
 
 export interface BusinessRuleContext {
   currentUser: Employee;
-  targetDocument: any;
+  targetDocument: unknown;
   operation: 'create' | 'update' | 'delete';
   timestamp: Timestamp;
 } 

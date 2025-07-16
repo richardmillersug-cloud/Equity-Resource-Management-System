@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  Search, 
-  Filter, 
-  Download, 
+
+import React, { useState, useEffect } from 'react';
+import {
+  CheckCircle,
+  Search,
+  Filter,
+  Download,
   Eye,
   CreditCard,
   Banknote,
   Building2,
   Smartphone,
   Receipt,
-  X
+  X,
 } from 'lucide-react';
 import { subscribeToInvoicePayments, InvoicePayment, getInvoicePaymentHistory, PurchasingManagerService } from '@/lib/firebase/purchasing-manager-service';
 import { authService } from '@/lib/firebase/auth';
@@ -454,13 +455,13 @@ export default function PaymentsPage() {
                   Amount & Method
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Installment
+//   Installment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+//   Actions
                     </th>
                   </tr>
                 </thead>
@@ -508,12 +509,12 @@ export default function PaymentsPage() {
                           )}
                           {payment.paymentStatus === 'completed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Cleared
+//   Cleared
                             </span>
                           )}
                           {payment.paymentStatus === 'failed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              Bounced
+//   Bounced
                             </span>
                           )}
                         </div>
@@ -540,7 +541,7 @@ export default function PaymentsPage() {
                         className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                       >
                         <Eye className="w-4 h-4" />
-                        View
+//   View
                       </button>
                       
                       {/* Cheque Actions */}
@@ -552,7 +553,7 @@ export default function PaymentsPage() {
                             disabled={loading}
                           >
                             <CheckCircle className="w-3 h-3" />
-                            Clear
+//   Clear
                           </button>
                           <button 
                             onClick={() => {
@@ -562,7 +563,7 @@ export default function PaymentsPage() {
                             disabled={loading}
                           >
                             <X className="w-3 h-3" />
-                            Bounce
+//   Bounce
                           </button>
                         </div>
                       )}
@@ -646,12 +647,12 @@ export default function PaymentsPage() {
                     <div className="mt-1">
                       {selectedPayment.paymentStatus === 'pending' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Pending
+//   Pending
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'completed' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Completed
+//   Completed
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'failed' && (

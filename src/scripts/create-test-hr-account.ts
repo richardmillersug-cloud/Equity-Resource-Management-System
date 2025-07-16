@@ -1,5 +1,4 @@
-import { authService } from '../lib/firebase/auth';
-import type { SignUpData } from '../lib/firebase/models';
+import { authService, SignUpData } from '../lib/firebase/auth';
 
 /**
  * Creates a test HR account for debugging authentication issues
@@ -47,7 +46,7 @@ async function createTestHRAccount() {
     await authService.signOut();
     console.log('\n✅ Account created and signed out. Ready for login test!');
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error creating HR account:', error);
     console.error('Error details:', error.message || error);
     
@@ -95,7 +94,7 @@ async function testLogin() {
     await authService.signOut();
     console.log('✅ Login test completed successfully!');
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Login test failed:', error.message || error);
   }
 }

@@ -15,9 +15,12 @@ export default function DashboardLayout({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
   const [loading, setLoading] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setHasMounted(true);
+    
     const user = authService.getCurrentUser();
     setCurrentUser(user);
     setLoading(false);
@@ -68,6 +71,18 @@ export default function DashboardLayout({
   const getUserRole = () => {
     return currentUser?.employee?.roles?.[0]?.jobTitle || 'User';
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!hasMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state while checking auth
   if (loading) {
