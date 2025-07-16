@@ -1,15 +1,15 @@
 import { auth, db } from './config';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
-  getDocs,
-  writeBatch,
-  Timestamp
-} from 'firebase/firestore';
+// import {
+//   doc,
+//   setDoc,
+//   getDoc,
+//   collection,
+//   query,
+//   where,
+//   getDocs,
+//   writeBatch,
+//   Timestamp,
+// } from 'firebase/firestore';
 
 export class FinancePermissionsFix {
   /**
@@ -54,7 +54,7 @@ export class FinancePermissionsFix {
   /**
    * Create user document with proper finance role
    */
-  private static async createFinanceUserDocument(user: any): Promise<void> {
+  private static async createFinanceUserDocument(user: Record<string, unknown>): Promise<void> {
     console.log('\n1. 👤 CREATING FINANCE USER DOCUMENT');
     console.log('------------------------------------');
 
@@ -90,7 +90,7 @@ export class FinancePermissionsFix {
   /**
    * Create employee document with finance-specific roles and permissions
    */
-  private static async createFinanceEmployeeDocument(user: any): Promise<void> {
+  private static async createFinanceEmployeeDocument(user: Record<string, unknown>): Promise<void> {
     console.log('\n2. 👷 CREATING FINANCE EMPLOYEE DOCUMENT');
     console.log('----------------------------------------');
 
@@ -157,7 +157,7 @@ export class FinancePermissionsFix {
   /**
    * Test access to finance tables
    */
-  private static async testFinanceTableAccess(user: any): Promise<void> {
+  private static async testFinanceTableAccess(user: Record<string, unknown>): Promise<void> {
     console.log('\n3. 💰 TESTING FINANCE TABLE ACCESS');
     console.log('----------------------------------');
 
@@ -174,7 +174,7 @@ export class FinancePermissionsFix {
       try {
         const snapshot = await getDocs(collection(db, collectionName));
         console.log(`✅ ${collectionName}: Access OK (${snapshot.size} documents)`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.log(`❌ ${collectionName}: ${error.message}`);
       }
     }
@@ -183,7 +183,7 @@ export class FinancePermissionsFix {
   /**
    * Verify business rules compliance
    */
-  private static async verifyBusinessRules(user: any): Promise<void> {
+  private static async verifyBusinessRules(user: Record<string, unknown>): Promise<void> {
     console.log('\n4. 📋 VERIFYING BUSINESS RULES');
     console.log('------------------------------');
 

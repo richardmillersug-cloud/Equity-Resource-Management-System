@@ -163,17 +163,17 @@ export default function SettingsPage() {
         setSettings(prev => ({
           ...prev,
           profile: {
-            firstName: user.employee?.firstName || '',
-            lastName: user.employee?.lastName || '',
-            email: user.employee?.email || '',
-            phone: user.employee?.phone || '',
-            avatar: '', // Not available in Employee interface
-            department: '', // Not available in Employee interface  
-            position: '' // Not available in Employee interface
+            firstName: user.employee.firstName || '',
+            lastName: user.employee.lastName || '',
+            email: user.employee.email || '',
+            phone: user.employee.phone || '',
+            avatar: user.employee.avatar || '',
+            department: user.employee.department || '',
+            position: user.employee.position || ''
           },
           security: {
             ...prev.security,
-            passwordLastChanged: new Date().toISOString().split('T')[0] // Fallback since this property doesn't exist in Employee interface
+            passwordLastChanged: user.employee.passwordLastChanged || new Date().toISOString().split('T')[0]
           }
         }));
       }
@@ -227,7 +227,7 @@ export default function SettingsPage() {
   };
 
   const getUserRole = (): string => {
-    return currentUser?.employee?.roles?.[0]?.jobTitle || 'User';
+    return currentUser?.employee?.role || 'User';
   };
 
   const tabs = [

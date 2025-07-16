@@ -1,16 +1,16 @@
-import {
-  Employee,
-  EmployeeRole,
-  CashAllocation,
-  AllocationType,
-  Payment,
-  Invoice,
-  InvoiceStatus,
-  Expense,
-  ExpenseCategory,
-  ExpenseStatus,
-  BusinessRules
-} from '../database/schema';
+// import {
+//   Employee,
+//   EmployeeRole,
+//   CashAllocation,
+//   AllocationType,
+//   Payment,
+//   Invoice,
+//   InvoiceStatus,
+//   Expense,
+//   ExpenseCategory,
+//   ExpenseStatus,
+//   BusinessRules,
+// } from '../database/schema';
 
 export class RetailBusinessRules implements BusinessRules {
   
@@ -208,7 +208,7 @@ export class RetailBusinessRules implements BusinessRules {
   /**
    * Validates unique constraints across the system
    */
-  validateUniqueConstraints(entity: any, field: string, value: any): boolean {
+  validateUniqueConstraints(entity: unknown, field: string, value: unknown): boolean {
     // This would typically check against the database
     // Implementation depends on your data layer
     const uniqueFields: Record<string, boolean> = {
@@ -226,7 +226,7 @@ export class RetailBusinessRules implements BusinessRules {
   /**
    * Validates referential integrity constraints
    */
-  validateReferentialIntegrity(entity: any): boolean {
+  validateReferentialIntegrity(entity: Record<string, unknown>): boolean {
     // Validate foreign key relationships exist
     // This would check against the database in a real implementation
     return true;
@@ -235,7 +235,7 @@ export class RetailBusinessRules implements BusinessRules {
   /**
    * Validates business logic constraints
    */
-  validateBusinessLogicConstraints(entity: any): boolean {
+  validateBusinessLogicConstraints(entity: Record<string, unknown>): boolean {
     // Due dates must be after invoice dates
     if (entity.due_date && entity.invoice_date) {
       if (entity.due_date <= entity.invoice_date) {
@@ -299,7 +299,7 @@ export class RetailBusinessRules implements BusinessRules {
     return [EmployeeRole.ACCOUNTANT, EmployeeRole.ACCOUNTANT_OPS, EmployeeRole.SUPERVISOR].includes(employee.role);
   }
 
-  private validateCashCloseBalance(cashClose: any): boolean {
+  private validateCashCloseBalance(cashClose: unknown): boolean {
     const calculatedTotal = 
       cashClose.cash_amount +
       cashClose.airtel_amount +

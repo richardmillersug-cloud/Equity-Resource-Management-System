@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { HRQueries } from '../../../lib/firebase/role-based-queries';
-import { 
-  Users, 
-  Calendar, 
+import {
+  Users,
+  Calendar,
   AlertCircle,
   CheckCircle,
   TrendingUp,
@@ -20,7 +20,7 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  Clock3
+  Clock3,
 } from 'lucide-react';
 
 interface HRStats {
@@ -33,8 +33,8 @@ interface HRStats {
 }
 
 export default function HRDashboard() {
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<Record<string, unknown>[]>([]);
   const [stats, setStats] = useState<HRStats>({
     totalEmployees: 0,
     activeEmployees: 0,

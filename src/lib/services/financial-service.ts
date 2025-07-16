@@ -12,8 +12,8 @@ import {
   AllocationStatus,
   InvoiceStatus,
   ExpenseStatus,
-  PaymentMethod
-} from '../database/schema';
+  PaymentMethod,
+} from '../firebase/models';
 import { businessRules } from '../business-rules';
 
 export class FinancialService {

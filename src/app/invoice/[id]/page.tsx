@@ -3,24 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../lib/firebase/enhanced-invoice';
-import { QRCodeService } from '../../../lib/utils/qr-code';
-import { 
-  FileText, 
-  Calendar, 
-  User, 
-  Package, 
-  DollarSign, 
-  MapPin, 
-  Phone, 
-  Mail,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertTriangle,
-  Download,
-  Share2,
-  ArrowLeft
-} from 'lucide-react';
+// import {
+//   FileText,
+//   Calendar,
+//   User,
+//   Package,
+//   DollarSign,
+//   MapPin,
+//   Phone,
+//   Mail,
+//   CheckCircle,
+//   XCircle,
+//   Clock,
+//   AlertTriangle,
+//   Download,
+//   Share2,
+//   ArrowLeft,
+// } from 'lucide-react';
 
 export default function PublicInvoicePage() {
   const params = useParams();
@@ -83,7 +82,7 @@ export default function PublicInvoicePage() {
     }).format(amount);
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: unknown) => {
     return timestamp?.toDate?.()?.toLocaleDateString() || 'N/A';
   };
 

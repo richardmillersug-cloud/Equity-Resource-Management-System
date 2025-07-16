@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  Search, 
-  Filter, 
-  Download, 
+
+import React, { useState, useEffect } from 'react';
+import {
+  CheckCircle,
+  Search,
+  Filter,
+  Download,
   Eye,
   CreditCard,
   Banknote,
@@ -16,16 +17,16 @@ import {
   Calendar,
   Users,
   BarChart3,
-  PieChart
+  PieChart,
 } from 'lucide-react';
-import { 
-  subscribeToInvoicePayments, 
-  InvoicePayment, 
+import {
+  subscribeToInvoicePayments,
+  InvoicePayment,
   PaymentAnalytics,
   PaymentSummary,
   getPaymentAnalytics,
   getAllPaymentSummaries,
-  searchPayments
+  searchPayments,
 } from '@/lib/firebase/purchasing-manager-service';
 
 export default function EnhancedPaymentsPage() {
@@ -84,7 +85,7 @@ export default function EnhancedPaymentsPage() {
 
   const applyFilters = async () => {
     try {
-      const criteria: any = {};
+      const criteria: unknown = {};
       
       if (dateFrom) criteria.dateFrom = new Date(dateFrom);
       if (dateTo) criteria.dateTo = new Date(dateTo);
@@ -214,7 +215,7 @@ export default function EnhancedPaymentsPage() {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Export
+//   Export
           </button>
         </div>
       </div>
@@ -422,7 +423,7 @@ export default function EnhancedPaymentsPage() {
                     Payment Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+//   Actions
                   </th>
                 </tr>
               </thead>
@@ -501,7 +502,7 @@ export default function EnhancedPaymentsPage() {
                         className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                       >
                         <Eye className="w-4 h-4" />
-                        View
+//   View
                       </button>
                     </td>
                   </tr>
@@ -542,7 +543,7 @@ export default function EnhancedPaymentsPage() {
                     Methods Used
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+//   Status
                   </th>
                 </tr>
               </thead>

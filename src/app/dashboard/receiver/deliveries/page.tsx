@@ -601,7 +601,14 @@ export default function DeliveriesPage() {
                         <span className="text-gray-500">Avg Usage:</span>
                         <span className="ml-2 font-medium">{item.averageUsage}/day</span>
                       </div>
-                      {/* Days until empty calculation would go here - needs to be computed from currentStock and averageUsage */}
+                      {item.daysUntilEmpty && (
+                        <div>
+                          <span className="text-gray-500">Days Until Empty:</span>
+                          <span className={`ml-2 font-medium ${item.daysUntilEmpty <= 7 ? 'text-red-600' : item.daysUntilEmpty <= 14 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {item.daysUntilEmpty}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -18,7 +18,7 @@ import {
   DocumentSnapshot,
   QuerySnapshot,
   DocumentReference,
-  CollectionReference
+  CollectionReference,
 } from 'firebase/firestore';
 
 import { db } from './config';
@@ -231,7 +231,7 @@ export class EmployeeService extends FirestoreService<Employee> {
     ]);
   }
 
-  async updateEmployeeRoles(employeeId: string, roles: any[]): Promise<void> {
+  async updateEmployeeRoles(employeeId: string, roles: Record<string, unknown>[]): Promise<void> {
     await this.update(employeeId, { roles });
   }
 }
@@ -725,7 +725,7 @@ export class BarcodeService extends FirestoreService<Barcode> {
 
 export class TransactionService {
   async executeTransaction<T>(
-    operation: (transaction: any) => Promise<T>
+    operation: (transaction: unknown) => Promise<T>
   ): Promise<T> {
     return runTransaction(db, operation);
   }

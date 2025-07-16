@@ -1,14 +1,14 @@
 import { db } from './config';
-import { 
-  collection, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
   serverTimestamp,
   query,
   where,
   orderBy,
-  limit
+  limit,
 } from 'firebase/firestore';
 
 export interface RealtimeSyncStatus {
@@ -41,8 +41,8 @@ export class RealtimeSync {
    */
   subscribeToCollection(
     collectionName: string, 
-    callback: (data: any[]) => void,
-    queryConstraints?: any[]
+    callback: (data: Record<string, unknown>[]) => void,
+    queryConstraints?: Record<string, unknown>[]
   ): () => void {
     try {
       let q = collection(db, collectionName);
@@ -78,7 +78,7 @@ export class RealtimeSync {
 
       this.listeners.set(collectionName, unsubscribe);
       return unsubscribe;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to subscribe to collection:', error);
       this.updateStatus({
         isConnected: false,
@@ -94,7 +94,7 @@ export class RealtimeSync {
   subscribeToDocument(
     collectionName: string,
     documentId: string,
-    callback: (data: any) => void
+    callback: (data: Record<string, unknown>) => void
   ): () => void {
     try {
       const docRef = doc(db, collectionName, documentId);
@@ -128,7 +128,7 @@ export class RealtimeSync {
 
       this.listeners.set(`${collectionName}/${documentId}`, unsubscribe);
       return unsubscribe;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to subscribe to document:', error);
       this.updateStatus({
         isConnected: false,
@@ -207,7 +207,7 @@ export class RealtimeSync {
           }
         );
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Connection test error:', error);
       this.updateStatus({ 
         isConnected: false, 
@@ -224,14 +224,14 @@ export const realtimeSync = RealtimeSync.getInstance();
 // Export convenience functions
 export const subscribeToCollection = (
   collectionName: string, 
-  callback: (data: any[]) => void,
-  queryConstraints?: any[]
+  callback: (data: Record<string, unknown>[]) => void,
+  queryConstraints?: Record<string, unknown>[]
 ) => realtimeSync.subscribeToCollection(collectionName, callback, queryConstraints);
 
 export const subscribeToDocument = (
   collectionName: string,
   documentId: string,
-  callback: (data: any) => void
+  callback: (data: Record<string, unknown>) => void
 ) => realtimeSync.subscribeToDocument(collectionName, documentId, callback);
 
 export const onSyncStatusChange = (callback: (status: RealtimeSyncStatus) => void) => 

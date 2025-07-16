@@ -2,16 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { 
-  subscribeToInvoices, 
-  subscribeToInvoicePayments, 
-  subscribeToCashCloses,
-
-  Invoice,
-  InvoicePayment,
-  CashClose,
-  Expense
-} from '../../../../lib/firebase/purchasing-manager-service';
+// import {
+//   subscribeToInvoices,
+//   subscribeToInvoicePayments,
+//   subscribeToCashCloses,
+//   Invoice,
+//   InvoicePayment,
+//   CashClose,
+//   Expense,
+// } from '../../../../lib/firebase/purchasing-manager-service';
 import { authService } from '../../../../lib/firebase/auth';
 
 export default function SyncCheckPage() {
@@ -62,7 +61,7 @@ export default function SyncCheckPage() {
     }).format(amount);
   };
 
-  const formatDate = (date: any) => {
+  const formatDate = (date: unknown) => {
     if (!date) return 'N/A';
     try {
       const dateObj = date instanceof Date ? date : 

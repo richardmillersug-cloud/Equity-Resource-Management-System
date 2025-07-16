@@ -1,7 +1,11 @@
 import { Timestamp } from 'firebase/firestore';
 import { FirestoreService } from './firestore-service';
 import { QRCodeService } from '../utils/qr-code';
-import { COLLECTIONS } from './models';
+
+// Collection names
+const COLLECTIONS = {
+  INVOICES: 'invoices'
+} as const;
 
 export interface PaymentPlan {
   id: string;

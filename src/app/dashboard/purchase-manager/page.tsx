@@ -734,7 +734,7 @@ export default function PurchaseManagerDashboard() {
           padding: 20,
           font: {
             size: 12,
-            weight: 600
+            weight: '600'
           }
         }
       },
@@ -760,7 +760,7 @@ export default function PurchaseManagerDashboard() {
         },
         ticks: {
           font: {
-            weight: 500
+            weight: '500'
           }
         }
       },
@@ -1314,7 +1314,7 @@ export default function PurchaseManagerDashboard() {
       </div>
 
             <div className="h-80">
-              <Line data={purchaseTrendsData} options={expenseChartOptions as any} />
+              <Line data={purchaseTrendsData} options={expenseChartOptions} />
             </div>
         </div>
 

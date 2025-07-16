@@ -68,7 +68,7 @@ export class PermissionFixer {
         try {
           await setDoc(userDocRef, userData);
           console.log('✅ User document created successfully!');
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.log('❌ Failed to create user document:', error.message);
           console.log('💡 Manual action required: Create user document in Firebase Console');
           console.log('   Collection: users');
@@ -76,7 +76,7 @@ export class PermissionFixer {
           console.log('   Data:', JSON.stringify(userData, null, 2));
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log('❌ Error checking user document:', error.message);
     }
   }
@@ -124,14 +124,14 @@ export class PermissionFixer {
           const docRef = await addDoc(collection(db, 'employees'), employeeData);
           console.log('✅ Employee document created successfully!');
           console.log('   - Document ID:', docRef.id);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.log('❌ Failed to create employee document:', error.message);
           console.log('💡 Manual action required: Create employee document in Firebase Console');
           console.log('   Collection: employees');
           console.log('   Data:', JSON.stringify(employeeData, null, 2));
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log('❌ Error checking employee document:', error.message);
     }
   }
@@ -221,7 +221,7 @@ export class PermissionFixer {
       } else {
         console.log('❌ Cannot read user document');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log('❌ Permission test failed:', error.message);
     }
 

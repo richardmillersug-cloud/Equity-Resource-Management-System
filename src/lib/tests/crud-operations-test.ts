@@ -1,5 +1,5 @@
 import { ReceiverCRUD, PurchasingManagerCRUD, CRUDUtils } from '../firebase/enhanced-crud-operations';
-import { authService } from '../firebase/auth';
+// import { authService } from '../firebase/auth';
 
 // =====================================================
 // COMPREHENSIVE CRUD OPERATIONS TEST SUITE

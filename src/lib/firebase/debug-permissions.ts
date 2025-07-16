@@ -133,7 +133,7 @@ export class PermissionDebugger {
         const testQuery = query(collection(db, collectionName));
         const snapshot = await getDocs(testQuery);
         console.log(`✅ ${collectionName}: READ access OK (${snapshot.size} documents)`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.log(`❌ ${collectionName}: READ access FAILED`);
         console.log(`   Error: ${error.message}`);
       }

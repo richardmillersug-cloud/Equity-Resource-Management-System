@@ -136,7 +136,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     return allSuppliers.filter(supplier => 
       supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       supplier.tinNumber.includes(searchTerm) ||
-      (supplier.phoneNumbers || []).some(phone => phone.includes(searchTerm))
+      supplier.phoneNumbers?.some(phone => phone.includes(searchTerm))
     );
   }
 

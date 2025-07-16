@@ -1,11 +1,11 @@
 import { auth, db } from './config';
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  query, 
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
   getDocs,
-  limit
+  limit,
 } from 'firebase/firestore';
 
 export class PMAccessTester {
@@ -59,7 +59,7 @@ export class PMAccessTester {
       } else {
         console.log('❌ User document does not exist');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`❌ User document access failed: ${error.message}`);
     }
   }
@@ -86,7 +86,7 @@ export class PMAccessTester {
       } else {
         console.log('❌ Employee document does not exist');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`❌ Employee document access failed: ${error.message}`);
     }
   }
@@ -115,7 +115,7 @@ export class PMAccessTester {
       try {
         const snapshot = await getDocs(query(collection(db, collectionName), limit(1)));
         console.log(`✅ ${collectionName}: Access OK (${snapshot.size} documents)`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.log(`❌ ${collectionName}: ${error.message}`);
       }
     }

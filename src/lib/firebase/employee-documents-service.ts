@@ -1,22 +1,22 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  Timestamp 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  Timestamp,
 } from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL, 
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
   deleteObject,
   uploadBytesResumable,
-  getMetadata
+  getMetadata,
 } from 'firebase/storage';
 import { db, storage } from './config';
 
@@ -295,7 +295,7 @@ export class EmployeeDocumentsService {
     updates: Partial<Pick<EmployeeDocument, 'description' | 'expiryDate' | 'tags' | 'accessLevel' | 'isActive'>>
   ): Promise<void> {
     try {
-      const updateData: any = { ...updates };
+      const updateData: unknown = { ...updates };
       
       if (updates.expiryDate) {
         updateData.expiryDate = Timestamp.fromDate(updates.expiryDate as any);
