@@ -104,7 +104,7 @@ export default function ModernInvoiceManagement() {
     setFilteredInvoices(filtered);
   }, [invoices, searchTerm, statusFilter]);
 
-  const handleInvoiceClick = (invoice) => {
+  const handleInvoiceClick = (invoice: any) => {
     setSelectedInvoice(invoice);
     setIsModalOpen(true);
   };
@@ -114,7 +114,7 @@ export default function ModernInvoiceManagement() {
     setSelectedInvoice(null);
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     const colors = {
       pending: 'bg-gradient-to-r from-yellow-400 to-orange-500',
       approved: 'bg-gradient-to-r from-blue-400 to-blue-600',
@@ -122,16 +122,16 @@ export default function ModernInvoiceManagement() {
       overdue: 'bg-gradient-to-r from-red-400 to-red-600',
       rejected: 'bg-gradient-to-r from-gray-400 to-gray-600'
     };
-    return colors[status] || 'bg-gradient-to-r from-gray-400 to-gray-600';
+    return colors[status as keyof typeof colors] || 'bg-gradient-to-r from-gray-400 to-gray-600';
   };
 
-  const getPriorityIcon = (priority) => {
+  const getPriorityIcon = (priority: string) => {
     if (priority === 'high') return <Zap className="w-4 h-4 text-red-500" />;
     if (priority === 'medium') return <TrendingUp className="w-4 h-4 text-yellow-500" />;
     return <Clock className="w-4 h-4 text-green-500" />;
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
@@ -413,7 +413,7 @@ export default function ModernInvoiceManagement() {
                       <td className="px-6 py-4">
                         <div className="text-gray-900">{invoice.dueDate.toLocaleDateString()}</div>
                         <div className="text-sm text-gray-500">
-                          {Math.ceil((invoice.dueDate - new Date()) / (1000 * 60 * 60 * 24))} days
+                          {Math.ceil((new Date(invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
                         </div>
                       </td>
                       <td className="px-6 py-4">

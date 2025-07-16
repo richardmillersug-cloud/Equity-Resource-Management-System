@@ -511,7 +511,7 @@ export default function AttendancePage() {
                 <p className="text-gray-600 mb-4">Select an employee to check in:</p>
                 <select
                   onChange={(e) => {
-                    const emp = employees.find(e => e.id === e.target.value);
+                    const emp = employees.find(emp => emp.id === e.target.value);
                     setCurrentEmployee(emp || null);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"

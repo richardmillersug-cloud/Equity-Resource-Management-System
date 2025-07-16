@@ -94,7 +94,7 @@ export default function AddSupplierPage() {
       newErrors.Address = 'Address is required';
     }
 
-    if (!formData.PhoneNumbers[0] || !formData.PhoneNumbers[0].trim()) {
+    if (!formData.PhoneNumbers?.[0] || !formData.PhoneNumbers[0]?.trim()) {
       newErrors.PhoneNumbers = 'At least one phone number is required';
     } else {
       // Validate all phone numbers

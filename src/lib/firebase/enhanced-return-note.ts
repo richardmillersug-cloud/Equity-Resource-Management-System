@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { FirestoreService } from './firestore-service';
+import { COLLECTIONS } from './models';
 
 export interface ReturnItem {
   id: string;
@@ -90,7 +91,7 @@ export const RETURN_STATUSES = [
 
 export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
   constructor() {
-    super('returnNotes');
+    super(COLLECTIONS.RETURN_NOTES);
   }
 
   // Generate return note number

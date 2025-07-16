@@ -161,7 +161,7 @@ export default function ReceiverDashboard() {
     days: 7,
     endDate: new Date().toISOString().split('T')[0]
   });
-  const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'predictive'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'predictive' | 'deliveries' | 'returns' | 'damages' | 'restock'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);

@@ -132,7 +132,7 @@ export class BarcodeService {
         console.log('Falling back to CODE128 format');
         return this.generateBarcodeSVG(codeValue, 'CODE128', settings);
       }
-      throw new Error(`Failed to generate barcode: ${error.message}`);
+      throw new Error(`Failed to generate barcode: ${(error as Error).message}`);
     }
   }
 

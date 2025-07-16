@@ -392,7 +392,7 @@ service cloud.firestore {
 
       // Employee document
       batch.set(doc(db, 'employees', user.uid), {
-        firstName: user.email.split('@')[0],
+        firstName: user.email?.split('@')[0] || 'Unknown',
         lastName: 'User',
         email: user.email,
         employeeNIN: '12345678901234',

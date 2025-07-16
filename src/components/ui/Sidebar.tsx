@@ -58,13 +58,13 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  // Dashboard - Available to all roles
+  // Dashboard - Available to all roles except Purchasing Manager and HR (they have their own dashboards)
   { 
     id: 'dashboard', 
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Dashboard', 
     path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+    roles: ['Admin', 'Manager', 'Accountant', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
   },
   
   // Admin specific
@@ -170,8 +170,8 @@ const navigationItems: NavigationItem[] = [
   // HR specific
   { 
     id: 'hr-dashboard', 
-    icon: <Users className="w-5 h-5" />, 
-    label: 'HR Dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'Dashboard', 
     path: '/dashboard/hr',
     roles: ['HR', 'HR Manager', 'Manager', 'Admin']
   },

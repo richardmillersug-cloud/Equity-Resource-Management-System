@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '../ui/Card';
+import { LegacyCard } from '../ui/Card';
 
 interface Transaction {
   id: string;
@@ -53,7 +53,7 @@ export const TransactionsList: React.FC<TransactionsListProps> = ({
   transactions = mockTransactions 
 }) => {
   return (
-    <Card 
+    <LegacyCard 
       title="Transactions" 
       subtitle="Your weekly transactions update"
       className="col-span-1"
@@ -84,6 +84,6 @@ export const TransactionsList: React.FC<TransactionsListProps> = ({
       <button className="w-full mt-6 py-2 text-emerald-600 font-medium hover:bg-emerald-50 rounded-lg transition-colors duration-200">
         View All Transactions
       </button>
-    </Card>
+    </LegacyCard>
   );
 }; 
