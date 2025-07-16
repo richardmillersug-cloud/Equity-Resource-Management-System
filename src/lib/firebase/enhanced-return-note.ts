@@ -220,8 +220,9 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
   async getRecentReturnNotes(limitCount: number = 10): Promise<ReturnNote[]> {
     return await this.getAll([], { 
       orderBy: 'createdAt', 
-      orderDirection: 'desc' 
-    }, limitCount);
+      orderDirection: 'desc',
+      limit: limitCount
+    });
   }
 
   // Get return notes by reason

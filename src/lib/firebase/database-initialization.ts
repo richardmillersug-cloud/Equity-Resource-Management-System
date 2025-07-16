@@ -1,12 +1,12 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  setDoc, 
-  getDocs, 
+import {
+  collection,
+  doc,
+  addDoc,
+  setDoc,
+  getDocs,
   serverTimestamp,
   Timestamp,
-  writeBatch
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -1639,7 +1639,7 @@ export class DatabaseInitialization {
       'notifications', 'auditLogs', 'userSessions'
     ];
 
-    const status: any = {
+    const status: unknown = {
       timestamp: new Date().toISOString(),
       collections: {}
     };
@@ -1708,7 +1708,7 @@ export class DatabaseInitialization {
       'notifications', 'auditLogs', 'userSessions', 'users'
     ];
 
-    const status: any = {};
+    const status: unknown = {};
 
     for (const collectionName of collections) {
       try {
@@ -1740,7 +1740,7 @@ export class DatabaseInitialization {
       'cashAllocations', 'specialFundsTracker', 'invoices'
     ];
 
-    const status: any = {};
+    const status: unknown = {};
 
     for (const collectionName of pmCollections) {
       try {
@@ -1762,7 +1762,7 @@ export class DatabaseInitialization {
       'deliveries', 'returnNotes', 'damages', 'restockItems', 'invoices'
     ];
 
-    const status: any = {};
+    const status: unknown = {};
 
     for (const collectionName of receiverCollections) {
       try {

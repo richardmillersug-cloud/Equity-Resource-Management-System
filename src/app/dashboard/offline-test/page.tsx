@@ -1,28 +1,26 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { OfflineReceiverQueries, OfflineUtils } from '../../../lib/firebase/offline-queries';
-import OfflineStatus from '../../../components/OfflineStatus';
-import { 
-  Wifi, 
-  WifiOff, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  RefreshCw, 
-  Database,
-  TestTube,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Package
-} from 'lucide-react';
+// import {
+//   Wifi,
+//   WifiOff,
+//   Plus,
+//   Edit,
+//   Trash2,
+//   RefreshCw,
+//   Database,
+//   TestTube,
+//   CheckCircle,
+//   AlertTriangle,
+//   Clock,
+//   Package,
+// } from 'lucide-react';
 
 export default function OfflineTestPage() {
   const [isOnline, setIsOnline] = useState(true);
-  const [testResults, setTestResults] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<Record<string, unknown>[]>([]);
+  const [deliveries, setDeliveries] = useState<Record<string, unknown>[]>([]);
+  const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [newDelivery, setNewDelivery] = useState({
     supplierId: 'test-supplier',
@@ -82,7 +80,7 @@ export default function OfflineTestPage() {
       setDeliveries(deliveriesData);
       setInventory(inventoryData);
       addTestResult('Data', `Loaded ${deliveriesData.length} deliveries, ${inventoryData.length} inventory items`, 'success');
-    } catch (error: any) {
+    } catch (error: unknown) {
       addTestResult('Data', `Failed to load data: ${error.message}`, 'error');
     } finally {
       setLoading(false);
@@ -94,7 +92,7 @@ export default function OfflineTestPage() {
       const deliveryId = await OfflineReceiverQueries.createDelivery(newDelivery);
       addTestResult('Create', `Created delivery: ${deliveryId}`, 'success');
       await loadTestData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       addTestResult('Create', `Failed to create delivery: ${error.message}`, 'error');
     }
   };
@@ -113,7 +111,7 @@ export default function OfflineTestPage() {
       });
       addTestResult('Update', `Updated delivery: ${delivery.id}`, 'success');
       await loadTestData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       addTestResult('Update', `Failed to update delivery: ${error.message}`, 'error');
     }
   };
@@ -130,7 +128,7 @@ export default function OfflineTestPage() {
       await OfflineReceiverQueries.updateInventoryStock(item.id, newStock, 'Test update offline');
       addTestResult('Inventory', `Updated stock for ${item.itemName}: ${newStock}`, 'success');
       await loadTestData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       addTestResult('Inventory', `Failed to update inventory: ${error.message}`, 'error');
     }
   };
@@ -139,7 +137,7 @@ export default function OfflineTestPage() {
     try {
       await OfflineUtils.forceSync();
       addTestResult('Sync', 'Force sync completed', 'success');
-    } catch (error: any) {
+    } catch (error: unknown) {
       addTestResult('Sync', `Force sync failed: ${error.message}`, 'error');
     }
   };

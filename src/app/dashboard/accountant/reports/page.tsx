@@ -3,18 +3,17 @@
 import { useState, useEffect } from 'react';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { authService } from '@/lib/firebase/auth';
-import { getPlaceholderData, mergeWithPlaceholders } from '@/lib/placeholders/accountant-data';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown,
-  PieChart,
-  BarChart3,
-  Download,
-  Calendar,
-  Filter,
-  RefreshCw
-} from 'lucide-react';
+// import {
+//   DollarSign,
+//   TrendingUp,
+//   TrendingDown,
+//   PieChart,
+//   BarChart3,
+//   Download,
+//   Calendar,
+//   Filter,
+//   RefreshCw,
+// } from 'lucide-react';
 
 export default function FinancialReportsPage() {
   const [loading, setLoading] = useState(true);
@@ -50,9 +49,9 @@ export default function FinancialReportsPage() {
 
       console.log('Loading financial report data...');
       
-      let cashAllocations: any[] = [];
-      let expenses: any[] = [];
-      let specialFunds: any[] = [];
+      let cashAllocations: Record<string, unknown>[] = [];
+      let expenses: Record<string, unknown>[] = [];
+      let specialFunds: Record<string, unknown>[] = [];
       
       try {
         // Load all data sources
@@ -101,7 +100,7 @@ export default function FinancialReportsPage() {
         expensesByCategory: placeholderSummary.expensesByCategory || []
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading report data:', err);
       
       // Fallback to complete placeholder data

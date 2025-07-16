@@ -1,15 +1,15 @@
 import { auth, db } from './config';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  query,
+  where,
   getDocs,
   writeBatch,
   Timestamp,
-  updateDoc
+  updateDoc,
 } from 'firebase/firestore';
 
 export class PMPermissionsEmergencyFix {
@@ -59,7 +59,7 @@ export class PMPermissionsEmergencyFix {
   /**
    * Fix user document with proper PM role
    */
-  private static async fixUserDocument(user: any): Promise<void> {
+  private static async fixUserDocument(user: Record<string, unknown>): Promise<void> {
     console.log('\n1. 👤 FIXING USER DOCUMENT');
     console.log('---------------------------');
 
@@ -100,7 +100,7 @@ export class PMPermissionsEmergencyFix {
   /**
    * Fix employee document with PM role and permissions
    */
-  private static async fixEmployeeDocument(user: any): Promise<void> {
+  private static async fixEmployeeDocument(user: Record<string, unknown>): Promise<void> {
     console.log('\n2. 👷 FIXING EMPLOYEE DOCUMENT');
     console.log('-------------------------------');
 
@@ -178,7 +178,7 @@ export class PMPermissionsEmergencyFix {
   /**
    * Create test collections with sample data for PM features
    */
-  private static async createTestCollections(user: any): Promise<void> {
+  private static async createTestCollections(user: Record<string, unknown>): Promise<void> {
     console.log('\n3. 📊 CREATING TEST COLLECTIONS');
     console.log('--------------------------------');
 
@@ -301,7 +301,7 @@ export class PMPermissionsEmergencyFix {
       try {
         const snapshot = await getDocs(query(collection(db, collectionName)));
         console.log(`✅ ${collectionName}: Access OK (${snapshot.size} documents)`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.log(`❌ ${collectionName}: ${error.message}`);
       }
     }
@@ -310,7 +310,7 @@ export class PMPermissionsEmergencyFix {
   /**
    * Fix any missing permissions
    */
-  private static async fixMissingPermissions(user: any): Promise<void> {
+  private static async fixMissingPermissions(user: Record<string, unknown>): Promise<void> {
     console.log('\n5. 🔧 FIXING MISSING PERMISSIONS');
     console.log('---------------------------------');
 

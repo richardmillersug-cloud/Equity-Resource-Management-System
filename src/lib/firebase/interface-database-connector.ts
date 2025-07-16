@@ -1,17 +1,17 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
   limit,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -29,7 +29,7 @@ export class InterfaceDatabaseConnector {
    * Connect Cash Close Interface to Firestore
    */
   static subscribeToCashCloseData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'cashClose');
@@ -55,7 +55,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Add new cash close entry
    */
-  static async addCashClose(data: any): Promise<string> {
+  static async addCashClose(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'cashClose');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -99,7 +99,7 @@ export class InterfaceDatabaseConnector {
    * Connect Suppliers Interface to Firestore
    */
   static subscribeToSuppliersData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'suppliers');
@@ -125,7 +125,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Add new supplier
    */
-  static async addSupplier(data: any): Promise<string> {
+  static async addSupplier(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'suppliers');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -139,7 +139,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Update supplier
    */
-  static async updateSupplier(id: string, data: any): Promise<void> {
+  static async updateSupplier(id: string, data: unknown): Promise<void> {
     const docRef = doc(db, 'suppliers', id);
     await updateDoc(docRef, {
       ...data,
@@ -151,7 +151,7 @@ export class InterfaceDatabaseConnector {
    * Connect Expenses Interface to Firestore
    */
   static subscribeToExpensesData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'expenses');
@@ -194,7 +194,7 @@ export class InterfaceDatabaseConnector {
    * Connect Purchase Orders Interface to Firestore
    */
   static subscribeToPurchaseOrdersData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'purchaseOrders');
@@ -222,7 +222,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create purchase order
    */
-  static async createPurchaseOrder(data: any): Promise<string> {
+  static async createPurchaseOrder(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'purchaseOrders');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -237,7 +237,7 @@ export class InterfaceDatabaseConnector {
    * Connect Payments Interface to Firestore
    */
   static subscribeToPaymentsData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'payments');
@@ -264,7 +264,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create new payment
    */
-  static async createPayment(data: any): Promise<string> {
+  static async createPayment(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'payments');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -343,7 +343,7 @@ export class InterfaceDatabaseConnector {
    * Connect Cheque Tracker Interface to Firestore
    */
   static subscribeToChequeTrackerData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'chequeTracker');
@@ -372,7 +372,7 @@ export class InterfaceDatabaseConnector {
    * Connect Installment Plans Interface to Firestore
    */
   static subscribeToInstallmentPlansData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'installmentPlans');
@@ -384,7 +384,7 @@ export class InterfaceDatabaseConnector {
           id: doc.id,
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-          installments: doc.data().installments?.map((inst: any) => ({
+          installments: doc.data().installments?.map((inst: unknown) => ({
             ...inst,
             dueDate: inst.dueDate?.toDate?.() || new Date(),
             paidDate: inst.paidDate?.toDate?.() || null
@@ -407,7 +407,7 @@ export class InterfaceDatabaseConnector {
    * Connect Deliveries Interface to Firestore
    */
   static subscribeToDeliveriesData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'deliveries');
@@ -433,7 +433,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create delivery
    */
-  static async createDelivery(data: any): Promise<string> {
+  static async createDelivery(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'deliveries');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -459,7 +459,7 @@ export class InterfaceDatabaseConnector {
    * Connect Return Notes Interface to Firestore
    */
   static subscribeToReturnNotesData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'returnNotes');
@@ -486,7 +486,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create return note
    */
-  static async createReturnNote(data: any): Promise<string> {
+  static async createReturnNote(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'returnNotes');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -501,7 +501,7 @@ export class InterfaceDatabaseConnector {
    * Connect Damages Interface to Firestore
    */
   static subscribeToDamagesData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'damages');
@@ -528,7 +528,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create damage report
    */
-  static async createDamageReport(data: any): Promise<string> {
+  static async createDamageReport(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'damages');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -543,7 +543,7 @@ export class InterfaceDatabaseConnector {
    * Connect Restock Items Interface to Firestore
    */
   static subscribeToRestockItemsData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'restockItems');
@@ -576,7 +576,7 @@ export class InterfaceDatabaseConnector {
    * Connect Invoices Interface to Firestore
    */
   static subscribeToInvoicesData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'invoices');
@@ -604,7 +604,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create invoice
    */
-  static async createInvoice(data: any): Promise<string> {
+  static async createInvoice(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'invoices');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -633,7 +633,7 @@ export class InterfaceDatabaseConnector {
    */
   static subscribeToNotificationsData(
     userId: string,
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'notifications');
@@ -679,7 +679,7 @@ export class InterfaceDatabaseConnector {
    * Connect Expense Requests Interface to Firestore
    */
   static subscribeToExpenseRequestsData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'expenseRequests');
@@ -721,7 +721,7 @@ export class InterfaceDatabaseConnector {
    * Connect Fund Acknowledgments Interface to Firestore
    */
   static subscribeToFundAcknowledgmentsData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'fundAcknowledgments');
@@ -762,7 +762,7 @@ export class InterfaceDatabaseConnector {
    * Connect Cash Allocations Interface to Firestore
    */
   static subscribeToCashAllocationsData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'cashAllocations');
@@ -788,7 +788,7 @@ export class InterfaceDatabaseConnector {
   /**
    * Create cash allocation
    */
-  static async createCashAllocation(data: any): Promise<string> {
+  static async createCashAllocation(data: Record<string, unknown>): Promise<string> {
     const collectionRef = collection(db, 'cashAllocations');
     const docRef = await addDoc(collectionRef, {
       ...data,
@@ -803,7 +803,7 @@ export class InterfaceDatabaseConnector {
    * Connect Special Funds Tracker Interface to Firestore
    */
   static subscribeToSpecialFundsTrackerData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'specialFundsTracker');
@@ -831,7 +831,7 @@ export class InterfaceDatabaseConnector {
    * Connect Users Interface to Firestore
    */
   static subscribeToUsersData(
-    callback: (data: any[]) => void,
+    callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
     const collectionRef = collection(db, 'users');
@@ -951,7 +951,7 @@ export class InterfaceDatabaseConnector {
       'damages', 'restockItems', 'invoices', 'notifications', 'users'
     ];
 
-    const results: any = {};
+    const results: unknown = {};
 
     for (const collectionName of collections) {
       try {
@@ -974,8 +974,8 @@ export class InterfaceDatabaseConnector {
       results,
       summary: {
         total: collections.length,
-        successful: Object.values(results).filter((r: any) => r.success).length,
-        failed: Object.values(results).filter((r: any) => !r.success).length
+        successful: Object.values(results).filter((r: unknown) => r.success).length,
+        failed: Object.values(results).filter((r: unknown) => !r.success).length
       }
     };
   }
@@ -1041,23 +1041,23 @@ export class InterfaceDatabaseConnector {
       (window as any).dbConnector = {
         // Purchasing Manager shortcuts
         cashClose: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToCashCloseData(callback),
-          add: (data: any) => InterfaceDatabaseConnector.addCashClose(data),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToCashCloseData(callback),
+          add: (data: Record<string, unknown>) => InterfaceDatabaseConnector.addCashClose(data),
           clear: () => InterfaceDatabaseConnector.clearCashCloseData(),
           reinitialize: () => InterfaceDatabaseConnector.reinitializeCashCloseData()
         },
         suppliers: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToSuppliersData(callback),
-          add: (data: any) => InterfaceDatabaseConnector.addSupplier(data),
-          update: (id: string, data: any) => InterfaceDatabaseConnector.updateSupplier(id, data)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToSuppliersData(callback),
+          add: (data: Record<string, unknown>) => InterfaceDatabaseConnector.addSupplier(data),
+          update: (id: string, data: unknown) => InterfaceDatabaseConnector.updateSupplier(id, data)
         },
         expenses: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToExpensesData(callback),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToExpensesData(callback),
           approve: (id: string) => InterfaceDatabaseConnector.approveExpense(id, 'console-user')
         },
         payments: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToPaymentsData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createPayment(data),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToPaymentsData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createPayment(data),
           process: (id: string) => InterfaceDatabaseConnector.processPayment(id, 'console-user'),
           complete: (id: string) => InterfaceDatabaseConnector.completePayment(id, 'console-user'),
           cancel: (id: string, reason: string) => InterfaceDatabaseConnector.cancelPayment(id, 'console-user', reason),
@@ -1065,45 +1065,45 @@ export class InterfaceDatabaseConnector {
           reinitialize: () => InterfaceDatabaseConnector.reinitializePaymentsData()
         },
         expenseRequests: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToExpenseRequestsData(callback),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToExpenseRequestsData(callback),
           approve: (id: string) => InterfaceDatabaseConnector.approveExpenseRequest(id, 'console-user')
         },
         fundAcknowledgments: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToFundAcknowledgmentsData(callback),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToFundAcknowledgmentsData(callback),
           acknowledge: (id: string, notes?: string) => InterfaceDatabaseConnector.acknowledgeFund(id, 'console-user', notes)
         },
         cashAllocations: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToCashAllocationsData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createCashAllocation(data)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToCashAllocationsData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createCashAllocation(data)
         },
         specialFundsTracker: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToSpecialFundsTrackerData(callback)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToSpecialFundsTrackerData(callback)
         },
         // Receiver shortcuts
         deliveries: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToDeliveriesData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createDelivery(data),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToDeliveriesData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createDelivery(data),
           updateStatus: (id: string, status: string) => InterfaceDatabaseConnector.updateDeliveryStatus(id, status)
         },
         returnNotes: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToReturnNotesData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createReturnNote(data)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToReturnNotesData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createReturnNote(data)
         },
         damages: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToDamagesData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createDamageReport(data)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToDamagesData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createDamageReport(data)
         },
         restockItems: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToRestockItemsData(callback)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToRestockItemsData(callback)
         },
         // Shared shortcuts
         invoices: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToInvoicesData(callback),
-          create: (data: any) => InterfaceDatabaseConnector.createInvoice(data),
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToInvoicesData(callback),
+          create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createInvoice(data),
           approve: (id: string) => InterfaceDatabaseConnector.approveInvoice(id, 'console-user')
         },
         users: {
-          subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToUsersData(callback)
+          subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToUsersData(callback)
         },
         // Utility shortcuts
         analytics: () => InterfaceDatabaseConnector.getDashboardAnalytics(),
@@ -1141,27 +1141,27 @@ if (typeof window !== 'undefined') {
     
     // Purchasing Manager shortcuts
     suppliers: {
-      subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToSuppliersData(callback),
-      add: (data: any) => InterfaceDatabaseConnector.addSupplier(data),
-      update: (id: string, data: any) => InterfaceDatabaseConnector.updateSupplier(id, data)
+      subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToSuppliersData(callback),
+      add: (data: Record<string, unknown>) => InterfaceDatabaseConnector.addSupplier(data),
+      update: (id: string, data: unknown) => InterfaceDatabaseConnector.updateSupplier(id, data)
     },
     
     expenses: {
-      subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToExpensesData(callback),
+      subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToExpensesData(callback),
       approve: (id: string, approvedBy: string) => InterfaceDatabaseConnector.approveExpense(id, approvedBy)
     },
 
     // Receiver shortcuts
     deliveries: {
-      subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToDeliveriesData(callback),
-      create: (data: any) => InterfaceDatabaseConnector.createDelivery(data),
+      subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToDeliveriesData(callback),
+      create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createDelivery(data),
       updateStatus: (id: string, status: string, notes?: string) => InterfaceDatabaseConnector.updateDeliveryStatus(id, status, notes)
     },
 
     // Shared shortcuts
     invoices: {
-      subscribe: (callback: any) => InterfaceDatabaseConnector.subscribeToInvoicesData(callback),
-      create: (data: any) => InterfaceDatabaseConnector.createInvoice(data),
+      subscribe: (callback: unknown) => InterfaceDatabaseConnector.subscribeToInvoicesData(callback),
+      create: (data: Record<string, unknown>) => InterfaceDatabaseConnector.createInvoice(data),
       approve: (id: string, approvedBy: string) => InterfaceDatabaseConnector.approveInvoice(id, approvedBy)
     }
   };

@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { enhancedDamageService, DamageWithDetails } from '../../../../lib/firebase/enhanced-damages';
-import { useLanguage } from '../../../../contexts/LanguageContext';
-import { 
-  AlertTriangle, 
-  Search, 
-  Filter, 
+import {
+  AlertTriangle,
+  Search,
+  Filter,
   Calendar,
   Package,
   User,
@@ -15,8 +13,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Eye
+  Eye,
 } from 'lucide-react';
+import { enhancedDamageService, DamageWithDetails } from '@/lib/firebase/enhanced-damages';
 
 interface DamageStats {
   total: number;
@@ -29,7 +28,6 @@ interface DamageStats {
 }
 
 export default function DamagesPage() {
-  const { t } = useLanguage();
   const [damages, setDamages] = useState<DamageWithDetails[]>([]);
   const [filteredDamages, setFilteredDamages] = useState<DamageWithDetails[]>([]);
   const [stats, setStats] = useState<DamageStats>({
@@ -178,9 +176,9 @@ export default function DamagesPage() {
               </div>
               <div>
                 <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
-                  {t('damages.damageManagement', 'Damages Management')}
+                  Damages Management
                 </h1>
-                <p className="text-purple-100 text-lg">{t('damages.trackAndManage', 'Track and manage damaged items from deliveries')}</p>
+                <p className="text-purple-100 text-lg">Track and manage damaged items from deliveries</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -189,7 +187,7 @@ export default function DamagesPage() {
                 className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
                 <Clock className="w-5 h-5" />
-                {t('receiver.dataRefresh', 'Refresh Data')}
+                Refresh Data
               </button>
             </div>
           </div>
@@ -419,7 +417,7 @@ export default function DamagesPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier
+//   Supplier
                   </label>
                   <p className="text-sm text-gray-900">{selectedDamage.supplierName}</p>
                 </div>
@@ -461,7 +459,7 @@ export default function DamagesPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
+//   Status
                   </label>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedDamage.status)}`}>
                     {getStatusIcon(selectedDamage.status)}
@@ -483,7 +481,7 @@ export default function DamagesPage() {
                 onClick={() => setShowDetailsModal(false)}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors"
               >
-                Close
+//   Close
               </button>
             </div>
           </div>

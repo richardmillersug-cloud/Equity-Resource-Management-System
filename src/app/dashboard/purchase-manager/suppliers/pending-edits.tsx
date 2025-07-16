@@ -1,25 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Eye, 
-  User, 
-  Calendar, 
-  Building2, 
-  Phone, 
-  Mail, 
-  MapPin,
-  Edit,
-  AlertTriangle,
-  FileText,
-  ArrowRight,
-  Zap,
-  Filter,
-  Search
-} from 'lucide-react';
+
+import React from 'react';
+// import {
+//   Clock,
+//   CheckCircle,
+//   XCircle,
+//   Eye,
+//   User,
+//   Calendar,
+//   Building2,
+//   Phone,
+//   Mail,
+//   MapPin,
+//   Edit,
+//   AlertTriangle,
+//   FileText,
+//   ArrowRight,
+//   Zap,
+//   Filter,
+//   Search,
+// } from 'lucide-react';
 import { enhancedSupplierService, EnhancedSupplier, PendingEdit } from '../../../../lib/firebase/enhanced-supplier';
 import { authService } from '../../../../lib/firebase/auth';
 
@@ -133,7 +134,7 @@ export default function PendingEditsManagement() {
     setShowModal(true);
   };
 
-  const getChangesSummary = (changes: any) => {
+  const getChangesSummary = (changes: unknown) => {
     const changeCount = Object.keys(changes).length;
     const fields = Object.keys(changes);
     
@@ -159,7 +160,7 @@ export default function PendingEditsManagement() {
     return fieldNames[field] || field;
   };
 
-  const renderFieldChange = (field: string, oldValue: any, newValue: any) => {
+  const renderFieldChange = (field: string, oldValue: unknown, newValue: unknown) => {
     if (field === 'phoneNumbers' && Array.isArray(newValue)) {
       return (
         <div className="space-y-2">
@@ -382,7 +383,7 @@ export default function PendingEditsManagement() {
                     </div>
                     {isUrgent && (
                       <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
-                        Urgent
+//   Urgent
                       </span>
                     )}
                   </div>
@@ -412,7 +413,7 @@ export default function PendingEditsManagement() {
                     </span>
                     <button className="text-orange-600 hover:text-orange-700 text-sm font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
                       <Eye className="w-4 h-4" />
-                      Review
+//   Review
                     </button>
                   </div>
                 </div>
@@ -485,7 +486,7 @@ export default function PendingEditsManagement() {
                   onClick={() => setShowModal(false)}
                   className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium transition-colors"
                 >
-                  Cancel
+//   Cancel
                 </button>
                 <button
                   onClick={() => {
@@ -496,7 +497,7 @@ export default function PendingEditsManagement() {
                   className="px-6 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
-                  Reject
+//   Reject
                 </button>
                 <button
                   onClick={() => handleApproveEdit(selectedEdit)}
@@ -504,7 +505,7 @@ export default function PendingEditsManagement() {
                   className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Approve
+//   Approve
                 </button>
               </div>
             </div>

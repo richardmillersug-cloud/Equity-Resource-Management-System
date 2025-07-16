@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  Search, 
-  Filter, 
-  Download, 
+
+import React, { useState, useEffect } from 'react';
+import {
+  CheckCircle,
+  Search,
+  Filter,
+  Download,
   Eye,
   CreditCard,
   Banknote,
   Building2,
   Smartphone,
   Receipt,
-  X
+  X,
 } from 'lucide-react';
 import { subscribeToInvoicePayments, InvoicePayment, getInvoicePaymentHistory, PurchasingManagerService } from '@/lib/firebase/purchasing-manager-service';
 import { authService } from '@/lib/firebase/auth';
@@ -267,7 +268,23 @@ export default function PaymentsPage() {
         </div>
 
         {/* Enhanced Stats Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Payments</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{totalPayments}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All transactions</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Receipt className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
@@ -438,13 +455,13 @@ export default function PaymentsPage() {
                   Amount & Method
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Installment
+//   Installment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+//   Actions
                     </th>
                   </tr>
                 </thead>
@@ -492,12 +509,12 @@ export default function PaymentsPage() {
                           )}
                           {payment.paymentStatus === 'completed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Cleared
+//   Cleared
                             </span>
                           )}
                           {payment.paymentStatus === 'failed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              Bounced
+//   Bounced
                             </span>
                           )}
                         </div>
@@ -524,7 +541,7 @@ export default function PaymentsPage() {
                         className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
                       >
                         <Eye className="w-4 h-4" />
-                        View
+//   View
                       </button>
                       
                       {/* Cheque Actions */}
@@ -536,7 +553,7 @@ export default function PaymentsPage() {
                             disabled={loading}
                           >
                             <CheckCircle className="w-3 h-3" />
-                            Clear
+//   Clear
                           </button>
                           <button 
                             onClick={() => {
@@ -546,7 +563,7 @@ export default function PaymentsPage() {
                             disabled={loading}
                           >
                             <X className="w-3 h-3" />
-                            Bounce
+//   Bounce
                           </button>
                         </div>
                       )}
@@ -630,12 +647,12 @@ export default function PaymentsPage() {
                     <div className="mt-1">
                       {selectedPayment.paymentStatus === 'pending' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Pending
+//   Pending
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'completed' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Completed
+//   Completed
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'failed' && (

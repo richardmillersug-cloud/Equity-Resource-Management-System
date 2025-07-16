@@ -1,14 +1,14 @@
 import { auth, db } from './config';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  deleteDoc, 
-  doc, 
-  writeBatch,
-  getDoc
-} from 'firebase/firestore';
+// import {
+//   collection,
+//   query,
+//   where,
+//   getDocs,
+//   deleteDoc,
+//   doc,
+//   writeBatch,
+//   getDoc,
+// } from 'firebase/firestore';
 import { deleteUser, signInWithEmailAndPassword } from 'firebase/auth';
 
 export class PurchasingManagerCleanup {
@@ -58,7 +58,7 @@ export class PurchasingManagerCleanup {
         const roles = data.roles || [];
         
         // Check if user has purchasing manager role
-        const hasPurchasingRole = roles.some((role: any) => 
+        const hasPurchasingRole = roles.some((role: unknown) => 
           role.jobTitle === 'Purchasing Manager' || 
           role.jobTitle === 'Purchase Manager'
         );
@@ -237,7 +237,7 @@ export class PurchasingManagerCleanup {
         console.log('✅ Employee document created in Firestore');
         console.log(`   - Name: ${data.firstName} ${data.lastName}`);
         console.log(`   - Email: ${data.email}`);
-        console.log(`   - Roles: ${JSON.stringify(data.roles.map((r: any) => r.jobTitle))}`);
+        console.log(`   - Roles: ${JSON.stringify(data.roles.map((r: unknown) => r.jobTitle))}`);
       } else {
         console.log('❌ Employee document NOT found in Firestore');
       }

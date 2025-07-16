@@ -378,166 +378,6 @@ export interface AuditLog {
   userAgent?: string;
 }
 
-// ==================== PERFORMANCE MANAGEMENT ====================
-
-export interface PerformanceTarget {
-  id: string;
-  employeeId: string; // Reference to Employee
-  targetName: string;
-  description: string;
-  targetType: TargetType;
-  targetValue: number;
-  unit: string; // e.g., 'scans', 'hours', 'percentage', 'items'
-  targetPeriod: TargetPeriod;
-  startDate: Timestamp;
-  endDate: Timestamp;
-  weightPercentage: number; // How much this target contributes to overall rating (0-100)
-  isMandatory: boolean;
-  createdByEmployeeId: string; // Reference to Employee
-  status: TargetStatus;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-export type TargetType = 
-  | 'ATTENDANCE_RATE' // Percentage of days present
-  | 'PUNCTUALITY_SCORE' // On-time check-ins percentage
-  | 'SCAN_TARGET' // Daily/weekly scan targets
-  | 'HOURS_WORKED' // Total hours or average daily hours
-  | 'SALES_TARGET' // For customer service/cashier roles
-  | 'CUSTOMER_SERVICE_RATING' // Customer satisfaction
-  | 'EFFICIENCY_SCORE' // Task completion rate
-  | 'LEARNING_DEVELOPMENT' // Training completion
-  | 'TEAMWORK_COLLABORATION' // Team projects/collaboration
-  | 'INNOVATION_IMPROVEMENT' // Process improvements suggested
-  | 'QUALITY_SCORE' // Work quality metrics
-  | 'SAFETY_COMPLIANCE' // Safety protocol adherence
-  | 'OVERTIME_MANAGEMENT' // Overtime efficiency
-  | 'LEAVE_MANAGEMENT' // Appropriate leave usage
-  | 'CUSTOM'; // Custom targets defined by managers
-
-export type TargetPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
-
-export type TargetStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'OVERDUE';
-
-export interface PerformanceEvaluation {
-  id: string;
-  employeeId: string; // Reference to Employee
-  evaluatorEmployeeId: string; // Reference to Employee
-  evaluationPeriodStart: Timestamp;
-  evaluationPeriodEnd: Timestamp;
-  overallRating: PerformanceRating;
-  overallScore: number; // Calculated weighted average (0-100)
-  targetAchievements: TargetAchievement[];
-  strengths: string[];
-  areasForImprovement: string[];
-  developmentGoals: string[];
-  managerComments: string;
-  employeeComments?: string;
-  hrComments?: string;
-  status: EvaluationStatus;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  reviewedByEmployeeDate?: Timestamp;
-  reviewedByHrDate?: Timestamp;
-  finalApprovalDate?: Timestamp;
-}
-
-export interface TargetAchievement {
-  targetId: string;
-  targetName: string;
-  targetValue: number;
-  achievedValue: number;
-  achievementPercentage: number; // (achieved/target) * 100
-  rating: PerformanceRating;
-  notes?: string;
-}
-
-export type PerformanceRating = 
-  | 'OUTSTANDING' // 90-100%
-  | 'EXCEEDS_EXPECTATIONS' // 80-89%
-  | 'MEETS_EXPECTATIONS' // 70-79%
-  | 'BELOW_EXPECTATIONS' // 60-69%
-  | 'UNSATISFACTORY'; // Below 60%
-
-export type EvaluationStatus = 
-  | 'DRAFT'
-  | 'PENDING_EMPLOYEE_REVIEW'
-  | 'PENDING_HR_REVIEW'
-  | 'APPROVED'
-  | 'REJECTED';
-
-export interface PerformanceMetrics {
-  id: string;
-  employeeId: string; // Reference to Employee
-  metricDate: Timestamp;
-  targetId?: string; // Reference to specific target if applicable
-  metricType: TargetType;
-  value: number;
-  notes?: string;
-  recordedByEmployeeId: string; // Reference to Employee
-  isAutoRecorded: boolean; // Whether this was automatically recorded by system
-  createdAt: Timestamp;
-}
-
-export interface PerformanceDevelopmentPlan {
-  id: string;
-  employeeId: string; // Reference to Employee
-  evaluationId: string; // Reference to the evaluation that created this plan
-  goalTitle: string;
-  goalDescription: string;
-  targetCompletionDate: Timestamp;
-  assignedByEmployeeId: string; // Reference to Employee
-  priority: DevelopmentPriority;
-  status: DevelopmentStatus;
-  progressNotes: DevelopmentProgressNote[];
-  resourcesRequired: string[];
-  successCriteria: string[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  completedAt?: Timestamp;
-}
-
-export interface DevelopmentProgressNote {
-  date: Timestamp;
-  note: string;
-  addedByEmployeeId: string; // Reference to Employee
-  progressPercentage: number; // 0-100
-}
-
-export type DevelopmentPriority = 'HIGH' | 'MEDIUM' | 'LOW';
-
-export type DevelopmentStatus = 
-  | 'NOT_STARTED'
-  | 'IN_PROGRESS'
-  | 'COMPLETED'
-  | 'CANCELLED'
-  | 'OVERDUE';
-
-export interface PerformanceReport {
-  id: string;
-  reportName: string;
-  reportType: ReportType;
-  generatedByEmployeeId: string; // Reference to Employee
-  generationDate: Timestamp;
-  periodStart: Timestamp;
-  periodEnd: Timestamp;
-  includedEmployees: string[]; // Employee IDs
-  includedBranches: string[]; // Branch IDs
-  reportData: any; // JSON object containing the report data
-  fileUrl?: string; // URL to generated PDF/Excel file
-  createdAt: Timestamp;
-}
-
-export type ReportType = 
-  | 'INDIVIDUAL_PERFORMANCE'
-  | 'TEAM_PERFORMANCE'
-  | 'BRANCH_PERFORMANCE'
-  | 'DEPARTMENTAL_ANALYSIS'
-  | 'TARGET_ACHIEVEMENT_SUMMARY'
-  | 'DEVELOPMENT_PROGRESS'
-  | 'PERFORMANCE_TRENDS';
-
 // ==================== FIRESTORE COLLECTION NAMES ====================
 
 export const COLLECTIONS = {
@@ -559,13 +399,7 @@ export const COLLECTIONS = {
   BARCODES: 'barcodes',
   LEAVE_REQUESTS: 'leaveRequests',
   PAYROLL: 'payroll',
-  AUDIT_LOGS: 'auditLogs',
-  // Performance Management Collections
-  PERFORMANCE_TARGETS: 'performanceTargets',
-  PERFORMANCE_EVALUATIONS: 'performanceEvaluations',
-  PERFORMANCE_METRICS: 'performanceMetrics',
-  PERFORMANCE_DEVELOPMENT_PLANS: 'performanceDevelopmentPlans',
-  PERFORMANCE_REPORTS: 'performanceReports'
+  AUDIT_LOGS: 'auditLogs'
 } as const;
 
 // ==================== FIRESTORE SUBCOLLECTIONS ====================
@@ -575,10 +409,6 @@ export const SUBCOLLECTIONS = {
   EMPLOYEE_ATTENDANCE: 'attendance', // employees/{employeeId}/attendance
   EMPLOYEE_PAYROLL: 'payroll', // employees/{employeeId}/payroll
   EMPLOYEE_LEAVES: 'leaves', // employees/{employeeId}/leaves
-  EMPLOYEE_PERFORMANCE_TARGETS: 'performanceTargets', // employees/{employeeId}/performanceTargets
-  EMPLOYEE_PERFORMANCE_EVALUATIONS: 'performanceEvaluations', // employees/{employeeId}/performanceEvaluations
-  EMPLOYEE_PERFORMANCE_METRICS: 'performanceMetrics', // employees/{employeeId}/performanceMetrics
-  EMPLOYEE_DEVELOPMENT_PLANS: 'developmentPlans', // employees/{employeeId}/developmentPlans
   SUPPLIER_INVOICES: 'invoices', // suppliers/{supplierId}/invoices
   SUPPLIER_PAYMENTS: 'payments', // suppliers/{supplierId}/payments
   INVOICE_PAYMENTS: 'payments', // invoices/{invoiceId}/payments
@@ -598,7 +428,7 @@ export interface FirestoreDocument {
 
 export interface PaginationOptions {
   limit?: number;
-  startAfter?: any;
+  startAfter?: unknown;
   orderBy?: string;
   orderDirection?: 'asc' | 'desc';
 }
@@ -606,7 +436,7 @@ export interface PaginationOptions {
 export interface QueryFilters {
   field: string;
   operator: '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in' | 'not-in' | 'array-contains' | 'array-contains-any';
-  value: any;
+  value: unknown;
 }
 
 // ==================== BUSINESS RULE TYPES ====================
@@ -619,7 +449,7 @@ export interface ValidationResult {
 
 export interface BusinessRuleContext {
   currentUser: Employee;
-  targetDocument: any;
+  targetDocument: unknown;
   operation: 'create' | 'update' | 'delete';
   timestamp: Timestamp;
 } 

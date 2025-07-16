@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { BarcodeService, CodeType, BarcodeFormat } from '../../../../lib/services/barcode-service';
 import { enhancedBarcodeService, BarcodeItem, BarcodeStats } from '../../../../lib/firebase/enhanced-barcode';
-import BarcodeService, { CodeType, BarcodeFormat } from '../../../../lib/services/barcode-service';
 import { authService } from '../../../../lib/firebase/auth';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
 import { hrService } from '../../../../lib/services/hr-service';
@@ -27,6 +27,7 @@ export default function BarcodePage() {
     paperHeight: 25.4
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadMode, setLoadMode] = useState<'recent' | 'all'>('recent');
 
   // Add Item Form State
   const [newItem, setNewItem] = useState({
@@ -56,8 +57,8 @@ export default function BarcodePage() {
     setCurrentUser(user);
     loadStats();
     loadSuppliers();
-    loadBarcodeItems();
-  }, []);
+    loadBarcodeItems(loadMode);
+  }, [loadMode]);
 
   const loadStats = async () => {
     try {
@@ -82,9 +83,16 @@ export default function BarcodePage() {
     }
   };
 
-  const loadBarcodeItems = async () => {
+  const loadBarcodeItems = async (mode: 'recent' | 'all' = 'recent') => {
     try {
-      const items = await enhancedBarcodeService.getRecentItems(30); // Get items from last 30 days
+      console.log(`🔄 Loading barcode items (${mode} mode)...`);
+      
+      // Choose loading method based on mode
+      const items = mode === 'all' 
+        ? await enhancedBarcodeService.getAll()
+        : await enhancedBarcodeService.getRecentItems(30); // Get items from last 30 days
+      
+      console.log(`📦 Loaded ${items.length} items from barcodeItems collection`);
       
       // Check for items without barcode images and regenerate them
       const itemsWithImages = await Promise.all(
@@ -115,15 +123,17 @@ export default function BarcodePage() {
       );
       
       setBarcodeItems(itemsWithImages);
+      console.log(`✅ Successfully loaded and processed ${itemsWithImages.length} barcode items`);
     } catch (error) {
-      console.error('Error loading barcode items:', error);
+      console.error('❌ Error loading barcode items:', error);
+      alert('Failed to load barcode items. Please check console for details.');
     }
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([loadStats(), loadSuppliers(), loadBarcodeItems()]);
+      await Promise.all([loadStats(), loadSuppliers(), loadBarcodeItems(loadMode)]);
     } catch (error) {
       console.error('Error refreshing data:', error);
       alert('Failed to refresh data. Please try again.');
@@ -392,9 +402,9 @@ export default function BarcodePage() {
       );
 
       // Record scan for shift tracking
-      if (currentUser?.employee?.id) {
+      if (currentUser?.employee?.employeeId) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
           console.log('Barcode print scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);
@@ -402,7 +412,7 @@ export default function BarcodePage() {
       }
 
       // Refresh items to update print history
-      loadBarcodeItems();
+      loadBarcodeItems(loadMode);
       
     } catch (error) {
       console.error('Error printing item:', error);
@@ -437,9 +447,9 @@ export default function BarcodePage() {
       await enhancedBarcodeService.addBarcodeItem(itemToAdd);
       
       // Record scan for shift tracking
-      if (currentUser?.employee?.id) {
+      if (currentUser?.employee?.employeeId) {
         try {
-          const scanResult = hrService.recordShiftScan(currentUser.employee.id);
+          const scanResult = hrService.recordShiftScan(currentUser.employee.employeeId);
           console.log('Barcode creation scan recorded:', scanResult);
         } catch (scanError) {
           console.log('Scan tracking not active for this user:', scanError);
@@ -447,7 +457,7 @@ export default function BarcodePage() {
       }
       
       alert('Barcode item added successfully!');
-      loadBarcodeItems();
+      loadBarcodeItems(loadMode);
       
       // Reset form and close modal
       setNewItem({
@@ -477,6 +487,55 @@ export default function BarcodePage() {
       alert('Failed to add barcode item. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateSampleData = async () => {
+    if (!window.confirm('Are you sure you want to seed sample data? This will add 3 sample barcode items to your database.')) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      // Use the built-in createSampleBarcodeItems method
+      const createdIds = await enhancedBarcodeService.createSampleBarcodeItems();
+      console.log('Created sample barcode items with IDs:', createdIds);
+      alert(`Sample data seeded successfully! Created ${createdIds.length} items.`);
+      await Promise.all([loadBarcodeItems(loadMode), loadStats(), loadSuppliers()]);
+    } catch (error) {
+      console.error('Error seeding sample data:', error);
+      alert('Failed to seed sample data. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleShowDatabaseContents = async () => {
+    try {
+      const allItems = await enhancedBarcodeService.getAll();
+      const stats = await enhancedBarcodeService.getBarcodeStats();
+      
+      console.group('🏷️ Barcode Database Contents');
+      console.log('📊 Statistics:', stats);
+      console.log('📝 Total Items in DB:', allItems.length);
+      
+      if (allItems.length > 0) {
+        console.log('🔍 Sample Items (first 5):');
+        allItems.slice(0, 5).forEach((item, index) => {
+          console.log(`${index + 1}. ${item.itemName} (${item.codeType}) - ${item.codeValue}`);
+        });
+        
+        if (allItems.length > 5) {
+          console.log(`... and ${allItems.length - 5} more items`);
+        }
+      } else {
+        console.log('❌ No barcode items found in database');
+      }
+      console.groupEnd();
+      
+      alert(`Database contains ${allItems.length} barcode items. Check console for details.`);
+    } catch (error) {
+      console.error('❌ Error fetching database contents:', error);
+      alert('Failed to fetch database contents. Check console for details.');
     }
   };
 
@@ -568,6 +627,66 @@ export default function BarcodePage() {
           )}
         </div>
 
+        {/* Stats and Actions Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{stats?.total || 0}</div>
+                <div className="text-sm text-gray-500">Total Items</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{stats?.active || 0}</div>
+                <div className="text-sm text-gray-500">Active</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{stats?.barcodes || 0}</div>
+                <div className="text-sm text-gray-500">Barcodes</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{stats?.qrcodes || 0}</div>
+                <div className="text-sm text-gray-500">QR Codes</div>
+              </div>
+            </div>
+            
+                         {/* Action Buttons */}
+             <div className="flex space-x-3 ml-6">
+               <button
+                 onClick={() => {
+                   const newMode = loadMode === 'recent' ? 'all' : 'recent';
+                   setLoadMode(newMode);
+                 }}
+                 className={`px-4 py-2 rounded-lg transition-colors flex items-center ${
+                   loadMode === 'all' 
+                     ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                     : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                 }`}
+               >
+                 <Activity className="w-4 h-4 mr-2" />
+                 {loadMode === 'recent' ? 'Show All' : 'Recent Only'}
+               </button>
+
+               {barcodeItems.length === 0 && (
+                 <button
+                   onClick={handleCreateSampleData}
+                   disabled={isSubmitting}
+                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   <Package className="w-4 h-4 mr-2" />
+                   {isSubmitting ? 'Creating...' : 'Seed Sample Data'}
+                 </button>
+               )}
+               <button
+                 onClick={() => setShowAddModal(true)}
+                 className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+               >
+                 <Plus className="w-4 h-4 mr-2" />
+                 Add Item
+               </button>
+             </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <div className="text-center">
             <QrCode className="w-16 h-16 text-purple-600 mx-auto mb-4" />
@@ -605,8 +724,10 @@ export default function BarcodePage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mt-8">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Barcode Items</h3>
-              <span className="text-sm text-gray-500">{barcodeItems.length} items</span>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {loadMode === 'recent' ? 'Recent Barcode Items (30 days)' : 'All Barcode Items'}
+              </h3>
+              <span className="text-sm text-gray-500">{barcodeItems.length} items loaded</span>
             </div>
           </div>
           
@@ -695,14 +816,14 @@ export default function BarcodePage() {
                         className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
                       >
                         <Printer className="w-4 h-4 mr-1" />
-                        Print
+//   Print
                       </button>
                       <button 
                         onClick={() => handleViewItem(item)}
                         className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
                       >
                         <Eye className="w-4 h-4 mr-1" />
-                        View
+//   View
                       </button>
                     </div>
                   </div>
@@ -801,7 +922,7 @@ export default function BarcodePage() {
                             onChange={(e) => setNewItem(prev => ({ ...prev, codeType: e.target.value as CodeType }))}
                             className="mr-2"
                           />
-                          Barcode
+//   Barcode
                         </label>
                         <label className="flex items-center">
                           <input
@@ -910,7 +1031,7 @@ export default function BarcodePage() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Notes
+//   Notes
                       </label>
                       <textarea
                         value={newItem.notes}
@@ -964,7 +1085,7 @@ export default function BarcodePage() {
                     onClick={() => setShowAddModal(false)}
                     className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
                   >
-                    Cancel
+//   Cancel
                   </button>
                   <button
                     onClick={handleAddItem}
@@ -1061,7 +1182,7 @@ export default function BarcodePage() {
                     onClick={() => setShowViewModal(false)}
                     className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
                   >
-                    Close
+//   Close
                   </button>
                   <button
                     onClick={() => {
@@ -1184,7 +1305,7 @@ export default function BarcodePage() {
                     onClick={() => setShowPrintModal(false)}
                     className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-4 rounded-lg transition-colors"
                   >
-                    Cancel
+//   Cancel
                   </button>
                   <button
                     onClick={async () => {
@@ -1194,7 +1315,7 @@ export default function BarcodePage() {
                     className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
                   >
                     <Printer className="w-4 h-4 mr-2" />
-                    Print
+//   Print
                   </button>
                 </div>
               </div>
