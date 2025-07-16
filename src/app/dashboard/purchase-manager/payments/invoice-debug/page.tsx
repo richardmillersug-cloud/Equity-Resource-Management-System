@@ -160,7 +160,7 @@ export default function InvoiceDebugPage() {
                       <div>✅ Has paidAt timestamp: {targetInvoice.paidAt.toLocaleString()}</div>
                     )}
                     {targetInvoice.paidAmount >= targetInvoice.amount && (
-                      <div>✅ Paid amount ({targetInvoice.paidAmount?.toLocaleString()}) {'>='} Total amount ({targetInvoice.amount?.toLocaleString()})</div>
+                      <div>✅ Paid amount ({targetInvoice.paidAmount?.toLocaleString()}) &gt;= Total amount ({targetInvoice.amount?.toLocaleString()})</div>
                     )}
                     {(!targetInvoice.paidAmount || targetInvoice.paidAmount < targetInvoice.amount) && (
                       <div className="text-orange-600">⚠️ Paid amount ({targetInvoice.paidAmount?.toLocaleString() || '0'}) is less than total amount ({targetInvoice.amount?.toLocaleString()})</div>
