@@ -13,7 +13,7 @@ import {
   Clock, 
   AlertTriangle,
   Download,
-  Print,
+  Printer,
   Edit,
   MessageSquare,
   Star,
@@ -40,7 +40,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
       overdue: 'bg-gradient-to-r from-red-400 to-red-600',
       rejected: 'bg-gradient-to-r from-gray-400 to-gray-600'
     };
-    return colors[status] || 'bg-gradient-to-r from-gray-400 to-gray-600';
+    return colors[status as keyof typeof colors] || 'bg-gradient-to-r from-gray-400 to-gray-600';
   };
 
   const getPriorityIcon = (priority: string) => {
@@ -96,7 +96,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                   <Download className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
-                  <Print className="w-5 h-5" />
+                                     <Printer className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
                   <Edit className="w-5 h-5" />
@@ -187,7 +187,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                     <div>
                       <p className="text-orange-600 text-sm font-medium">Days Left</p>
                       <p className="text-2xl font-bold text-orange-900">
-                        {Math.ceil((invoice.dueDate - new Date()) / (1000 * 60 * 60 * 24))}
+                        {Math.ceil((new Date(invoice.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
                       </p>
                     </div>
                   </div>

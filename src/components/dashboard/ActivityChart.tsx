@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card } from '../ui/Card';
+import { LegacyCard } from '../ui/Card';
 
 interface ActivityChartProps {
   data?: Array<{ day: string; amount: number }>;
@@ -52,7 +52,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({ data = mockData })
   };
   
   return (
-    <Card 
+    <LegacyCard 
       title="Activity" 
       subtitle="Your transaction activities"
       className="col-span-2"
@@ -152,6 +152,6 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({ data = mockData })
           <span>$0</span>
         </div>
       </div>
-    </Card>
+    </LegacyCard>
   );
 }; 

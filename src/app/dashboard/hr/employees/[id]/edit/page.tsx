@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
+import { toSafeDate } from '@/lib/utils';
 
 interface Employee {
   id: string;
@@ -111,9 +112,7 @@ export default function EmployeeEditPage() {
       
       // Convert employee data to form data
       const hireDate = foundEmployee.hireDate 
-        ? (foundEmployee.hireDate.seconds 
-            ? new Date(foundEmployee.hireDate.seconds * 1000).toISOString().split('T')[0]
-            : new Date(foundEmployee.hireDate).toISOString().split('T')[0])
+        ? toSafeDate(foundEmployee.hireDate).toISOString().split('T')[0]
         : '';
       
       setFormData({

@@ -158,7 +158,7 @@ export default function SuppliersPage() {
       supplierName: supplier.supplierName,
       address: supplier.address,
       emailAddress: supplier.emailAddress || '',
-      phoneNumbers: [...supplier.phoneNumbers],
+      phoneNumbers: [...(supplier.phoneNumbers || [])],
       routeDays: [...(supplier.routeDays || [])]
     });
   };
@@ -264,12 +264,12 @@ export default function SuppliersPage() {
 
       // Prepare CSV rows
       const csvRows = filteredSuppliers.map(supplier => {
-        const phoneNumbers = supplier.phoneNumbers.join('; ');
+        const phoneNumbers = (supplier.phoneNumbers || []).join('; ');
         const routeDays = supplier.routeDays ? supplier.routeDays.join(', ') : 'None';
-        const bankAccounts = supplier.bankAccounts.map(acc => 
+        const bankAccounts = (supplier.bankAccounts || []).map(acc => 
           `${acc.bankName} (${acc.accountNumber})`
         ).join('; ') || 'None';
-        const mobilePayments = supplier.mobilePayments.map(payment => 
+        const mobilePayments = (supplier.mobilePayments || []).map(payment => 
           `${payment.provider}: ${payment.merchantCode} (${payment.phoneNumber})`
         ).join('; ') || 'None';
         const pendingEdits = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
@@ -510,7 +510,7 @@ export default function SuppliersPage() {
                     </div>
                     
                     <div class="supplier-detail">
-                      <span class="detail-label">Phone:</span> ${supplier.phoneNumbers.join(', ')}
+                      <span class="detail-label">Phone:</span> ${(supplier.phoneNumbers || []).join(', ')}
                     </div>
                     
                     ${supplier.emailAddress ? `
@@ -763,7 +763,7 @@ export default function SuppliersPage() {
                 {supplier.phoneNumbers && supplier.phoneNumbers.length > 0 && (
                   <div className="flex items-center text-sm text-gray-600">
                     <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                    <span>{supplier.phoneNumbers[0]}</span>
+                    <span>{supplier.phoneNumbers?.[0] || 'No phone'}</span>
                     {supplier.phoneNumbers.length > 1 && (
                       <span className="ml-1 text-xs text-gray-400">+{supplier.phoneNumbers.length - 1} more</span>
                     )}
@@ -990,7 +990,7 @@ export default function SuppliersPage() {
                        </div>
                      ) : (
                        <div className="space-y-2">
-                         {selectedSupplier.phoneNumbers.map((phone, index) => (
+                         {(selectedSupplier.phoneNumbers || []).map((phone, index) => (
                            <div key={index} className="flex items-center text-gray-900">
                              <Phone className="w-4 h-4 mr-2 text-gray-400" />
                              {phone}

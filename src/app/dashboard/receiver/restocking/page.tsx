@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuthContext } from '../../../../contexts/AuthContext';
 import { EnhancedRestockingService } from '../../../../lib/firebase/enhanced-restocking';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
 import { Package, Plus, Search, RefreshCw, Calendar, CheckCircle, XCircle, AlertCircle, Clock, Edit, Trash2, Download, FileText, FileSpreadsheet, File, Filter, AlertTriangle } from 'lucide-react';
-import { authService } from '../../../../lib/firebase/auth';
+import { authService, AuthUser } from '../../../../lib/firebase/auth';
+import { Timestamp } from 'firebase/firestore';
 
 interface RestockingItem {
   id: string;
@@ -28,9 +28,23 @@ interface RestockingItem {
 
 interface RestockingStats {
   totalExpected: number;
-  totalReceived: number;
-  totalPending: number;
-  totalOverdue: number;
+  received: number;
+  pending: number;
+  partial: number;
+  overdue: number;
+  completionRate: number;
+}
+
+interface NewRestockingItem {
+  itemName: string;
+  itemDescription: string;
+  category: string;
+  supplierName: string;
+  expectedQuantity: number;
+  unit: string;
+  expectedDate: string;
+  priority: 'low' | 'medium' | 'high';
+  notes: string;
 }
 
 const enhancedRestockingService = new EnhancedRestockingService();
@@ -38,7 +52,7 @@ const supplierService = new EnhancedSupplierService();
 
 export default function RestockingPage() {
   // State variables
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [restockingItems, setRestockingItems] = useState<RestockingItem[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; }[]>([]);
   const [stats, setStats] = useState<RestockingStats | null>(null);
@@ -53,7 +67,7 @@ export default function RestockingPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RestockingItem | null>(null);
-  const [editItem, setEditItem] = useState<any>({
+  const [editItem, setEditItem] = useState<NewRestockingItem>({
     itemName: '',
     itemDescription: '',
     category: '',
@@ -66,7 +80,7 @@ export default function RestockingPage() {
   });
 
   // Add Item Form State
-  const [newItem, setNewItem] = useState({
+  const [newItem, setNewItem] = useState<NewRestockingItem>({
     itemName: '',
     itemDescription: '',
     category: '',
@@ -74,7 +88,7 @@ export default function RestockingPage() {
     expectedQuantity: 1,
     unit: 'pcs',
     expectedDate: new Date().toISOString().split('T')[0],
-    priority: 'medium' as 'low' | 'medium' | 'high',
+    priority: 'medium',
     notes: ''
   });
 
@@ -138,7 +152,7 @@ export default function RestockingPage() {
       // Generate the code value
       const itemToAdd = {
         ...newItem,
-        expectedDate: new Date(newItem.expectedDate),
+        expectedDate: Timestamp.fromDate(new Date(newItem.expectedDate)),
         receiverId: currentUser?.uid || '',
         status: 'pending' as const
       };
@@ -222,7 +236,7 @@ export default function RestockingPage() {
       
       const updates = {
         ...editItem,
-        expectedDate: new Date(editItem.expectedDate)
+        expectedDate: Timestamp.fromDate(new Date(editItem.expectedDate))
       };
 
       await enhancedRestockingService.updateRestockingItem(selectedItem.id, updates);
@@ -451,7 +465,7 @@ export default function RestockingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm font-medium mb-1">Received</p>
-                  <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{stats.totalReceived}</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{stats.received}</p>
                   <div className="flex items-center mt-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                     <span className="text-xs text-gray-500">Successfully received</span>
@@ -467,7 +481,7 @@ export default function RestockingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
-                  <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">{stats.totalPending}</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">{stats.pending}</p>
                   <div className="flex items-center mt-2">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
                     <span className="text-xs text-gray-500">Awaiting delivery</span>
@@ -483,7 +497,7 @@ export default function RestockingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-500 text-sm font-medium mb-1">Overdue</p>
-                  <p className="text-3xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">{stats.totalOverdue}</p>
+                  <p className="text-3xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">{stats.overdue}</p>
                   <div className="flex items-center mt-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
                     <span className="text-xs text-gray-500">Past due date</span>
@@ -984,7 +998,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
                 type="text"
                 required
                 value={newItem.itemName}
-                onChange={(e) => setNewItem(prev => ({ ...prev, itemName: e.target.value }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, itemName: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter item name"
               />
@@ -998,11 +1012,11 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
               <select
                 required
                 value={newItem.category}
-                onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, category: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select category</option>
-                {categories.map(category => (
+                {categories.map((category: string) => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
@@ -1018,7 +1032,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
                 required
                 min="1"
                 value={newItem.expectedQuantity}
-                onChange={(e) => setNewItem(prev => ({ ...prev, expectedQuantity: parseInt(e.target.value) || 1 }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, expectedQuantity: parseInt(e.target.value) || 1 }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter quantity"
               />
@@ -1031,10 +1045,10 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
               </label>
               <select
                 value={newItem.unit}
-                onChange={(e) => setNewItem(prev => ({ ...prev, unit: e.target.value }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, unit: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {units.map(unit => (
+                {units.map((unit: string) => (
                   <option key={unit} value={unit}>{unit}</option>
                 ))}
               </select>
@@ -1049,7 +1063,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
                 type="date"
                 required
                 value={newItem.expectedDate}
-                onChange={(e) => setNewItem(prev => ({ ...prev, expectedDate: e.target.value }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, expectedDate: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -1061,7 +1075,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
               </label>
               <select
                 value={newItem.priority}
-                onChange={(e) => setNewItem(prev => ({ ...prev, priority: e.target.value }))}
+                onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, priority: e.target.value as 'low' | 'medium' | 'high' }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="low">Low</option>
@@ -1078,11 +1092,11 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
             </label>
             <select
               value={newItem.supplierName}
-              onChange={(e) => setNewItem(prev => ({ ...prev, supplierName: e.target.value }))}
+                             onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, supplierName: e.target.value }))}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select supplier (optional)</option>
-              {suppliers.map(supplier => (
+              {suppliers.map((supplier: { id: string; name: string; }) => (
                 <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
               ))}
             </select>
@@ -1095,7 +1109,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
             </label>
             <textarea
               value={newItem.itemDescription}
-              onChange={(e) => setNewItem(prev => ({ ...prev, itemDescription: e.target.value }))}
+                             onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, itemDescription: e.target.value }))}
               rows={3}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter item description (optional)"
@@ -1109,7 +1123,7 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
             </label>
             <textarea
               value={newItem.notes}
-              onChange={(e) => setNewItem(prev => ({ ...prev, notes: e.target.value }))}
+                             onChange={(e) => setNewItem((prev: NewRestockingItem) => ({ ...prev, notes: e.target.value }))}
               rows={2}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter any additional notes (optional)"
@@ -1175,7 +1189,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
                 type="text"
                 required
                 value={editItem.itemName}
-                onChange={(e) => setEditItem(prev => ({ ...prev, itemName: e.target.value }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, itemName: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter item name"
               />
@@ -1189,11 +1203,11 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
               <select
                 required
                 value={editItem.category}
-                onChange={(e) => setEditItem(prev => ({ ...prev, category: e.target.value }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, category: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select category</option>
-                {categories.map(category => (
+                {categories.map((category: string) => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
@@ -1209,7 +1223,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
                 required
                 min="1"
                 value={editItem.expectedQuantity}
-                onChange={(e) => setEditItem(prev => ({ ...prev, expectedQuantity: parseInt(e.target.value) || 1 }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, expectedQuantity: parseInt(e.target.value) || 1 }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter quantity"
               />
@@ -1222,10 +1236,10 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
               </label>
               <select
                 value={editItem.unit}
-                onChange={(e) => setEditItem(prev => ({ ...prev, unit: e.target.value }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, unit: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {units.map(unit => (
+                {units.map((unit: string) => (
                   <option key={unit} value={unit}>{unit}</option>
                 ))}
               </select>
@@ -1240,7 +1254,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
                 type="date"
                 required
                 value={editItem.expectedDate}
-                onChange={(e) => setEditItem(prev => ({ ...prev, expectedDate: e.target.value }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, expectedDate: e.target.value }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -1252,7 +1266,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
               </label>
               <select
                 value={editItem.priority}
-                onChange={(e) => setEditItem(prev => ({ ...prev, priority: e.target.value }))}
+                onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, priority: e.target.value as 'low' | 'medium' | 'high' }))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="low">Low</option>
@@ -1269,11 +1283,11 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
             </label>
             <select
               value={editItem.supplierName}
-              onChange={(e) => setEditItem(prev => ({ ...prev, supplierName: e.target.value }))}
+                             onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, supplierName: e.target.value }))}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select supplier (optional)</option>
-              {suppliers.map(supplier => (
+                             {suppliers.map((supplier: { id: string; name: string; }) => (
                 <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
               ))}
             </select>
@@ -1286,7 +1300,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
             </label>
             <textarea
               value={editItem.itemDescription}
-              onChange={(e) => setEditItem(prev => ({ ...prev, itemDescription: e.target.value }))}
+                             onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, itemDescription: e.target.value }))}
               rows={3}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter item description (optional)"
@@ -1300,7 +1314,7 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
             </label>
             <textarea
               value={editItem.notes}
-              onChange={(e) => setEditItem(prev => ({ ...prev, notes: e.target.value }))}
+                             onChange={(e) => setEditItem((prev: NewRestockingItem) => ({ ...prev, notes: e.target.value }))}
               rows={2}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter any additional notes (optional)"

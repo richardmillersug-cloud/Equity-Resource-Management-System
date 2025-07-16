@@ -51,9 +51,11 @@ export interface Invoice {
   amount: number;
   paidAmount: number; // Total amount paid so far
   remainingAmount: number; // Amount still owed
+  date: Date; // Invoice date - alias for createdAt for compatibility
   dueDate: Date;
   status: 'pending' | 'approved' | 'paid' | 'partial' | 'rejected' | 'overdue';
   items: InvoiceItem[];
+  fdn?: string; // Fiscal Document Number for compatibility
   createdAt: Date;
   approvedAt?: Date;
   approvedBy?: string;
@@ -312,6 +314,7 @@ export class PurchasingManagerService {
         return {
           id: doc.id,
           ...data,
+          date: data.date?.toDate ? data.date.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt),
           dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : data.dueDate,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
           approvedAt: data.approvedAt?.toDate ? data.approvedAt.toDate() : data.approvedAt,

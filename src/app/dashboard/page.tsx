@@ -9,6 +9,7 @@ import { quickFixPermissions, testPermissions } from '../../lib/firebase/permiss
 import { cleanupPurchasingManagers, createNewPurchasingManager, getDatabaseStats } from '../../lib/firebase/cleanup-purchasing-managers';
 import { fixAllPermissions, quickPermissionFix, getUpdatedFirestoreRules } from '../../lib/firebase/permissions-final-fix';
 import '../../lib/firebase/test-purchasing-manager';
+import PagePermissionTester from '../../scripts/test-page-permissions';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [fixerLoaded, setFixerLoaded] = useState(false);
+  const [testCollection, setTestCollection] = useState<string>('');
 
   useEffect(() => {
     // Load the fixer utility
@@ -42,7 +44,9 @@ export default function DashboardPage() {
         getDatabaseStats: getDatabaseStats,
         fixAllPermissions: fixAllPermissions,
         quickPermissionFix: quickPermissionFix,
-        getUpdatedFirestoreRules: getUpdatedFirestoreRules
+        getUpdatedFirestoreRules: getUpdatedFirestoreRules,
+        testPagePermissions: PagePermissionTester.testAllPages,
+        testCollection: PagePermissionTester.testCollection
       };
       
       console.log('🔧 Debug commands available:');
@@ -57,6 +61,8 @@ export default function DashboardPage() {
       console.log('- debugUserData.fixAllPermissions() - FINAL FIX: Solve all permission issues permanently');
       console.log('- debugUserData.quickPermissionFix() - Quick emergency permission fix');
       console.log('- debugUserData.getUpdatedFirestoreRules() - Get updated Firestore rules');
+      console.log('- debugUserData.testPagePermissions() - Test all dashboard pages for permission errors');
+      console.log('- debugUserData.testCollection("collectionName") - Test specific Firebase collection');
     } catch (error) {
       console.error('Failed to load employee data fixer:', error);
     }
@@ -310,6 +316,55 @@ export default function DashboardPage() {
             >
               📊 Show Database Stats
             </button>
+            
+            <button
+              onClick={async () => {
+                try {
+                  console.log('🔍 Starting comprehensive page permission test...');
+                  await PagePermissionTester.testAllPages();
+                  alert('✅ Permission test completed! Check console for detailed results.');
+                } catch (error) {
+                  console.error('Permission test failed:', error);
+                  alert('❌ Permission test failed. Check console for details.');
+                }
+              }}
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+                         >
+               🔍 Test Page Permissions
+             </button>
+             
+             <div className="mt-4">
+               <label className="block text-sm font-medium text-gray-700 mb-2">Test Specific Collection:</label>
+               <div className="flex space-x-2">
+                 <input
+                   type="text"
+                   value={testCollection}
+                   onChange={(e) => setTestCollection(e.target.value)}
+                   placeholder="e.g. invoices, suppliers, employees"
+                   className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+                 />
+                 <button
+                   onClick={async () => {
+                     if (!testCollection.trim()) {
+                       alert('Please enter a collection name');
+                       return;
+                     }
+                     try {
+                       console.log(`🔍 Testing collection: ${testCollection}`);
+                       await PagePermissionTester.testCollection(testCollection.trim());
+                       alert(`✅ Collection test completed! Check console for results.`);
+                     } catch (error) {
+                       console.error('Collection test failed:', error);
+                       alert('❌ Collection test failed. Check console for details.');
+                     }
+                   }}
+                   className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                 >
+                   Test
+                 </button>
+               </div>
+               <p className="text-xs text-gray-500 mt-1">Common collections: invoices, suppliers, employees, cashAllocations, expenses</p>
+             </div>
           </div>
         </div>
 

@@ -18,6 +18,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { authService } from './auth';
+import { logger } from '../utils/logger';
+import { toSafeDate } from '../utils';
 import { 
   CashAllocation, 
   FundAcknowledgment, 
@@ -397,7 +399,7 @@ export class ReceiverQueries {
 
   private static calculateDaysUntilDue(dueDate: Timestamp): number {
     const now = new Date();
-    const due = dueDate.toDate();
+          const due = toSafeDate(dueDate);
     const diffTime = due.getTime() - now.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
@@ -435,7 +437,7 @@ export class ReceiverQueries {
       const todaysDeliveries = allDeliveries.filter((delivery: any) => {
         if (!delivery.scheduledDate) return false;
         
-        const deliveryDate = delivery.scheduledDate.toDate();
+        const deliveryDate = toSafeDate(delivery.scheduledDate);
         return deliveryDate >= today && deliveryDate < tomorrow;
       });
 
@@ -447,7 +449,8 @@ export class ReceiverQueries {
   static async getTodaysExpectedSuppliers() {
     const userId = getCurrentUserId();
     if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
-      throw new Error('Unauthorized access');
+      console.warn('Unauthorized access to getTodaysExpectedSuppliers, returning empty array');
+      return [];
     }
 
     try {
@@ -476,7 +479,7 @@ export class ReceiverQueries {
       // Sort by scheduled time on client-side to avoid complex index
       todaysDeliveries.sort((a, b) => {
         // First sort by date, then by time
-        const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
+        const dateCompare = toSafeDate(a.scheduledDate).getTime() - toSafeDate(b.scheduledDate).getTime();
         if (dateCompare !== 0) return dateCompare;
         
         // Then sort by time
@@ -563,8 +566,8 @@ export class ReceiverQueries {
       return suppliersWithDeliveries;
 
     } catch (error) {
-      console.error('Error fetching today\'s expected suppliers:', error);
-      throw error;
+      logger.error('Error fetching today\'s expected suppliers', error as Error, { userId });
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -572,7 +575,8 @@ export class ReceiverQueries {
   static async getTodaysRestockItems() {
     const userId = getCurrentUserId();
     if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
-      throw new Error('Unauthorized access');
+      console.warn('Unauthorized access to getTodaysRestockItems, returning empty array');
+      return [];
     }
 
     try {
@@ -680,8 +684,8 @@ export class ReceiverQueries {
       return itemsNeedingRestock;
 
     } catch (error) {
-      console.error('Error fetching restock items:', error);
-      throw error;
+      logger.error('Error fetching restock items', error as Error, { userId });
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -808,7 +812,9 @@ export class ReceiverQueries {
   static subscribeTodaysExpectedSuppliers(callback: (data: any[]) => void) {
     const userId = getCurrentUserId();
     if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
-      throw new Error('Unauthorized access');
+      console.warn('Unauthorized access to subscribeTodaysExpectedSuppliers, calling callback with empty array');
+      callback([]);
+      return () => {}; // Return empty unsubscribe function
     }
 
     // Get today's date range
@@ -927,11 +933,11 @@ export class ReceiverQueries {
         callback(suppliersWithDeliveries);
 
       } catch (error) {
-        console.error('Error in suppliers subscription:', error);
+        logger.error('Error in suppliers subscription', error as Error, { userId });
         callback([]); // Return empty array on error
       }
     }, (error) => {
-      console.error('Firestore subscription error:', error);
+      logger.error('Firestore subscription error', error as Error, { userId });
       callback([]); // Return empty array on subscription error
     });
   }

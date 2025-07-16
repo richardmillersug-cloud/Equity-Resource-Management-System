@@ -734,7 +734,7 @@ export default function PurchaseManagerDashboard() {
           padding: 20,
           font: {
             size: 12,
-            weight: '600'
+            weight: 600
           }
         }
       },
@@ -760,7 +760,7 @@ export default function PurchaseManagerDashboard() {
         },
         ticks: {
           font: {
-            weight: '500'
+            weight: 500
           }
         }
       },
@@ -1217,37 +1217,7 @@ export default function PurchaseManagerDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-purple-100 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-              <div>
-              <h1 className="text-2xl font-bold text-gray-900">Overview</h1>
-              <p className="text-purple-600 font-medium">{formatDate(currentTime)}</p>
-              </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-white rounded-full px-4 py-2 shadow-sm border border-purple-100">
-                <span className="text-sm text-gray-600">EN</span>
-                <ArrowDownRight className="w-4 h-4 text-gray-400" />
-            </div>
-              <button className="p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200">
-                <Bell className="w-5 h-5 text-gray-600" />
-              </button>
-              <button className="p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200">
-                <Settings className="w-5 h-5 text-gray-600" />
-              </button>
-              <div className="flex items-center space-x-3 bg-white rounded-full px-4 py-2 shadow-sm border border-purple-100">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">PM</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">Purchase Manager</p>
-                  <p className="text-xs text-gray-500">Admin & Finance</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+   
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Purchasing Analytics Cards */}
@@ -1344,7 +1314,7 @@ export default function PurchaseManagerDashboard() {
       </div>
 
             <div className="h-80">
-              <Line data={purchaseTrendsData} options={expenseChartOptions} />
+              <Line data={purchaseTrendsData} options={expenseChartOptions as any} />
             </div>
         </div>
 

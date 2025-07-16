@@ -127,9 +127,7 @@ export class OfflineReceiverQueries {
       updatedAt: Timestamp.now()
     };
 
-    if (reason) {
-      updateData.lastUpdateReason = reason;
-    }
+    // Reason tracking removed as property doesn't exist in interface
 
     await offlineManager.updateDocument('inventory', itemId, updateData);
   }
@@ -310,7 +308,7 @@ export class OfflineUtils {
 
   // Force sync when online
   static async forceSync(): Promise<void> {
-    return await offlineManager.forcSync();
+    return await offlineManager.forceSync();
   }
 
   // Subscribe to online/offline events

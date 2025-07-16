@@ -85,16 +85,26 @@ export default function SuppliersPage() {
       
       // Calculate this month's registrations
       const thisMonth = allSuppliers.filter(supplier => {
-        const registrationDate = supplier.dateOfRegistration.toDate();
-        const now = new Date();
-        return registrationDate.getMonth() === now.getMonth() && 
-               registrationDate.getFullYear() === now.getFullYear();
+        try {
+          if (!supplier.dateOfRegistration || typeof supplier.dateOfRegistration.toDate !== 'function') {
+            return false;
+          }
+          const registrationDate = supplier.dateOfRegistration.toDate();
+          const now = new Date();
+          return registrationDate.getMonth() === now.getMonth() && 
+                 registrationDate.getFullYear() === now.getFullYear();
+        } catch (error) {
+          console.warn('Invalid date format for supplier:', supplier.id, error);
+          return false;
+        }
       }).length;
       
       setStats({ ...supplierStats, thisMonth });
       
     } catch (error) {
       console.error('Error loading suppliers:', error);
+      setSuppliers([]); // Set empty array as fallback
+      setStats({ total: 0, active: 0, pending: 0, inactive: 0, thisMonth: 0 }); // Set default stats
       alert('Error loading suppliers. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -158,7 +168,7 @@ export default function SuppliersPage() {
       supplierName: supplier.supplierName,
       address: supplier.address,
       emailAddress: supplier.emailAddress || '',
-      phoneNumbers: [...supplier.phoneNumbers],
+      phoneNumbers: [...(supplier.phoneNumbers || [])],
       routeDays: [...(supplier.routeDays || [])]
     });
   };
@@ -280,12 +290,12 @@ export default function SuppliersPage() {
 
       // Prepare CSV rows
       const csvRows = filteredSuppliers.map(supplier => {
-        const phoneNumbers = supplier.phoneNumbers.join('; ');
-        const routeDays = supplier.routeDays ? supplier.routeDays.join(', ') : 'None';
-        const bankAccounts = supplier.bankAccounts.map(acc => 
+        const phoneNumbers = (supplier.phoneNumbers || []).join('; ');
+        const routeDays = supplier.routeDays && supplier.routeDays.length > 0 ? supplier.routeDays.join(', ') : 'None';
+        const bankAccounts = (supplier.bankAccounts || []).map(acc => 
           `${acc.bankName} (${acc.accountNumber})`
         ).join('; ') || 'None';
-        const mobilePayments = supplier.mobilePayments.map(payment => 
+        const mobilePayments = (supplier.mobilePayments || []).map(payment => 
           `${payment.provider}: ${payment.merchantCode} (${payment.phoneNumber})`
         ).join('; ') || 'None';
         const pendingEdits = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
@@ -293,7 +303,7 @@ export default function SuppliersPage() {
         return [
           supplier.supplierName,
           supplier.tinNumber,
-          supplier.dateOfRegistration.toDate().toLocaleDateString(),
+          supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A',
           supplier.address,
           phoneNumbers,
           supplier.emailAddress || 'N/A',
@@ -302,7 +312,7 @@ export default function SuppliersPage() {
           getEmployeeName(supplier.employeeId),
           bankAccounts,
           mobilePayments,
-          supplier.createdAt.toDate().toLocaleDateString(),
+          supplier.createdAt?.toDate ? supplier.createdAt.toDate().toLocaleDateString() : 'N/A',
           pendingEdits > 0 ? `${pendingEdits} pending` : 'None'
         ];
       });
@@ -526,7 +536,7 @@ export default function SuppliersPage() {
                     </div>
                     
                     <div class="supplier-detail">
-                      <span class="detail-label">Phone:</span> ${supplier.phoneNumbers.join(', ')}
+                      <span class="detail-label">Phone:</span> ${(supplier.phoneNumbers || []).join(', ')}
                     </div>
                     
                     ${supplier.emailAddress ? `
@@ -536,7 +546,7 @@ export default function SuppliersPage() {
                     ` : ''}
                     
                     <div class="supplier-detail">
-                      <span class="detail-label">Registration:</span> ${supplier.dateOfRegistration.toDate().toLocaleDateString()}
+                      <span class="detail-label">Registration:</span> ${supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
                     </div>
                     
                     <div class="supplier-detail">
@@ -841,16 +851,16 @@ export default function SuppliersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        {supplier.phoneNumbers.slice(0, 2).map((phone, index) => (
+                        {(supplier.phoneNumbers || []).slice(0, 2).map((phone, index) => (
                           <div key={index} className="flex items-center text-sm text-gray-600">
                             <Phone className="w-3 h-3 mr-1" />
                             {phone}
                     </div>
                         ))}
-                        {supplier.phoneNumbers.length > 2 && (
-                          <div className="text-xs text-gray-400">
-                            +{supplier.phoneNumbers.length - 2} more
-                  </div>
+                        {(supplier.phoneNumbers || []).length > 2 && (
+                                                      <div className="text-xs text-gray-400">
+                              +{(supplier.phoneNumbers || []).length - 2} more
+                            </div>
                         )}
                         {supplier.emailAddress && (
                           <div className="flex items-center text-sm text-gray-600">
@@ -863,11 +873,11 @@ export default function SuppliersPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center text-sm text-gray-600">
                         <Calendar className="w-3 h-3 mr-1" />
-                        {supplier.dateOfRegistration.toDate().toLocaleDateString()}
+                        {supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
                   </div>
                     </td>
                     <td className="px-6 py-4">
-                      {supplier.routeDays && supplier.routeDays.length > 0 ? (
+                      {supplier.routeDays && Array.isArray(supplier.routeDays) && supplier.routeDays.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {supplier.routeDays.map((day, index) => (
                             <span key={day} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
@@ -1003,7 +1013,7 @@ export default function SuppliersPage() {
                       <label className="text-sm font-medium text-gray-500">Registration Date</label>
                       <p className="text-gray-900 flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
-                        {selectedSupplier.dateOfRegistration.toDate().toLocaleDateString()}
+                        {selectedSupplier.dateOfRegistration?.toDate ? selectedSupplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
                       </p>
                       </div>
                     <div>
@@ -1121,7 +1131,7 @@ export default function SuppliersPage() {
                        </div>
                      ) : (
                        <div className="space-y-2">
-                         {selectedSupplier.phoneNumbers.map((phone, index) => (
+                                                   {(selectedSupplier.phoneNumbers || []).map((phone, index) => (
                            <div key={index} className="flex items-center text-gray-900">
                              <Phone className="w-4 h-4 mr-2 text-gray-400" />
                              {phone}
@@ -1214,11 +1224,11 @@ export default function SuppliersPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                   <div>
                     <label className="text-gray-500">Created At</label>
-                    <p className="text-gray-900">{selectedSupplier.createdAt.toDate().toLocaleString()}</p>
+                    <p className="text-gray-900">{selectedSupplier.createdAt?.toDate ? selectedSupplier.createdAt.toDate().toLocaleString() : 'N/A'}</p>
                   </div>
                   <div>
                     <label className="text-gray-500">Last Updated</label>
-                    <p className="text-gray-900">{selectedSupplier.updatedAt.toDate().toLocaleString()}</p>
+                    <p className="text-gray-900">{selectedSupplier.updatedAt?.toDate ? selectedSupplier.updatedAt.toDate().toLocaleString() : 'N/A'}</p>
                   </div>
                 </div>
               </div>
