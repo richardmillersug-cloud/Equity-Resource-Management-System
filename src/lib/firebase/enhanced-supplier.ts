@@ -36,9 +36,9 @@ export interface EnhancedSupplier {
   dateOfRegistration: Timestamp;
   address: string;
   emailAddress?: string;
-  phoneNumbers: string[];
-  bankAccounts: BankAccount[];
-  mobilePayments: MobilePayment[];
+  phoneNumbers?: string[]; // Make optional to handle undefined data
+  bankAccounts?: BankAccount[]; // Make optional to handle undefined data
+  mobilePayments?: MobilePayment[]; // Make optional to handle undefined data
   employeeId: string; // Reference to Employee (managing employee)
   status: 'Active' | 'Inactive' | 'Pending';
   routeDays?: string[]; // Optional - Expected delivery days (e.g., ["Monday", "Thursday"])
@@ -86,9 +86,9 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
       dateOfRegistration: Timestamp.fromDate(data.dateOfRegistration),
       address: data.address,
       emailAddress: data.emailAddress || '',
-      phoneNumbers: data.phoneNumbers.filter(phone => phone.trim() !== ''),
-      bankAccounts: bankAccountsWithIds,
-      mobilePayments: mobilePaymentsWithIds,
+      phoneNumbers: data.phoneNumbers?.filter(phone => phone.trim() !== '') || [],
+      bankAccounts: bankAccountsWithIds || [],
+      mobilePayments: mobilePaymentsWithIds || [],
       employeeId: data.employeeId,
       status: 'Active' as const,
       routeDays: data.routeDays && data.routeDays.length > 0 ? data.routeDays : undefined
@@ -136,7 +136,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     return allSuppliers.filter(supplier => 
       supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       supplier.tinNumber.includes(searchTerm) ||
-      supplier.phoneNumbers.some(phone => phone.includes(searchTerm))
+      supplier.phoneNumbers?.some(phone => phone.includes(searchTerm))
     );
   }
 
@@ -168,7 +168,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     };
 
     await this.update(supplierId, {
-      bankAccounts: [...supplier.bankAccounts, newBankAccount]
+      bankAccounts: [...(supplier.bankAccounts || []), newBankAccount]
     });
   }
 
@@ -183,7 +183,7 @@ export class EnhancedSupplierService extends FirestoreService<EnhancedSupplier> 
     };
 
     await this.update(supplierId, {
-      mobilePayments: [...supplier.mobilePayments, newMobilePayment]
+      mobilePayments: [...(supplier.mobilePayments || []), newMobilePayment]
     });
   }
 

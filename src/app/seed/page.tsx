@@ -16,7 +16,7 @@ export default function SeedPage() {
     try {
       const data = await seedInitialData();
       setResult(`Successfully seeded ${data.branches.length} branches`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.message || 'Failed to seed data');
     } finally {
       setIsSeeding(false);

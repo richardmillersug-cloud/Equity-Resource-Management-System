@@ -160,7 +160,7 @@ export const getPlaceholderData = (dataType: 'cashAllocations' | 'expenses' | 's
 };
 
 // Helper function to merge real data with placeholders
-export const mergeWithPlaceholders = (realData: any[], placeholderData: any[]) => {
+export const mergeWithPlaceholders = (realData: Record<string, unknown>[], placeholderData: Record<string, unknown>[]) => {
   if (realData && realData.length > 0) {
     return realData;
   }

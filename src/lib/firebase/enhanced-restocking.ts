@@ -192,20 +192,50 @@ export class EnhancedRestockingService {
 
   // Delete restocking item
   async deleteRestockingItem(itemId: string): Promise<void> {
-    await this.delete(itemId);
+    try {
+      const itemRef = doc(db, this.collectionName, itemId);
+      await updateDoc(itemRef, {
+        status: 'deleted' as any,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error deleting restocking item:', error);
+      throw error;
+    }
   }
 
   // Update restocking item
   async updateRestockingItem(itemId: string, updates: Partial<RestockingItem>): Promise<void> {
-    await this.update(itemId, {
-      ...updates,
-      updatedAt: new Date()
-    });
+    try {
+      const itemRef = doc(db, this.collectionName, itemId);
+      await updateDoc(itemRef, {
+        ...updates,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error updating restocking item:', error);
+      throw error;
+    }
   }
 
   // Get restocking item by ID
   async getRestockingItemById(itemId: string): Promise<RestockingItem | null> {
-    return await this.getById(itemId);
+    try {
+      const itemRef = doc(db, this.collectionName, itemId);
+      const itemDoc = await getDoc(itemRef);
+      
+      if (!itemDoc.exists()) {
+        return null;
+      }
+      
+      return {
+        id: itemDoc.id,
+        ...itemDoc.data()
+      } as RestockingItem;
+    } catch (error) {
+      console.error('Error getting restocking item by ID:', error);
+      throw error;
+    }
   }
 }
 

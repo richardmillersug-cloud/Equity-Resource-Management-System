@@ -7,7 +7,7 @@ import {
   updateProfile,
   sendPasswordResetEmail,
   sendEmailVerification,
-  UserCredential
+  UserCredential,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './config';
@@ -172,7 +172,7 @@ class FirebaseAuthService {
       );
 
       return { user: authUser, employee: employeeWithId as Employee };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       throw this.handleAuthError(error);
     }
@@ -211,7 +211,7 @@ class FirebaseAuthService {
       );
 
       return authUser;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signin error:', error);
       throw this.handleAuthError(error);
     }
@@ -242,7 +242,7 @@ class FirebaseAuthService {
       // Sign out from Firebase Auth
       await signOut(auth);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signout error:', error);
       throw this.handleAuthError(error);
     }
@@ -252,7 +252,7 @@ class FirebaseAuthService {
   async forceSignOut(): Promise<void> {
     try {
       await signOut(auth);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Force signout error:', error);
       // Even if Firebase signOut fails, clear local state
       this.currentUser = null;
@@ -265,7 +265,7 @@ class FirebaseAuthService {
   async resetPassword(email: string): Promise<void> {
     try {
       await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Password reset error:', error);
       throw this.handleAuthError(error);
     }
@@ -290,7 +290,7 @@ class FirebaseAuthService {
       }
 
       // Update employee document
-      const employeeUpdates: any = {};
+      const employeeUpdates: unknown = {};
       if (updates.phone) employeeUpdates.phone = updates.phone;
       if (updates.address) employeeUpdates.address = updates.address;
 
@@ -305,7 +305,7 @@ class FirebaseAuthService {
       if (auth.currentUser) {
         this.currentUser = await this.createAuthUser(auth.currentUser);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Profile update error:', error);
       throw this.handleAuthError(error);
     }
@@ -379,7 +379,7 @@ class FirebaseAuthService {
   }
 
   // Handle authentication errors
-  private handleAuthError(error: any): AuthError {
+  private handleAuthError(error: unknown): AuthError {
     let message = 'An unexpected error occurred';
     let code = 'unknown';
 
@@ -469,7 +469,7 @@ class FirebaseAuthService {
       );
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Admin create employee error:', error);
       throw this.handleAuthError(error);
     }
@@ -495,7 +495,7 @@ class FirebaseAuthService {
         { action: 'admin_deactivate_employee' },
         `Admin deactivated employee: ${employeeId}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Deactivate employee error:', error);
       throw this.handleAuthError(error);
     }

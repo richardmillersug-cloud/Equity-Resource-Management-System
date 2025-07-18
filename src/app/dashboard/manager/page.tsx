@@ -1,21 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ManagerQueries } from '../../../lib/firebase/role-based-queries';
-import { 
-  Building2, 
-  TrendingUp, 
-  Users, 
-  DollarSign,
-  Truck,
-  BarChart3,
-  AlertCircle,
-  PieChart
-} from 'lucide-react';
+// import {
+//   Building2,
+//   TrendingUp,
+//   Users,
+//   DollarSign,
+//   Truck,
+//   BarChart3,
+//   AlertCircle,
+//   PieChart,
+// } from 'lucide-react';
 
 export default function ManagerDashboard() {
-  const [branchPerformance, setBranchPerformance] = useState<any[]>([]);
-  const [supplierPerformance, setSupplierPerformance] = useState<any[]>([]);
+  const [branchPerformance, setBranchPerformance] = useState<Record<string, unknown>[]>([]);
+  const [supplierPerformance, setSupplierPerformance] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -174,7 +173,7 @@ export default function ManagerDashboard() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Branch
+//   Branch
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Employees
@@ -229,7 +228,7 @@ export default function ManagerDashboard() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Supplier
+//   Supplier
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Invoices

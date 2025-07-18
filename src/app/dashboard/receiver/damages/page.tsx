@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { enhancedDamageService, DamageWithDetails } from '../../../../lib/firebase/enhanced-damages';
-import { 
-  AlertTriangle, 
-  Search, 
-  Filter, 
+import {
+  AlertTriangle,
+  Search,
+  Filter,
   Calendar,
   Package,
   User,
@@ -14,8 +13,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Eye
+  Eye,
 } from 'lucide-react';
+import { enhancedDamageService, DamageWithDetails } from '@/lib/firebase/enhanced-damages';
 
 interface DamageStats {
   total: number;
@@ -417,7 +417,7 @@ export default function DamagesPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier
+//   Supplier
                   </label>
                   <p className="text-sm text-gray-900">{selectedDamage.supplierName}</p>
                 </div>
@@ -459,7 +459,7 @@ export default function DamagesPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
+//   Status
                   </label>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedDamage.status)}`}>
                     {getStatusIcon(selectedDamage.status)}
@@ -481,7 +481,7 @@ export default function DamagesPage() {
                 onClick={() => setShowDetailsModal(false)}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors"
               >
-                Close
+//   Close
               </button>
             </div>
           </div>

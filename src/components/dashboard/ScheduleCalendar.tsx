@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card } from '../ui/Card';
+import { LegacyCard } from '../ui/Card';
 
 interface ScheduleEvent {
   date: number;
@@ -67,7 +67,7 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
   return (
     <div className="space-y-6">
       {/* Calendar */}
-      <Card 
+      <LegacyCard 
         title="Schedule" 
         subtitle="Schedule your transaction"
         actions={
@@ -133,10 +133,10 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             );
           })}
         </div>
-      </Card>
+      </LegacyCard>
 
       {/* Bills */}
-      <Card 
+      <LegacyCard 
         title="Bills" 
         subtitle="Your upcoming bills"
       >
@@ -165,7 +165,7 @@ export const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({
             </div>
           ))}
         </div>
-      </Card>
+      </LegacyCard>
     </div>
   );
 }; 

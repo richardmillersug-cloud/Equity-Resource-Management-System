@@ -13,7 +13,7 @@ import {
   Clock, 
   AlertTriangle,
   Download,
-  Print,
+  Printer,
   Edit,
   MessageSquare,
   Star,
@@ -96,7 +96,7 @@ export default function InvoiceDetailModal({ invoice, isOpen, onClose }: Invoice
                   <Download className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
-                  <Print className="w-5 h-5" />
+                  <Printer className="w-5 h-5" />
                 </button>
                 <button className="bg-white/20 backdrop-blur-sm border border-white/30 text-white p-3 rounded-2xl hover:bg-white/30 transition-all duration-300">
                   <Edit className="w-5 h-5" />

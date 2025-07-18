@@ -22,7 +22,7 @@ export default function InitializeDatabasePage() {
       
       // Override console.log to capture logs
       const originalConsoleLog = console.log;
-      console.log = (message: any) => {
+      console.log = (message: unknown) => {
         addLog(String(message));
         originalConsoleLog(message);
       };
@@ -34,7 +34,7 @@ export default function InitializeDatabasePage() {
       
       addLog('✅ Database initialization completed successfully!');
       setStatus('✅ Complete! All HR collections have been created.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       addLog(`❌ Error: ${error.message}`);
       setStatus('❌ Initialization failed. Check logs for details.');
     } finally {
@@ -60,7 +60,7 @@ export default function InitializeDatabasePage() {
       ]);
       
       setStatus('Status check complete');
-    } catch (error: any) {
+    } catch (error: unknown) {
       setStatus(`Error checking status: ${error.message}`);
     }
   };

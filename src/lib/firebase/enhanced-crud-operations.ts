@@ -1,19 +1,19 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
   serverTimestamp,
   Timestamp,
   onSnapshot,
-  writeBatch
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 import { authService } from './auth';
@@ -35,7 +35,7 @@ export class ReceiverCRUDOperations {
     scheduledDate: Date;
     scheduledTime: string;
     status: 'pending' | 'in-progress' | 'completed' | 'delayed';
-    items: any[];
+    items: Record<string, unknown>[];
     contactPerson?: string;
     phone?: string;
     notes?: string;
@@ -90,7 +90,7 @@ export class ReceiverCRUDOperations {
   static async updateDelivery(deliveryId: string, updates: {
     status?: 'pending' | 'in-progress' | 'completed' | 'delayed';
     actualArrivalTime?: string;
-    receivedItems?: any[];
+    receivedItems?: Record<string, unknown>[];
     notes?: string;
     discrepancies?: string;
   }) {
@@ -131,8 +131,8 @@ export class ReceiverCRUDOperations {
     fdn: string;
     quantity: number;
     dueDate: Date;
-    items?: any[];
-    paymentPlan?: any[];
+    items?: Record<string, unknown>[];
+    paymentPlan?: Record<string, unknown>[];
   }) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
@@ -185,7 +185,7 @@ export class ReceiverCRUDOperations {
     quantity?: number;
     status?: string;
     notes?: string;
-    paymentPlan?: any[];
+    paymentPlan?: Record<string, unknown>[];
   }) {
     const invoiceRef = doc(db, 'invoices', invoiceId);
     
@@ -204,7 +204,7 @@ export class ReceiverCRUDOperations {
   static async createReturnNote(returnData: {
     supplierId: string;
     supplierName: string;
-    items: any[];
+    items: Record<string, unknown>[];
     reason: string;
     totalValue: number;
     description?: string;
@@ -275,7 +275,7 @@ export class ReceiverCRUDOperations {
   static async updatePurchaseOrderStatus(orderId: string, updates: {
     status?: 'pending' | 'approved' | 'received' | 'completed';
     receivedDate?: Date;
-    receivedItems?: any[];
+    receivedItems?: Record<string, unknown>[];
     discrepancies?: string;
     notes?: string;
   }) {
@@ -299,7 +299,7 @@ export class ReceiverCRUDOperations {
   /**
    * Subscribe to delivery updates
    */
-  static subscribeToDeliveries(callback: (deliveries: any[]) => void) {
+  static subscribeToDeliveries(callback: (deliveries: Record<string, unknown>[]) => void) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
 
@@ -319,7 +319,7 @@ export class ReceiverCRUDOperations {
   /**
    * Subscribe to invoice updates
    */
-  static subscribeToInvoices(callback: (invoices: any[]) => void) {
+  static subscribeToInvoices(callback: (invoices: Record<string, unknown>[]) => void) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
 
@@ -473,7 +473,7 @@ export class PurchasingManagerCRUDOperations {
   static async updateInvoiceStatus(invoiceId: string, status: 'approved' | 'rejected', notes?: string) {
     const invoiceRef = doc(db, 'invoices', invoiceId);
     
-    const updates: any = {
+    const updates: unknown = {
       status,
       updatedAt: serverTimestamp(),
       lastModifiedBy: authService.getCurrentUser()?.uid
@@ -503,7 +503,7 @@ export class PurchasingManagerCRUDOperations {
   static async createPurchaseOrder(orderData: {
     supplierId: string;
     supplierName: string;
-    items: any[];
+    items: Record<string, unknown>[];
     totalAmount: number;
     expectedDeliveryDate: Date;
     notes?: string;
@@ -556,7 +556,7 @@ export class PurchasingManagerCRUDOperations {
    */
   static async updatePurchaseOrder(orderId: string, updates: {
     status?: string;
-    items?: any[];
+    items?: Record<string, unknown>[];
     totalAmount?: number;
     notes?: string;
     receivedDate?: Date;
@@ -654,7 +654,7 @@ export class PurchasingManagerCRUDOperations {
   static async updateExpenseStatus(expenseId: string, status: 'approved' | 'rejected', notes?: string) {
     const expenseRef = doc(db, 'expenses', expenseId);
     
-    const updates: any = {
+    const updates: unknown = {
       status,
       updatedAt: serverTimestamp(),
       processedBy: authService.getCurrentUser()?.uid
@@ -681,7 +681,7 @@ export class PurchasingManagerCRUDOperations {
   /**
    * Subscribe to supplier updates
    */
-  static subscribeToSuppliers(callback: (suppliers: any[]) => void) {
+  static subscribeToSuppliers(callback: (suppliers: Record<string, unknown>[]) => void) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
 
@@ -700,7 +700,7 @@ export class PurchasingManagerCRUDOperations {
   /**
    * Subscribe to invoice updates
    */
-  static subscribeToInvoices(callback: (invoices: any[]) => void) {
+  static subscribeToInvoices(callback: (invoices: Record<string, unknown>[]) => void) {
     const q = query(
       collection(db, 'invoices'),
       orderBy('createdAt', 'desc'),
@@ -716,7 +716,7 @@ export class PurchasingManagerCRUDOperations {
   /**
    * Subscribe to purchase order updates
    */
-  static subscribeToPurchaseOrders(callback: (orders: any[]) => void) {
+  static subscribeToPurchaseOrders(callback: (orders: Record<string, unknown>[]) => void) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
 
@@ -778,7 +778,7 @@ export class CRUDUtils {
   /**
    * Log CRUD operations for audit trail
    */
-  static async logOperation(operation: string, resource: string, resourceId: string, details?: any) {
+  static async logOperation(operation: string, resource: string, resourceId: string, details?: unknown) {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) return;
 
@@ -824,5 +824,5 @@ export class CRUDUtils {
 export {
   ReceiverCRUDOperations as ReceiverCRUD,
   PurchasingManagerCRUDOperations as PurchasingManagerCRUD,
-  CRUDUtils
+//   CRUDUtils
 };

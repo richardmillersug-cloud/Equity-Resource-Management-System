@@ -97,7 +97,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onAction }) => {
             className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-medium hover:bg-emerald-700 transition-colors duration-200"
             disabled={!transferAmount || selectedContacts.length === 0}
           >
-            Send
+//   Send
           </button>
           <button 
             onClick={() => onAction?.('save-draft')}

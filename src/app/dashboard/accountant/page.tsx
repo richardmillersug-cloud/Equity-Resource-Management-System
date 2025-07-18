@@ -107,12 +107,12 @@ export default function AccountantDashboard() {
       setSpecialFunds(finalSpecialFunds);
 
       // Calculate summary
-      const totalAllocated = finalCashAllocations.reduce((sum, allocation) => sum + (allocation.cashCloseTotal || 0), 0);
-      const totalExpenses = finalExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-      const totalPaid = finalExpenses.reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
+      const totalAllocated = finalCashAllocations.reduce((sum, allocation) => sum + (Number(allocation?.cashCloseTotal) || 0), 0);
+      const totalExpenses = finalExpenses.reduce((sum, expense) => sum + (Number(expense?.amount) || 0), 0);
+      const totalPaid = finalExpenses.reduce((sum, expense) => sum + (Number(expense?.paidAmount) || 0), 0);
       const pendingPayments = totalExpenses - totalPaid;
-      const savingsTotal = finalCashAllocations.reduce((sum, allocation) => sum + (allocation.savings || 0), 0);
-      const specialFundsTotal = finalSpecialFunds.reduce((sum, fund) => sum + (fund.specialFundsBalance || 0), 0);
+      const savingsTotal = finalCashAllocations.reduce((sum, allocation) => sum + (Number(allocation?.savings) || 0), 0);
+      const specialFundsTotal = finalSpecialFunds.reduce((sum, fund) => sum + (Number(fund?.specialFundsBalance) || 0), 0);
 
       setDashboardData({
         cashAllocations: finalCashAllocations,

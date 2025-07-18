@@ -58,13 +58,13 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  // Dashboard - Available to all roles
+  // Dashboard - Available to all roles except purchasing managers (they use PM Dashboard)
   { 
     id: 'dashboard', 
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Dashboard', 
     path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'Purchase Manager', 'Purchasing Manager', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
   },
   
   // Admin specific

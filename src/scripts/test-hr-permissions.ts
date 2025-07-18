@@ -15,7 +15,7 @@ async function testHRPermissions() {
     try {
       const employees = await firestoreServices.employee.getAll();
       console.log(`   ✅ Successfully read ${employees.length} employees`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Employee access error: ${error.message}`);
     }
 
@@ -24,7 +24,7 @@ async function testHRPermissions() {
     try {
       const attendance = await firestoreServices.attendance.getAll();
       console.log(`   ✅ Successfully read ${attendance.length} attendance records`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Attendance access error: ${error.message}`);
     }
 
@@ -33,7 +33,7 @@ async function testHRPermissions() {
     try {
       const payroll = await firestoreServices.payroll.getAll();
       console.log(`   ✅ Successfully read ${payroll.length} payroll records`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Payroll access error: ${error.message}`);
     }
 
@@ -42,7 +42,7 @@ async function testHRPermissions() {
     try {
       const leaveRequests = await firestoreServices.leaveRequest.getAll();
       console.log(`   ✅ Successfully read ${leaveRequests.length} leave requests`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Leave requests access error: ${error.message}`);
     }
 
@@ -51,7 +51,7 @@ async function testHRPermissions() {
     try {
       const barcodes = await firestoreServices.barcode.getAll();
       console.log(`   ✅ Successfully read ${barcodes.length} barcodes`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Barcodes access error: ${error.message}`);
     }
 
@@ -60,7 +60,7 @@ async function testHRPermissions() {
     try {
       const auditLogs = await firestoreServices.audit.getAll();
       console.log(`   ✅ Successfully read ${auditLogs.length} audit logs`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Audit logs access error: ${error.message}`);
     }
 
@@ -69,7 +69,7 @@ async function testHRPermissions() {
     try {
       const branches = await firestoreServices.branch.getAll();
       console.log(`   ✅ Successfully read ${branches.length} branches`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Branches access error: ${error.message}`);
     }
 
@@ -87,7 +87,7 @@ async function testHRPermissions() {
       console.log('   📝 Testing attendance creation permissions...');
       // Note: We won't actually create it, just test if the service is accessible
       console.log('   ✅ Attendance creation permissions available');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Create operations error: ${error.message}`);
     }
 
@@ -102,7 +102,7 @@ async function testHRPermissions() {
         console.log('   ⚠️ No user currently authenticated');
         console.log('   💡 Note: Some permission tests may fail without authentication');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`   ❌ Authentication check error: ${error.message}`);
     }
 
