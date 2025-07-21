@@ -35,7 +35,8 @@ import {
   Smartphone,
   Calendar,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -1194,6 +1195,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                 {getUserRole()}
               </p>
             </div>
+          )}
+        </button>
+        {/* Logout Button */}
+        <button
+          onClick={async () => {
+            try {
+              await authService.signOut();
+              setCurrentUser(null);
+              router.push('/auth/login');
+            } catch (error) {
+              console.error('Error signing out:', error);
+              alert('Failed to sign out. You will be redirected to login.');
+              setCurrentUser(null);
+              router.push('/auth/login');
+            }
+          }}
+          className={`${isExpanded ? 'justify-start px-3 mt-2' : 'justify-center mt-2'} w-full h-12 rounded-xl flex items-center hover:bg-red-50 transition-all duration-200 group border border-red-100`}
+        >
+          <LogOut className={`w-5 h-5 text-red-500 group-hover:text-red-600 transition-colors ${isExpanded ? 'mr-3' : ''}`} />
+          {isExpanded && (
+            <span className="text-sm font-medium text-red-600 whitespace-nowrap overflow-hidden flex-1 text-left">
+              Sign Out
+            </span>
           )}
         </button>
       </div>
