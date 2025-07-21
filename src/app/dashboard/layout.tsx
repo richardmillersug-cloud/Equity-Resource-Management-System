@@ -76,18 +76,17 @@ export default function DashboardLayout({
   }, []);
 
   const handleSignOut = async () => {
+    console.log('handleSignOut called');
     try {
       setShowUserMenu(false); // Close the menu immediately
       await authService.signOut();
-      // The redirect will be handled by the auth state change listener
+      setCurrentUser(null); // Clear local user state
+      router.push('/auth/login'); // Force redirect after sign out
     } catch (error: any) {
       console.error('Error signing out:', error);
-      
-      // Show user-friendly error message
       const errorMessage = error?.message || 'Failed to sign out properly';
       alert(`Sign out error: ${errorMessage}\n\nYou will be redirected to the login page.`);
-      
-      // If there's an error, still try to redirect
+      setCurrentUser(null);
       router.push('/auth/login');
     }
   };
@@ -187,6 +186,15 @@ export default function DashboardLayout({
                 <Settings className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
               </button>
               
+              {/* Prominent Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="p-2 bg-white rounded-full shadow-sm border border-red-200 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group"
+                title="Sign Out"
+              >
+                <LogOut className="w-5 h-5 text-red-500 group-hover:text-red-600 transition-colors" />
+              </button>
+              
               {/* User Profile */}
               <div className="relative">
                 <button
@@ -227,7 +235,7 @@ export default function DashboardLayout({
                     </button>
                     <div className="border-t border-gray-100 mt-2 pt-2">
                       <button
-                        onClick={handleSignOut}
+                        onMouseDown={async () => { console.log('Dropdown sign out clicked'); setShowUserMenu(false); await handleSignOut(); }}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                       >
                         <LogOut className="w-4 h-4" />
