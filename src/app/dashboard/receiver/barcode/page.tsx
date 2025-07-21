@@ -484,7 +484,13 @@ export default function BarcodePage() {
         
     } catch (error) {
       console.error('Error adding barcode item:', error);
-      alert('Failed to add barcode item. Please try again.');
+      console.error('Error details:', error);
+      
+      if (error instanceof Error) {
+        alert(`Failed to add barcode item: ${error.message}. Please try again.`);
+      } else {
+        alert('Failed to add barcode item. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
