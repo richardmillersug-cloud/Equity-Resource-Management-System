@@ -162,7 +162,7 @@ export default function DashboardLayout({
                     router.push('/dashboard/notifications');
                   } catch (error) {
                     console.error('Error handling notification click:', error);
-                    router.push('/dashboard/notifications');
+                  router.push('/dashboard/notifications');
                   }
                 }}
                 className="relative p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200 group"

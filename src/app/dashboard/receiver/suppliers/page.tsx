@@ -89,10 +89,10 @@ export default function SuppliersPage() {
           if (!supplier.dateOfRegistration || typeof supplier.dateOfRegistration.toDate !== 'function') {
             return false;
           }
-          const registrationDate = supplier.dateOfRegistration.toDate();
-          const now = new Date();
-          return registrationDate.getMonth() === now.getMonth() && 
-                 registrationDate.getFullYear() === now.getFullYear();
+        const registrationDate = supplier.dateOfRegistration.toDate();
+        const now = new Date();
+        return registrationDate.getMonth() === now.getMonth() && 
+               registrationDate.getFullYear() === now.getFullYear();
         } catch (error) {
           console.warn('Invalid date format for supplier:', supplier.id, error);
           return false;
@@ -548,20 +548,20 @@ export default function SuppliersPage() {
               </thead>
               <tbody>
                 ${filteredSuppliers.map((supplier, index) => {
-                  const pendingEditsCount = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
-                  const statusClass = `status-${supplier.status.toLowerCase()}`;
-                  
-                  return `
+                const pendingEditsCount = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
+                const statusClass = `status-${supplier.status.toLowerCase()}`;
+                
+                return `
                     <tr>
                       <td>
-                        <div class="supplier-name">${supplier.supplierName}</div>
+                      <div class="supplier-name">${supplier.supplierName}</div>
                         <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">
                           Manager: ${getEmployeeName(supplier.employeeId)}
-                        </div>
+                    </div>
                         ${pendingEditsCount > 0 ? `
                           <div class="pending-edit" style="margin-top: 3px;">
                             ${pendingEditsCount} Pending Edit${pendingEditsCount > 1 ? 's' : ''}
-                          </div>
+                    </div>
                         ` : ''}
                       </td>
                       <td>
@@ -576,19 +576,19 @@ export default function SuppliersPage() {
                             <div style="margin-bottom: 3px;">
                               📞 ${(supplier.phoneNumbers || []).slice(0, 2).join(', ')}
                               ${(supplier.phoneNumbers || []).length > 2 ? ` (+${(supplier.phoneNumbers || []).length - 2} more)` : ''}
-                            </div>
+                    </div>
                           ` : ''}
-                          ${supplier.emailAddress ? `
+                    ${supplier.emailAddress ? `
                             <div style="margin-bottom: 3px;">
                               ✉️ ${supplier.emailAddress}
-                            </div>
-                          ` : ''}
+                      </div>
+                    ` : ''}
                           ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
                             <div style="font-size: 10px; color: #6b7280;">
                               💳 ${supplier.mobilePayments.map(p => p.provider).join(', ')}
-                            </div>
+                    </div>
                           ` : ''}
-                        </div>
+                    </div>
                       </td>
                       <td>
                         <div style="line-height: 1.3;">${supplier.address}</div>
@@ -599,34 +599,34 @@ export default function SuppliersPage() {
                         </div>
                       </td>
                       <td>
-                        ${supplier.routeDays && supplier.routeDays.length > 0 ? `
-                          <div class="route-days">
+                    ${supplier.routeDays && supplier.routeDays.length > 0 ? `
+                        <div class="route-days">
                             ${supplier.routeDays.map(day => `<span class="route-day">${day.substring(0, 3)}</span>`).join('')}
-                          </div>
+                        </div>
                         ` : '<span style="color: #9ca3af; font-style: italic;">None</span>'}
                       </td>
                       <td>
                         <div style="text-align: center;">
-                          ${supplier.bankAccounts && supplier.bankAccounts.length > 0 ? `
+                    ${supplier.bankAccounts && supplier.bankAccounts.length > 0 ? `
                             <div style="font-weight: bold; color: #059669;">
                               ${supplier.bankAccounts.length}
-                            </div>
+                      </div>
                             <div style="font-size: 9px; color: #6b7280;">Bank</div>
-                          ` : ''}
-                          ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
+                    ` : ''}
+                    ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
                             <div style="font-weight: bold; color: #7c3aed; margin-top: 2px;">
                               ${supplier.mobilePayments.length}
-                            </div>
+                      </div>
                             <div style="font-size: 9px; color: #6b7280;">Mobile</div>
-                          ` : ''}
+                    ` : ''}
                           ${(!supplier.bankAccounts || supplier.bankAccounts.length === 0) && (!supplier.mobilePayments || supplier.mobilePayments.length === 0) ? `
                             <span style="color: #9ca3af; font-style: italic;">None</span>
-                          ` : ''}
-                        </div>
+                    ` : ''}
+                  </div>
                       </td>
                     </tr>
-                  `;
-                }).join('')}
+                `;
+              }).join('')}
               </tbody>
             </table>
 
