@@ -5,27 +5,27 @@ import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 import { QRCodeService } from '../../../../lib/utils/qr-code';
-// import {
-//   FileText,
-//   Plus,
-//   Search,
-//   Filter,
-//   Calendar,
-//   DollarSign,
-//   User,
-//   Package,
-//   Eye,
-//   Edit,
-//   Trash2,
-//   Download,
-//   Printer,
-//   CheckCircle,
-//   XCircle,
-//   Clock,
-//   AlertTriangle,
-//   QrCode,
-//   Save,
-// } from 'lucide-react';
+import {
+  FileText,
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  DollarSign,
+  User,
+  Package,
+  Eye,
+  Edit,
+  Trash2,
+  Download,
+  Printer,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+  QrCode,
+  Save,
+} from 'lucide-react';
 
 interface InvoiceStats {
   total: number;
@@ -69,6 +69,12 @@ export default function InvoicesPage() {
         orderBy: 'date', 
         orderDirection: 'desc' 
       });
+      
+      // Debug: Log unique statuses to see what's actually in the database
+      const uniqueStatuses = [...new Set(data.map(invoice => invoice.status))];
+      console.log('Unique Invoice Statuses:', uniqueStatuses);
+      console.log('Total Invoices:', data.length);
+      
       setInvoices(data);
     } catch (error) {
       console.error('Error loading invoices:', error);
@@ -80,6 +86,7 @@ export default function InvoicesPage() {
   const loadStats = async () => {
     try {
       const statsData = await enhancedInvoiceService.getInvoiceStats();
+      console.log('Invoice Stats:', statsData);
       setStats(statsData);
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -231,6 +238,225 @@ export default function InvoicesPage() {
     return timestamp?.toDate?.()?.toLocaleDateString() || 'N/A';
   };
 
+  // Export invoices to CSV
+  const handleExportInvoices = () => {
+    try {
+      const headers = [
+        'Invoice Number',
+        'Supplier Name',
+        'Amount',
+        'Status',
+        'Date Created',
+        'Due Date',
+        'FDN',
+        'Description',
+        'Quantity'
+      ];
+
+      const csvData = filteredInvoices.map(invoice => [
+        invoice.invoiceNumber || 'N/A',
+        invoice.supplierName || 'N/A',
+        invoice.amount || 0,
+        invoice.status || 'N/A',
+        formatDate(invoice.createdAt),
+        formatDate(invoice.dueDate),
+        invoice.fdn || 'N/A',
+        invoice.description || 'N/A',
+        invoice.quantity || 0
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => 
+          row.map(field => 
+            typeof field === 'string' && (field.includes(',') || field.includes('"')) 
+              ? `"${field.replace(/"/g, '""')}"` 
+              : field
+          ).join(',')
+        )
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error exporting invoices:', error);
+      alert('Error exporting invoices. Please try again.');
+    }
+  };
+
+  // Print invoices list
+  const handlePrintInvoices = () => {
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Please allow popups for this website to enable printing.');
+        return;
+      }
+
+      const currentDate = new Date().toLocaleDateString();
+      const currentTime = new Date().toLocaleTimeString();
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Invoices Report - ${currentDate}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                color: #333;
+                line-height: 1.4;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 30px;
+                border-bottom: 3px solid #7C3AED;
+                padding-bottom: 20px;
+              }
+              .header h1 {
+                color: #7C3AED;
+                margin: 0;
+                font-size: 28px;
+              }
+              .header p {
+                margin: 5px 0;
+                color: #666;
+              }
+              .invoices-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 30px;
+                background: white;
+              }
+              .invoices-table th {
+                background: #7C3AED;
+                color: white;
+                padding: 12px 8px;
+                text-align: left;
+                font-weight: 600;
+                font-size: 11px;
+                text-transform: uppercase;
+              }
+              .invoices-table td {
+                padding: 8px;
+                border-bottom: 1px solid #e5e7eb;
+                font-size: 10px;
+                vertical-align: top;
+              }
+              .invoices-table tr:nth-child(even) {
+                background: #f9fafb;
+              }
+              .invoice-number {
+                font-weight: bold;
+                color: #7C3AED;
+              }
+              .status-badge {
+                padding: 2px 6px;
+                border-radius: 8px;
+                font-size: 9px;
+                font-weight: 500;
+                text-transform: uppercase;
+              }
+              .status-draft { background: #f3f4f6; color: #374151; }
+              .status-pending { background: #fef3c7; color: #92400e; }
+              .status-approved { background: #d1fae5; color: #065f46; }
+              .status-paid { background: #dbeafe; color: #1e40af; }
+              .status-rejected { background: #fee2e2; color: #dc2626; }
+              .footer {
+                margin-top: 30px;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+                border-top: 1px solid #e5e7eb;
+                padding-top: 20px;
+              }
+              @media print {
+                body { margin: 0; }
+                .invoices-table { break-inside: avoid; }
+                .invoices-table th { 
+                  background: #7C3AED !important;
+                  color: white !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Invoices Report</h1>
+              <p>Generated on ${currentDate} at ${currentTime}</p>
+              <p>Total Invoices: ${filteredInvoices.length}</p>
+              ${stats ? `
+                <p>Pending: ${stats.pending} | Approved: ${stats.approved} | Paid: ${stats.paid}</p>
+              ` : ''}
+            </div>
+
+            <table class="invoices-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Supplier</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>FDN</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredInvoices.map(invoice => `
+                  <tr>
+                    <td>
+                      <div class="invoice-number">${invoice.invoiceNumber || 'N/A'}</div>
+                    </td>
+                    <td>${invoice.supplierName || 'N/A'}</td>
+                    <td>${formatAmount(invoice.amount || 0)}</td>
+                    <td>
+                      <span class="status-badge status-${(invoice.status || 'draft').toLowerCase()}">
+                        ${invoice.status || 'Draft'}
+                      </span>
+                    </td>
+                    <td>${formatDate(invoice.createdAt)}</td>
+                    <td>${invoice.fdn || 'N/A'}</td>
+                    <td>${(invoice.description || 'N/A').substring(0, 50)}${(invoice.description || '').length > 50 ? '...' : ''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              <p>Invoices Management System - Receiver Dashboard</p>
+              <p>This report contains ${filteredInvoices.length} invoices based on current filters</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      };
+
+    } catch (error) {
+      console.error('Error printing invoices:', error);
+      alert('Error generating print document. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-6">
@@ -273,57 +499,112 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        {/* Enhanced Statistics Cards */}
+        {/* Enhanced Statistics Cards - Complete Database Status Breakdown */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium mb-1">Total Invoices</p>
-                  <p className="text-3xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.total}</p>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+              {/* Total Invoices */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Total</p>
+                  <p className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.total}</p>
                 </div>
-                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <FileText className="w-7 h-7 text-white" />
+              </div>
+
+              {/* Draft */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-gray-400 to-gray-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <Edit className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Draft</p>
+                  <p className="text-2xl font-bold text-gray-600 group-hover:text-gray-700 transition-colors">{stats.draft}</p>
+                </div>
+              </div>
+
+              {/* Pending */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Pending</p>
+                  <p className="text-2xl font-bold text-yellow-600 group-hover:text-yellow-700 transition-colors">{stats.pending}</p>
+                </div>
+              </div>
+
+              {/* Approved */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Approved</p>
+                  <p className="text-2xl font-bold text-green-600 group-hover:text-green-700 transition-colors">{stats.approved}</p>
+                </div>
+              </div>
+
+              {/* Paid */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <DollarSign className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Paid</p>
+                  <p className="text-2xl font-bold text-blue-600 group-hover:text-blue-700 transition-colors">{stats.paid}</p>
+                </div>
+              </div>
+
+              {/* Rejected */}
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-700 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
+                    <XCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mb-1">Rejected</p>
+                  <p className="text-2xl font-bold text-red-600 group-hover:text-red-700 transition-colors">{stats.rejected}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium mb-1">Pending</p>
-                  <p className="text-3xl font-bold text-yellow-600 group-hover:text-yellow-700 transition-colors">{stats.pending}</p>
-                </div>
-                <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Clock className="w-7 h-7 text-white" />
+            {/* Financial Summary Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium mb-1">Total Balance</p>
+                    <p className="text-3xl font-bold text-purple-600 group-hover:text-purple-700 transition-colors">{formatAmount(stats.pendingAmount || stats.totalAmount)}</p>
+                    <div className="flex items-center mt-1">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                      <span className="text-xs text-gray-500">Outstanding amount</span>
+                    </div>
+                  </div>
+                  <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <DollarSign className="w-7 h-7 text-white" />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium mb-1">Approved</p>
-                  <p className="text-3xl font-bold text-green-600 group-hover:text-green-700 transition-colors">{stats.approved}</p>
-                </div>
-                <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <CheckCircle className="w-7 h-7 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
-                  <p className="text-3xl font-bold text-purple-600 group-hover:text-purple-700 transition-colors">{formatAmount(stats.totalAmount)}</p>
-                </div>
-                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <DollarSign className="w-7 h-7 text-white" />
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
+                    <p className="text-3xl font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors">{formatAmount(stats.totalAmount)}</p>
+                    <div className="flex items-center mt-1">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                      <span className="text-xs text-gray-500">All invoices value</span>
+                    </div>
+                  </div>
+                  <div className="w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <FileText className="w-7 h-7 text-white" />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Modern Filters and Search */}
@@ -358,7 +639,7 @@ export default function InvoicesPage() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <button 
                 onClick={async () => {
                   try {
@@ -373,16 +654,27 @@ export default function InvoicesPage() {
                     setLoading(false);
                   }
                 }}
-                className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200"
+                className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200 font-medium"
                 title="Generate Missing QR Codes"
               >
                 <QrCode className="w-5 h-5" />
+                <span className="hidden sm:inline">Generate QR</span>
               </button>
-              <button className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200">
+              <button 
+                onClick={handleExportInvoices}
+                className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200 font-medium"
+                title="Export to CSV"
+              >
                 <Download className="w-5 h-5" />
+                <span className="hidden sm:inline">Export CSV</span>
               </button>
-              <button className="p-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200">
+              <button 
+                onClick={handlePrintInvoices}
+                className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200 font-medium"
+                title="Print Invoices List"
+              >
                 <Printer className="w-5 h-5" />
+                <span className="hidden sm:inline">Print List</span>
               </button>
             </div>
           </div>

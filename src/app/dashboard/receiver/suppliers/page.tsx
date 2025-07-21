@@ -85,16 +85,26 @@ export default function SuppliersPage() {
       
       // Calculate this month's registrations
       const thisMonth = allSuppliers.filter(supplier => {
-        const registrationDate = supplier.dateOfRegistration.toDate();
-        const now = new Date();
-        return registrationDate.getMonth() === now.getMonth() && 
-               registrationDate.getFullYear() === now.getFullYear();
+        try {
+          if (!supplier.dateOfRegistration || typeof supplier.dateOfRegistration.toDate !== 'function') {
+            return false;
+          }
+          const registrationDate = supplier.dateOfRegistration.toDate();
+          const now = new Date();
+          return registrationDate.getMonth() === now.getMonth() && 
+                 registrationDate.getFullYear() === now.getFullYear();
+        } catch (error) {
+          console.warn('Invalid date format for supplier:', supplier.id, error);
+          return false;
+        }
       }).length;
       
       setStats({ ...supplierStats, thisMonth });
       
     } catch (error) {
       console.error('Error loading suppliers:', error);
+      setSuppliers([]); // Set empty array as fallback
+      setStats({ total: 0, active: 0, pending: 0, inactive: 0, thisMonth: 0 }); // Set default stats
       alert('Error loading suppliers. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -264,12 +274,12 @@ export default function SuppliersPage() {
 
       // Prepare CSV rows
       const csvRows = filteredSuppliers.map(supplier => {
-        const phoneNumbers = supplier.phoneNumbers.join('; ');
+        const phoneNumbers = (supplier.phoneNumbers || []).join('; ');
         const routeDays = supplier.routeDays ? supplier.routeDays.join(', ') : 'None';
-        const bankAccounts = supplier.bankAccounts.map(acc => 
+        const bankAccounts = (supplier.bankAccounts || []).map(acc => 
           `${acc.bankName} (${acc.accountNumber})`
         ).join('; ') || 'None';
-        const mobilePayments = supplier.mobilePayments.map(payment => 
+        const mobilePayments = (supplier.mobilePayments || []).map(payment => 
           `${payment.provider}: ${payment.merchantCode} (${payment.phoneNumber})`
         ).join('; ') || 'None';
         const pendingEdits = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
@@ -277,7 +287,7 @@ export default function SuppliersPage() {
         return [
           supplier.supplierName,
           supplier.tinNumber,
-          supplier.dateOfRegistration.toDate().toLocaleDateString(),
+          supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A',
           supplier.address,
           phoneNumbers,
           supplier.emailAddress || 'N/A',
@@ -286,7 +296,7 @@ export default function SuppliersPage() {
           getEmployeeName(supplier.employeeId),
           bankAccounts,
           mobilePayments,
-          supplier.createdAt.toDate().toLocaleDateString(),
+          supplier.createdAt?.toDate ? supplier.createdAt.toDate().toLocaleDateString() : 'N/A',
           pendingEdits > 0 ? `${pendingEdits} pending` : 'None'
         ];
       });
@@ -384,59 +394,65 @@ export default function SuppliersPage() {
                 color: #666;
                 text-transform: uppercase;
               }
-              .supplier-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 20px;
+              .suppliers-table {
+                width: 100%;
+                border-collapse: collapse;
                 margin-bottom: 30px;
-              }
-              .supplier-card {
-                border: 1px solid #e5e7eb;
-                border-radius: 8px;
-                padding: 15px;
                 background: white;
-                break-inside: avoid;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
               }
-              .supplier-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 10px;
+              .suppliers-table th {
+                background: #7C3AED;
+                color: white;
+                padding: 12px 8px;
+                text-align: left;
+                font-weight: 600;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              }
+              .suppliers-table td {
+                padding: 10px 8px;
                 border-bottom: 1px solid #e5e7eb;
-                padding-bottom: 10px;
+                font-size: 11px;
+                vertical-align: top;
+              }
+              .suppliers-table tr:nth-child(even) {
+                background: #f9fafb;
+              }
+              .suppliers-table tr:hover {
+                background: #f3f4f6;
               }
               .supplier-name {
                 font-weight: bold;
-                font-size: 16px;
                 color: #111827;
+                font-size: 12px;
               }
               .supplier-status {
-                padding: 4px 8px;
+                padding: 3px 8px;
                 border-radius: 12px;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 500;
+                text-transform: uppercase;
               }
               .status-active { background: #d1fae5; color: #065f46; }
               .status-pending { background: #fef3c7; color: #92400e; }
               .status-inactive { background: #f3f4f6; color: #374151; }
-              .supplier-detail {
-                margin: 5px 0;
-                font-size: 12px;
-              }
-              .detail-label {
-                font-weight: 500;
-                color: #4b5563;
+              .contact-info {
+                line-height: 1.4;
               }
               .route-days {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 4px;
-                margin-top: 4px;
+                gap: 3px;
+                margin-top: 2px;
               }
               .route-day {
                 background: #ede9fe;
                 color: #5b21b6;
-                padding: 2px 6px;
+                padding: 1px 4px;
                 border-radius: 8px;
                 font-size: 10px;
               }
@@ -445,9 +461,10 @@ export default function SuppliersPage() {
                 color: #9a3412;
                 padding: 2px 6px;
                 border-radius: 8px;
-                font-size: 10px;
-                margin-top: 5px;
+                font-size: 9px;
+                margin-top: 3px;
                 display: inline-block;
+                border: 1px solid #f59e0b;
               }
               .footer {
                 margin-top: 30px;
@@ -459,7 +476,34 @@ export default function SuppliersPage() {
               }
               @media print {
                 body { margin: 0; }
-                .supplier-card { break-inside: avoid; }
+                .suppliers-table { break-inside: avoid; }
+                .suppliers-table th { 
+                  background: #7C3AED !important;
+                  color: white !important;
+                }
+                .suppliers-table tr { break-inside: avoid; }
+                .route-day {
+                  background: #ede9fe !important;
+                  color: #5b21b6 !important;
+                }
+                .supplier-status {
+                  border: 1px solid !important;
+                }
+                .status-active { 
+                  background: #d1fae5 !important; 
+                  color: #065f46 !important;
+                  border-color: #059669 !important;
+                }
+                .status-pending { 
+                  background: #fef3c7 !important; 
+                  color: #92400e !important;
+                  border-color: #f59e0b !important;
+                }
+                .status-inactive { 
+                  background: #f3f4f6 !important; 
+                  color: #374151 !important;
+                  border-color: #6b7280 !important;
+                }
               }
             </style>
           </head>
@@ -489,74 +533,102 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            <div class="supplier-grid">
-              ${filteredSuppliers.map(supplier => {
-                const pendingEditsCount = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
-                const statusClass = `status-${supplier.status.toLowerCase()}`;
-                
-                return `
-                  <div class="supplier-card">
-                    <div class="supplier-header">
-                      <div class="supplier-name">${supplier.supplierName}</div>
-                      <span class="supplier-status ${statusClass}">${supplier.status}</span>
-                    </div>
-                    
-                    <div class="supplier-detail">
-                      <span class="detail-label">TIN:</span> ${supplier.tinNumber}
-                    </div>
-                    
-                    <div class="supplier-detail">
-                      <span class="detail-label">Address:</span> ${supplier.address}
-                    </div>
-                    
-                    <div class="supplier-detail">
-                      <span class="detail-label">Phone:</span> ${supplier.phoneNumbers.join(', ')}
-                    </div>
-                    
-                    ${supplier.emailAddress ? `
-                      <div class="supplier-detail">
-                        <span class="detail-label">Email:</span> ${supplier.emailAddress}
-                      </div>
-                    ` : ''}
-                    
-                    <div class="supplier-detail">
-                      <span class="detail-label">Registration:</span> ${supplier.dateOfRegistration.toDate().toLocaleDateString()}
-                    </div>
-                    
-                    <div class="supplier-detail">
-                      <span class="detail-label">Manager:</span> ${getEmployeeName(supplier.employeeId)}
-                    </div>
-                    
-                    ${supplier.routeDays && supplier.routeDays.length > 0 ? `
-                      <div class="supplier-detail">
-                        <span class="detail-label">Route Days:</span>
-                        <div class="route-days">
-                          ${supplier.routeDays.map(day => `<span class="route-day">${day}</span>`).join('')}
+            <table class="suppliers-table">
+              <thead>
+                <tr>
+                  <th style="width: 15%;">Supplier Name</th>
+                  <th style="width: 10%;">TIN Number</th>
+                  <th style="width: 8%;">Status</th>
+                  <th style="width: 20%;">Contact Information</th>
+                  <th style="width: 18%;">Address</th>
+                  <th style="width: 10%;">Registration Date</th>
+                  <th style="width: 12%;">Route Days</th>
+                  <th style="width: 7%;">Accounts</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredSuppliers.map((supplier, index) => {
+                  const pendingEditsCount = supplier.pendingEdits?.filter(edit => edit.status === 'Pending').length || 0;
+                  const statusClass = `status-${supplier.status.toLowerCase()}`;
+                  
+                  return `
+                    <tr>
+                      <td>
+                        <div class="supplier-name">${supplier.supplierName}</div>
+                        <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">
+                          Manager: ${getEmployeeName(supplier.employeeId)}
                         </div>
-                      </div>
-                    ` : ''}
-                    
-                    ${supplier.bankAccounts && supplier.bankAccounts.length > 0 ? `
-                      <div class="supplier-detail">
-                        <span class="detail-label">Bank Accounts:</span> ${supplier.bankAccounts.length} account(s)
-                      </div>
-                    ` : ''}
-                    
-                    ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
-                      <div class="supplier-detail">
-                        <span class="detail-label">Mobile Payments:</span> ${supplier.mobilePayments.map(p => p.provider).join(', ')}
-                      </div>
-                    ` : ''}
-                    
-                    ${pendingEditsCount > 0 ? `
-                      <div class="pending-edit">
-                        ${pendingEditsCount} Pending Edit${pendingEditsCount > 1 ? 's' : ''}
-                      </div>
-                    ` : ''}
-                  </div>
-                `;
-              }).join('')}
-            </div>
+                        ${pendingEditsCount > 0 ? `
+                          <div class="pending-edit" style="margin-top: 3px;">
+                            ${pendingEditsCount} Pending Edit${pendingEditsCount > 1 ? 's' : ''}
+                          </div>
+                        ` : ''}
+                      </td>
+                      <td>
+                        <strong>${supplier.tinNumber}</strong>
+                      </td>
+                      <td>
+                        <span class="supplier-status ${statusClass}">${supplier.status}</span>
+                      </td>
+                      <td>
+                        <div class="contact-info">
+                          ${(supplier.phoneNumbers || []).length > 0 ? `
+                            <div style="margin-bottom: 3px;">
+                              📞 ${(supplier.phoneNumbers || []).slice(0, 2).join(', ')}
+                              ${(supplier.phoneNumbers || []).length > 2 ? ` (+${(supplier.phoneNumbers || []).length - 2} more)` : ''}
+                            </div>
+                          ` : ''}
+                          ${supplier.emailAddress ? `
+                            <div style="margin-bottom: 3px;">
+                              ✉️ ${supplier.emailAddress}
+                            </div>
+                          ` : ''}
+                          ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
+                            <div style="font-size: 10px; color: #6b7280;">
+                              💳 ${supplier.mobilePayments.map(p => p.provider).join(', ')}
+                            </div>
+                          ` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <div style="line-height: 1.3;">${supplier.address}</div>
+                      </td>
+                      <td>
+                        <div style="font-size: 11px;">
+                          ${supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
+                        </div>
+                      </td>
+                      <td>
+                        ${supplier.routeDays && supplier.routeDays.length > 0 ? `
+                          <div class="route-days">
+                            ${supplier.routeDays.map(day => `<span class="route-day">${day.substring(0, 3)}</span>`).join('')}
+                          </div>
+                        ` : '<span style="color: #9ca3af; font-style: italic;">None</span>'}
+                      </td>
+                      <td>
+                        <div style="text-align: center;">
+                          ${supplier.bankAccounts && supplier.bankAccounts.length > 0 ? `
+                            <div style="font-weight: bold; color: #059669;">
+                              ${supplier.bankAccounts.length}
+                            </div>
+                            <div style="font-size: 9px; color: #6b7280;">Bank</div>
+                          ` : ''}
+                          ${supplier.mobilePayments && supplier.mobilePayments.length > 0 ? `
+                            <div style="font-weight: bold; color: #7c3aed; margin-top: 2px;">
+                              ${supplier.mobilePayments.length}
+                            </div>
+                            <div style="font-size: 9px; color: #6b7280;">Mobile</div>
+                          ` : ''}
+                          ${(!supplier.bankAccounts || supplier.bankAccounts.length === 0) && (!supplier.mobilePayments || supplier.mobilePayments.length === 0) ? `
+                            <span style="color: #9ca3af; font-style: italic;">None</span>
+                          ` : ''}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
 
             <div class="footer">
               <p>Suppliers Management System - Receiver Dashboard</p>
@@ -772,7 +844,7 @@ export default function SuppliersPage() {
                 
                 <div className="flex items-center text-sm text-gray-600">
                   <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                  <span>Registered: {supplier.dateOfRegistration.toDate().toLocaleDateString()}</span>
+                  <span>Registered: {supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}</span>
                 </div>
               </div>
 
@@ -874,7 +946,7 @@ export default function SuppliersPage() {
                       <label className="text-sm font-medium text-gray-500">Registration Date</label>
                       <p className="text-gray-900 flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
-                        {selectedSupplier.dateOfRegistration.toDate().toLocaleDateString()}
+                        {selectedSupplier.dateOfRegistration?.toDate ? selectedSupplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
                       </p>
                     </div>
                     <div>

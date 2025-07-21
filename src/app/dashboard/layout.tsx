@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '../../components/ui/Sidebar';
 import { authService, AuthUser } from '../../lib/firebase/auth';
+import { notificationService } from '../../lib/firebase/notification-service';
 import { LogOut, User, ChevronDown, Bell, Settings } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -13,7 +14,7 @@ export default function DashboardLayout({
 }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(3);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
   const router = useRouter();
@@ -37,6 +38,29 @@ export default function DashboardLayout({
 
     return unsubscribe;
   }, [router]);
+
+  // Load notification count when user changes
+  useEffect(() => {
+    if (currentUser?.uid) {
+      loadNotificationCount();
+      
+      // Set up interval to refresh notification count periodically
+      const interval = setInterval(loadNotificationCount, 30000); // Every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
+
+  const loadNotificationCount = async () => {
+    if (!currentUser?.uid) return;
+    
+    try {
+      const count = await notificationService.getUnreadCount(currentUser.uid);
+      setNotificationCount(count);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -128,9 +152,19 @@ export default function DashboardLayout({
             <div className="flex items-center space-x-4">
               {/* Notifications */}
               <button 
-                onClick={() => {
-                  setNotificationCount(0);
-                  router.push('/dashboard/notifications');
+                onClick={async () => {
+                  try {
+                    // Generate notifications if user has none
+                    if (notificationCount === 0 && currentUser) {
+                      const userRole = currentUser.employee?.roles?.[0]?.jobTitle || 'general';
+                      await notificationService.generateNotifications(currentUser.uid, userRole);
+                      await loadNotificationCount();
+                    }
+                    router.push('/dashboard/notifications');
+                  } catch (error) {
+                    console.error('Error handling notification click:', error);
+                    router.push('/dashboard/notifications');
+                  }
                 }}
                 className="relative p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200 group"
                 title="Notifications"
