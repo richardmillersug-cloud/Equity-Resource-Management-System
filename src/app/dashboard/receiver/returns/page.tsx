@@ -316,32 +316,7 @@ export default function ReturnNotesPage() {
 
 
 
-  const handleAddItemClick = () => {
-    const userValidation = validateUser();
-    if (!userValidation.isValid) {
-      showValidationError(userValidation.message);
-      return;
-    }
 
-    const supplierValidation = validateSupplier();
-    if (!supplierValidation.isValid) {
-      showValidationError(supplierValidation.message);
-      return;
-    }
-
-    // Additional checks for add item process
-    if (newReturnNote.items.length >= 50) {
-      showValidationError('Maximum of 50 items allowed per return note. Please create a new return note for additional items.');
-      return;
-    }
-
-    try {
-      setShowItemModal(true);
-    } catch (error) {
-      console.error('Error opening add item modal:', error);
-      showValidationError('Failed to open add item form. Please try again.');
-    }
-  };
 
 
 
@@ -1550,7 +1525,7 @@ const AddReturnNoteModal = ({
                 <h3 className="text-lg font-semibold text-gray-900">Return Items</h3>
                 <button
                   type="button"
-                  onClick={handleAddItemClick}
+                  onClick={() => setShowItemModal(true)}
                   disabled={!newReturnNote.supplierId}
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
