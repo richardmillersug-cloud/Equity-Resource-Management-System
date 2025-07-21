@@ -186,15 +186,6 @@ export default function DashboardLayout({
                 <Settings className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
               </button>
               
-              {/* Prominent Sign Out Button */}
-              <button
-                onClick={handleSignOut}
-                className="p-2 bg-white rounded-full shadow-sm border border-red-200 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group"
-                title="Sign Out"
-              >
-                <LogOut className="w-5 h-5 text-red-500 group-hover:text-red-600 transition-colors" />
-              </button>
-              
               {/* User Profile */}
               <div className="relative">
                 <button
