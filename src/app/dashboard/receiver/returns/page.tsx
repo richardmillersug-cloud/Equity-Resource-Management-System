@@ -5,6 +5,7 @@ import { EnhancedReturnNoteService, ReturnNote, ReturnItem, ReturnNoteStats, RET
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
 import { Package, Plus, Search, RefreshCw, Calendar, CheckCircle, XCircle, AlertCircle, Clock, Edit, Trash2, Download, FileText, FileSpreadsheet, File, Filter, AlertTriangle, ArrowLeft, Eye, Truck } from 'lucide-react';
 import { authService } from '../../../../lib/firebase/auth';
+import { Timestamp } from 'firebase/firestore';
 
 const enhancedReturnNoteService = new EnhancedReturnNoteService();
 const supplierService = new EnhancedSupplierService();
@@ -313,26 +314,7 @@ export default function ReturnNotesPage() {
     }
   };
 
-  const handleViewReturnNote = (returnNote: ReturnNote) => {
-    const userValidation = validateUser();
-    if (!userValidation.isValid) {
-      showValidationError(userValidation.message);
-      return;
-    }
 
-    if (!returnNote || !returnNote.id) {
-      showValidationError('Invalid return note. Please refresh the page and try again.');
-      return;
-    }
-
-    try {
-      setSelectedReturnNote(returnNote);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error('Error opening return note view:', error);
-      showValidationError('Failed to open return note details. Please try again.');
-    }
-  };
 
   const handleAddItemClick = () => {
     const userValidation = validateUser();
@@ -361,45 +343,7 @@ export default function ReturnNotesPage() {
     }
   };
 
-  const handleEditReturnNote = (returnNote: ReturnNote) => {
-    const userValidation = validateUser();
-    if (!userValidation.isValid) {
-      showValidationError(userValidation.message);
-      return;
-    }
 
-    // Only allow editing of draft and pending return notes
-    if (!['draft', 'pending'].includes(returnNote.status)) {
-      showValidationError(`Cannot edit return note with status "${returnNote.status}". Only draft and pending return notes can be edited.`);
-      return;
-    }
-
-    try {
-      // Convert return note data to editable format
-      const editableData = {
-        id: returnNote.id,
-        supplierId: returnNote.supplierId,
-        supplierName: returnNote.supplierName,
-        returnDate: returnNote.returnDate.toDate().toISOString().split('T')[0],
-        expectedPickupDate: returnNote.expectedPickupDate ? returnNote.expectedPickupDate.toDate().toISOString().split('T')[0] : '',
-        reason: returnNote.reason,
-        notes: returnNote.notes || '',
-        items: returnNote.items.map(item => ({
-          ...item,
-          expiryDate: item.expiryDate ? item.expiryDate.toDate().toISOString().split('T')[0] : ''
-        })),
-        status: returnNote.status
-      };
-
-      setEditingReturnNote(editableData);
-      setNewReturnNote(editableData);
-      setIsViewMode(false);
-      setShowEditModal(true);
-    } catch (error) {
-      console.error('Error opening return note for editing:', error);
-      showValidationError('Failed to open return note for editing. Please try again.');
-    }
-  };
 
   const handleUpdateReturnNote = async () => {
     try {
@@ -520,6 +464,128 @@ export default function ReturnNotesPage() {
     }
   };
 
+  // Handler functions for modals
+
+
+
+
+
+  const handleCreateReturnNote = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      const userValidation = validateUser();
+      if (!userValidation.isValid) {
+        showValidationError(userValidation.message);
+        return;
+      }
+
+      const returnNoteValidation = validateReturnNote();
+      if (!returnNoteValidation.isValid) {
+        showValidationError(returnNoteValidation.message);
+        return;
+      }
+
+      const returnNoteData = {
+        supplierId: newReturnNote.supplierId,
+        supplierName: newReturnNote.supplierName,
+        returnDate: Timestamp.fromDate(new Date(newReturnNote.returnDate)),
+        expectedPickupDate: newReturnNote.expectedPickupDate ? Timestamp.fromDate(new Date(newReturnNote.expectedPickupDate)) : null,
+        reason: newReturnNote.reason,
+        notes: newReturnNote.notes,
+        items: newReturnNote.items,
+        status: 'draft',
+        createdBy: currentUser.uid,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+
+      if (editingReturnNote) {
+        await enhancedReturnNoteService.update(editingReturnNote.id, returnNoteData);
+        showSuccess('Return note updated successfully!');
+        setEditingReturnNote(null);
+      } else {
+        await enhancedReturnNoteService.create(returnNoteData);
+        showSuccess('Return note created successfully!');
+      }
+
+      // Reset form
+      setNewReturnNote({
+        supplierId: '',
+        supplierName: '',
+        returnDate: new Date().toISOString().split('T')[0],
+        expectedPickupDate: '',
+        reason: '',
+        notes: '',
+        items: []
+      });
+
+      setShowAddModal(false);
+      loadReturnNotes();
+      loadStats();
+
+    } catch (error) {
+      console.error('Error creating return note:', error);
+      showValidationError('Failed to create return note. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateReturnNoteStatus = async (id: string, status: string) => {
+    try {
+      await enhancedReturnNoteService.updateStatus(id, status);
+      showSuccess(`Return note status updated to ${status}!`);
+      loadReturnNotes();
+      loadStats();
+    } catch (error) {
+      console.error('Error updating return note status:', error);
+      showValidationError('Failed to update status. Please try again.');
+    }
+  };
+
+  const handleUpdateItem = () => {
+    const itemValidation = validateItem(newItem);
+    if (!itemValidation.isValid) {
+      showValidationError(itemValidation.message);
+      return;
+    }
+
+    setNewReturnNote(prev => ({
+      ...prev,
+      items: prev.items.map((item, index) => 
+        index === editingItemIndex 
+          ? {
+              ...newItem,
+              expiryDate: newItem.expiryDate ? Timestamp.fromDate(new Date(newItem.expiryDate)) : null
+            }
+          : item
+      )
+    }));
+
+    // Reset item form
+    setNewItem({
+      itemName: '',
+      itemDescription: '',
+      category: '',
+      quantity: 1,
+      unit: 'pcs',
+      unitPrice: 0,
+      reason: '',
+      batchNumber: '',
+      expiryDate: '',
+      invoiceNumber: '',
+      notes: ''
+    });
+
+    setEditingItemIndex(-1);
+    setShowItemModal(false);
+  };
+
+  const handleSubmitReturnNote = async () => {
+    await handleCreateReturnNote();
+  };
+
   const handleRefresh = async () => {
     const userValidation = validateUser();
     if (!userValidation.isValid) {
@@ -534,6 +600,25 @@ export default function ReturnNotesPage() {
       console.error('Error refreshing data:', error);
       showValidationError('Failed to refresh data. Please check your connection and try again.');
     }
+  };
+
+  const handleViewReturnNote = (returnNote: ReturnNote) => {
+    setSelectedReturnNote(returnNote);
+    setShowViewModal(true);
+  };
+
+  const handleEditReturnNote = (returnNote: ReturnNote) => {
+    setEditingReturnNote(returnNote);
+    setNewReturnNote({
+      supplierId: returnNote.supplierId,
+      supplierName: returnNote.supplierName,
+      returnDate: returnNote.returnDate.toDate().toISOString().split('T')[0],
+      expectedPickupDate: returnNote.expectedPickupDate ? returnNote.expectedPickupDate.toDate().toISOString().split('T')[0] : '',
+      reason: returnNote.reason,
+      notes: returnNote.notes || '',
+      items: returnNote.items || []
+    });
+    setShowAddModal(true);
   };
 
   const handleAddReturnNote = async () => {
@@ -1018,8 +1103,11 @@ export default function ReturnNotesPage() {
                 returnNote={returnNote}
                 onView={handleViewReturnNote}
                 onEdit={handleEditReturnNote}
-                onDelete={handleDeleteReturnNote}
-                onUpdateStatus={handleUpdateStatus}
+                onDelete={(returnNote) => {
+                  setSelectedReturnNote(returnNote);
+                  setShowDeleteModal(true);
+                }}
+                onUpdateStatus={handleUpdateReturnNoteStatus}
               />
             ))}
         </div>
@@ -1063,6 +1151,107 @@ export default function ReturnNotesPage() {
           </div>
         )}
       </div>
+
+      {/* Add Modal */}
+      {showAddModal && (
+        <AddReturnNoteModal
+          newReturnNote={newReturnNote}
+          setNewReturnNote={setNewReturnNote}
+          suppliers={suppliers}
+          categories={categories}
+          units={units}
+          newItem={newItem}
+          setNewItem={setNewItem}
+          showItemModal={showItemModal}
+          setShowItemModal={setShowItemModal}
+          editingItemIndex={editingItemIndex}
+          onAddItem={handleAddItem}
+          onEditItem={handleEditItem}
+          onRemoveItem={handleRemoveItem}
+          onSubmit={handleSubmitReturnNote}
+          onClose={() => setShowAddModal(false)}
+          isSubmitting={isSubmitting}
+          title={editingReturnNote ? "Edit Return Note" : "Create Return Note"}
+          submitButtonText={editingReturnNote ? "Update Return Note" : "Create Return Note"}
+        />
+      )}
+
+      {/* View Modal */}
+      {showViewModal && selectedReturnNote && (
+        <ViewReturnNoteModal
+          returnNote={selectedReturnNote}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedReturnNote(null);
+          }}
+          onEdit={() => {
+            setEditingReturnNote(selectedReturnNote);
+            setShowViewModal(false);
+            setShowAddModal(true);
+            setIsViewMode(false);
+          }}
+          onUpdateStatus={handleUpdateReturnNoteStatus}
+        />
+      )}
+
+      {/* Item Modal */}
+      {showItemModal && (
+        <ItemModal
+          newItem={newItem}
+          setNewItem={setNewItem}
+          categories={categories}
+          units={units}
+          onClose={() => {
+            setShowItemModal(false);
+            setEditingItemIndex(-1);
+          }}
+          onSubmit={editingItemIndex >= 0 ? handleUpdateItem : handleAddItem}
+          isEditing={editingItemIndex >= 0}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedReturnNote && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirm Delete</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this return note? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedReturnNote(null);
+                }}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (selectedReturnNote) {
+                    try {
+                      await enhancedReturnNoteService.delete(selectedReturnNote.id);
+                      showSuccess('Return note deleted successfully!');
+                      loadReturnNotes();
+                      loadStats();
+                    } catch (error) {
+                      console.error('Error deleting return note:', error);
+                      showValidationError('Failed to delete return note. Please try again.');
+                    }
+                  }
+                  setShowDeleteModal(false);
+                  setSelectedReturnNote(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

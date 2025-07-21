@@ -102,6 +102,31 @@ export class EnhancedBarcodeService extends FirestoreService<BarcodeItem> {
     return await this.create(barcodeItem);
   }
 
+  // Alias for backward compatibility
+  async addBarcodeItem(data: any): Promise<string> {
+    const barcodeItem: Omit<BarcodeItem, 'id'> = {
+      itemName: data.itemName,
+      itemDescription: data.itemDescription || '',
+      category: data.category,
+      supplierName: data.supplierName,
+      receivedDate: data.receivedDate,
+      codeType: data.codeType,
+      codeValue: data.codeValue,
+      barcodeFormat: data.barcodeFormat,
+      generatedBy: data.userId || data.generatedBy || '',
+      generatedAt: Timestamp.now(),
+      printSettings: data.printSettings,
+      status: data.status || 'Active',
+      notes: data.notes || '',
+      codeImageUrl: data.codeImageUrl || '',
+      printHistory: data.printHistory || [],
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+
+    return await this.create(barcodeItem);
+  }
+
   // Get barcode items by category
   async getByCategory(category: string): Promise<BarcodeItem[]> {
     return await this.getAll([
