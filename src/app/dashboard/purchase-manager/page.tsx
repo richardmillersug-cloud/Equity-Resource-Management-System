@@ -1610,7 +1610,7 @@ export default function PurchaseManagerDashboard() {
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xl font-bold text-gray-900">Cash Close Analysis</h3>
+              <h3 className="text-xl font-bold text-gray-900">Cash Close Analysis</h3>
                 <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${
                   (cashCloseFromDate || cashCloseToDate) ? 'bg-orange-50' : 'bg-blue-50'
                 }`}>
@@ -1675,7 +1675,7 @@ export default function PurchaseManagerDashboard() {
                     title={formatCurrency(metrics.cashCloseMetrics.totalDayCash)}
                   >
                     {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalDayCash)}
-                  </p>
+                </p>
                 </div>
                 <p className="text-xs text-blue-600 truncate">{metrics.cashCloseMetrics.dayCloseCount} closes</p>
               </div>
@@ -1691,7 +1691,7 @@ export default function PurchaseManagerDashboard() {
                     title={formatCurrency(metrics.cashCloseMetrics.totalNightCash)}
                   >
                     {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNightCash)}
-                  </p>
+                </p>
                 </div>
                 <p className="text-xs text-indigo-600 truncate">{metrics.cashCloseMetrics.nightCloseCount} closes</p>
               </div>
@@ -1707,7 +1707,7 @@ export default function PurchaseManagerDashboard() {
                     title={formatCurrency(metrics.cashCloseMetrics.totalNetworkMoney)}
                   >
                     {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNetworkMoney)}
-                  </p>
+                </p>
                 </div>
                 <p className="text-xs text-green-600 truncate">Digital payments</p>
               </div>
@@ -1739,7 +1739,7 @@ export default function PurchaseManagerDashboard() {
                     title={formatCurrency(metrics.cashCloseMetrics.totalExcess)}
                   >
                     {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalExcess)}
-                  </p>
+                </p>
                 </div>
                 <p className="text-xs text-amber-600 truncate">Cash surplus</p>
               </div>
@@ -2140,7 +2140,7 @@ export default function PurchaseManagerDashboard() {
         <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Recent Cash Closes</h3>
+            <h3 className="text-xl font-bold text-gray-900">Recent Cash Closes</h3>
               <p className="text-sm text-gray-500">Showing {metrics.cashCloseMetrics.recentCloses.length} of latest cash closes</p>
             </div>
             <div className="flex items-center space-x-4">
@@ -2197,7 +2197,7 @@ export default function PurchaseManagerDashboard() {
                 <Clock className="w-4 h-4 text-blue-600" />
                 <span className="text-sm text-blue-600 font-medium">Real-time</span>
               </div>
-            </div>
+              </div>
           </div>
 
           <div className="overflow-x-auto">
