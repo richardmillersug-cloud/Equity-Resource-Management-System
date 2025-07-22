@@ -139,13 +139,16 @@ export default function DashboardLayout({
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-purple-100 px-6 py-4 sticky top-0 z-40">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {getUserRole()} Dashboard
-              </h1>
-              <p className="text-purple-600 font-medium">
-                Welcome back, {currentUser?.employee?.firstName || 'User'}
-              </p>
+            <div className="flex items-center gap-3">
+              <img src="/equity-logo.png" alt="Equity Logo" className="h-10 w-auto object-contain" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {getUserRole()} Dashboard
+                </h1>
+                <p className="text-purple-600 font-medium">
+                  Welcome back, 
+                </p>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">
@@ -162,7 +165,7 @@ export default function DashboardLayout({
                     router.push('/dashboard/notifications');
                   } catch (error) {
                     console.error('Error handling notification click:', error);
-                    router.push('/dashboard/notifications');
+                  router.push('/dashboard/notifications');
                   }
                 }}
                 className="relative p-2 bg-white rounded-full shadow-sm border border-purple-100 hover:shadow-md transition-all duration-200 group"

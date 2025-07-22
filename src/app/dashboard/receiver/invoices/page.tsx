@@ -508,7 +508,7 @@ export default function InvoicesPage() {
                 <div className="text-center">
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
                     <FileText className="w-6 h-6 text-white" />
-                  </div>
+                </div>
                   <p className="text-gray-500 text-xs font-medium mb-1">Total</p>
                   <p className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">{stats.total}</p>
                 </div>
@@ -522,15 +522,15 @@ export default function InvoicesPage() {
                   </div>
                   <p className="text-gray-500 text-xs font-medium mb-1">Draft</p>
                   <p className="text-2xl font-bold text-gray-600 group-hover:text-gray-700 transition-colors">{stats.draft}</p>
-                </div>
               </div>
+            </div>
 
               {/* Pending */}
               <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-lg">
                     <Clock className="w-6 h-6 text-white" />
-                  </div>
+                </div>
                   <p className="text-gray-500 text-xs font-medium mb-1">Pending</p>
                   <p className="text-2xl font-bold text-yellow-600 group-hover:text-yellow-700 transition-colors">{stats.pending}</p>
                 </div>
@@ -544,8 +544,8 @@ export default function InvoicesPage() {
                   </div>
                   <p className="text-gray-500 text-xs font-medium mb-1">Approved</p>
                   <p className="text-2xl font-bold text-green-600 group-hover:text-green-700 transition-colors">{stats.approved}</p>
-                </div>
               </div>
+            </div>
 
               {/* Paid */}
               <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
@@ -572,37 +572,37 @@ export default function InvoicesPage() {
 
             {/* Financial Summary Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                <div className="flex items-center justify-between">
-                  <div>
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
                     <p className="text-gray-500 text-sm font-medium mb-1">Total Balance</p>
                     <p className="text-3xl font-bold text-purple-600 group-hover:text-purple-700 transition-colors">{formatAmount(stats.pendingAmount || stats.totalAmount)}</p>
                     <div className="flex items-center mt-1">
                       <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                       <span className="text-xs text-gray-500">Outstanding amount</span>
-                    </div>
+                </div>
                   </div>
                   <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <DollarSign className="w-7 h-7 text-white" />
-                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
                     <p className="text-3xl font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors">{formatAmount(stats.totalAmount)}</p>
                     <div className="flex items-center mt-1">
                       <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
                       <span className="text-xs text-gray-500">All invoices value</span>
-                    </div>
-                  </div>
+                </div>
+                </div>
                   <div className="w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <FileText className="w-7 h-7 text-white" />
-                  </div>
-                </div>
               </div>
+            </div>
+          </div>
             </div>
           </>
         )}

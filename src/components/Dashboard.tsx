@@ -234,9 +234,12 @@ export function Dashboard() {
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-8 py-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-500 mt-1">Welcome back! Here's what's happening with your business.</p>
+            <div className="flex items-center gap-3">
+              <img src="/equity-logo.png" alt="Equity Logo" className="h-10 w-auto object-contain" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-500 mt-1">Welcome back! Here's what's happening with your business.</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               {/* Search */}

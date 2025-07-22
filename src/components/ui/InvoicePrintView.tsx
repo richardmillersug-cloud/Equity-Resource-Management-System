@@ -72,7 +72,8 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
   const generateQRCode = async () => {
     try {
       setLoadingQR(true);
-      const svgString = await QRCodeService.generateInvoiceQRCodeSVG(invoice.id, invoice.invoiceNumber);
+      const verificationUrl = `https://equi-319f.vercel.app/invoice/verify/${invoice.id}`;
+      const svgString = await QRCodeService.generateInvoiceQRCodeSVG(verificationUrl, invoice.invoiceNumber);
       setQrCodeSVG(svgString);
       console.log('QR code generated for print view');
     } catch (error) {
@@ -170,8 +171,8 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
 
         {/* Printable Invoice Content */}
         <div id="printable-invoice" className="p-6 bg-white">
-          {/* Header Section */}
-          <div className="flex justify-between items-start mb-6">
+          {/* GRN-Style Header Section */}
+          <div className="flex justify-between items-start mb-6 border-b pb-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-white border border-gray-300 flex items-center justify-center overflow-hidden">
                 <img 
@@ -191,205 +192,155 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
               </div>
               <div>
                 <h1 className="text-base font-bold text-gray-900 leading-tight">
-                  UNISON TECHNOLOGIES AND INNOVATIONS LTD
+                  UNISON TECHNOLOGIES AND INNOVATION LTD
                 </h1>
                 <p className="text-xs text-gray-600">EQUITY SHOPPERS SUPERMARKET</p>
-                <p className="text-xs text-gray-600">RECEIVING SECTION</p>
-                <p className="text-xs text-gray-600">KAMPALA-UGANDA</p>
+                <p className="text-xs text-gray-600">KYENGERA, KAMPALA-MASAKA</p>
                 <p className="text-xs text-blue-600 underline">unisontechnologiesaninnovation@gmail.com</p>
                 <p className="text-xs text-blue-600 underline">equityshoppers@gmail.com</p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="w-[100px] h-[100px] border border-gray-400 bg-white p-1 flex-shrink-0 mb-2">
-                <div 
-                  className="w-full h-full"
-                  data-qr-code
-                  dangerouslySetInnerHTML={{ __html: qrCodeSVG }}
-                />
-              </div>
-              <p className="text-xs text-gray-600">Scan for details</p>
-            </div>
           </div>
 
-          {/* Title Section */}
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-bold border border-gray-600 py-2">
-              PAYMENT HISTORY RECORD
-            </h3>
-            <div className="text-right mt-2">
-              <span className="font-bold text-base">Invoice #{invoice.invoiceNumber}</span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-bold text-sm">Supplier:</span>
-                <span className="ml-2 text-sm">{invoice.supplierName}</span>
-              </div>
-              <div>
-                <span className="font-bold text-sm">Date:</span>
-                <span className="ml-2 text-sm">{formatDate(invoice.date || new Date())}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment History Section */}
-          <div className="mt-4 mb-4">
-            <h3 className="font-bold mb-4 underline text-lg text-center">
-              {paymentHistory.length > 0 ? 'PAYMENT HISTORY DETAILS' : 'PAYMENT PLAN TEMPLATE'}
-            </h3>
-            <table className="w-full border-collapse border border-gray-400">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-12">Installment</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Date</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-24">Amount (UGX)</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Bal</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-28">Transaction ID</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-32">Paid By</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-20">Received By</th>
-                  <th className="border border-gray-400 px-1 py-1 text-xs font-bold text-left w-16">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentHistory.length > 0 ? (
-                  // Show actual payment history if available
-                  <>
-                    {paymentHistory.slice(0, 5).map((payment, index) => {
-                      // Calculate running total up to this payment (including this payment)
-                      const runningTotal = paymentHistory.slice(0, index + 1).reduce((sum, p) => sum + p.amount, 0);
-                      // Calculate remaining balance after this payment
-                      const remainingBalance = runningTotal >= invoice.amount ? 0 : Math.max(0, invoice.amount - runningTotal);
-                      
-                      // If invoice is fully paid, treat all payments as completed
-                      const isInvoiceFullyPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0) >= invoice.amount;
-                      const displayStatus = isInvoiceFullyPaid ? 'completed' : (payment.paymentStatus || 'completed');
-                      
-                      return (
-                        <tr key={payment.id || index}>
-                          <td className="border border-gray-400 px-1 py-2 text-xs font-medium">#{payment.installmentNumber}</td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs">
-                            {new Date(payment.paymentDate).toLocaleDateString('en-GB', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: '2-digit'
-                            })}
-                            <br />
-                            <span className="text-gray-600">
-                              {new Date(payment.paymentDate).toLocaleTimeString('en-GB', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs font-medium">
-                            {formatAmount(payment.amount)}
-                          </td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs">
-                            {formatAmount(remainingBalance)}
-                          </td>
-                        <td className="border border-gray-400 px-1 py-2 text-xs font-mono">
-                          {payment.paymentMethod.details.transactionId || 
-                           payment.paymentMethod.details.chequeNumber || 
-                           payment.paymentReference.slice(-8)}
-                        </td>
-                                                 <td className="border border-gray-400 px-1 py-2 text-xs">
-                           {payment.paidByName}
-                         </td>
-                         <td className="border border-gray-400 px-1 py-2 text-xs">
-                           {payment.approvedBy || receiverName}
-                         </td>
-                                                 <td className="border border-gray-400 px-1 py-2 text-xs">
-                           {displayStatus === 'completed' ? '✓ PAID' :
-                            displayStatus === 'pending' ? '⏳ PENDING' :
-                            displayStatus === 'failed' ? '✗ FAILED' :
-                            displayStatus === 'cancelled' ? '✗ CANCELLED' :
-                            '? UNKNOWN'}
-                         </td>
-                       </tr>
-                     );
-                     })}
-                    {/* Fill remaining rows if payment history has less than 5 items */}
-                    {paymentHistory.length < 5 && 
-                      Array.from({ length: 5 - paymentHistory.length }, (_, index) => (
-                        <tr key={`empty-${index}`}>
-                          <td className="border border-gray-400 px-1 py-2 text-xs">#{paymentHistory.length + index + 1}</td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                          <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                        </tr>
-                      ))
-                    }
-                  </>
-                ) : (
-                  // Default 5 empty rows when no payment history exists
-                  Array.from({ length: 5 }, (_, index) => (
-                    <tr key={index}>
-                      <td className="border border-gray-400 px-1 py-2 text-xs">#{index + 1}</td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                      <td className="border border-gray-400 px-1 py-2 text-xs h-8"></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            
-            {/* Payment Summary for paid invoices */}
-            {paymentHistory.length > 0 && (
-              <div className="mt-3 p-2 bg-gray-50 border border-gray-300 rounded">
-                <div className="grid grid-cols-3 gap-4 text-xs">
-                  <div className="text-center">
-                    <span className="font-bold">Total Invoice:</span>
-                    <br />
-                    <span className="font-bold text-blue-600">{formatAmount(invoice.amount)}</span>
-                  </div>
-                                     <div className="text-center">
-                     <span className="font-bold">Total Paid:</span>
-                     <br />
-                     <span className="font-bold text-green-600">
-                       {formatAmount(paymentHistory.reduce((sum, p) => sum + p.amount, 0))}
-                     </span>
-                   </div>
-                   <div className="text-center">
-                     <span className="font-bold">Balance:</span>
-                     <br />
-                     <span className="font-bold text-red-600">
-                       {formatAmount(Math.max(0, invoice.amount - paymentHistory.reduce((sum, p) => sum + p.amount, 0)))}
-                     </span>
-                   </div>
-                 </div>
-                 <div className="mt-2 text-center text-xs text-gray-600">
-                   <span className="font-bold">Payment Status: </span>
-                   {paymentHistory.reduce((sum, p) => sum + p.amount, 0) >= invoice.amount ? 
-                     <span className="text-green-600 font-bold">FULLY PAID</span> : 
-                     <span className="text-orange-600 font-bold">PARTIAL PAYMENT</span>
-                   }
-                </div>
-              </div>
+          {/* GRN Title and Number */}
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-bold border border-gray-600 py-2 inline-block px-8">GOODS RECEIVED NOTE</h3>
+            <div className="mt-2 text-xs">EQS{invoice.invoiceNumber || invoice.id?.slice(-4) || '0000'}</div>
+            {invoice.fdn && (
+              <div className="mt-1 text-xs font-semibold text-gray-700">FDN: <span className="font-mono">{invoice.fdn}</span></div>
             )}
           </div>
 
-          {/* Digital Verification Section */}
-          <div className="mt-3 text-center border-t border-gray-300 pt-2">
-            <div className="text-center">
-              <p className="text-xs font-semibold text-gray-900">Digital Verification</p>
-              <p className="text-xs text-gray-600">Scan QR code to verify this invoice online</p>
-              <p className="text-xs text-gray-600">Invoice: {invoice.invoiceNumber}</p>
+          {/* Supplier and Description */}
+          <div className="mb-2 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-bold">RECEIVED FROM:</span>
+              <span className="ml-2">{invoice.supplierName}</span>
+            </div>
+            <div>
+              <span className="font-bold">Description of goods:</span>
+              <span className="ml-2">{invoice.description || 'N/A'}</span>
             </div>
           </div>
 
-          {/* Footer - Left Aligned at Bottom */}
-          <div className="mt-4 text-left text-xs text-gray-600">
-            <p>This document serves as proof of goods received and payment made</p>
-            <p>Generated by EQUI Supply Management System - {new Date().toLocaleDateString()}</p>
+          {/* Checkboxes Section */}
+          <div className="mb-2 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-bold">Quantity received according to order:</span>
+              <span className="ml-2">
+                <input type="checkbox" checked={!!invoice.quantity} readOnly className="mr-1" />YES
+                <input type="checkbox" checked={!invoice.quantity} readOnly className="ml-4 mr-1" />NO
+              </span>
+            </div>
+            <div>
+              <span className="font-bold">Transport payment:</span>
+              <span className="ml-2">
+                <input type="checkbox" checked={!!invoice.hasTransportPayment} readOnly className="mr-1" />YES
+                <input type="checkbox" checked={!invoice.hasTransportPayment} readOnly className="ml-4 mr-1" />NO
+                {invoice.hasTransportPayment && (
+                  <span className="ml-2">Amount: {formatAmount(invoice.transportAmount || 0)}</span>
+                )}
+              </span>
+            </div>
+          </div>
+          <div className="mb-2 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-bold">Damages:</span>
+              <span className="ml-2">
+                <input type="checkbox" checked={!!invoice.hasDamages} readOnly className="mr-1" />YES
+                <input type="checkbox" checked={!invoice.hasDamages} readOnly className="ml-4 mr-1" />NO
+                {invoice.hasDamages && invoice.damages && invoice.damages.length > 0 && (
+                  <span className="ml-2">Amount: {formatAmount(invoice.damages.reduce((sum, d) => sum + (d.estimatedValue || 0), 0))}</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Payment Details Section */}
+          <div className="mt-8 mb-2">
+            <div className="text-center text-lg font-bold mb-2">PAYMENT DETAILS</div>
+            {/* Payment method checkboxes removed: not present in Invoice model */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 justify-start text-base">
+              <span>Amount:</span>
+              <span className="font-bold underline">{formatAmount(invoice.amount)}</span>
+            </div>
+          </div>
+          <div className="mb-2 text-sm">
+            <span>Amount in words:</span>
+            <span className="ml-2 font-bold underline">{convertNumberToWords(invoice.amount)}</span>
+          </div>
+
+          {/* Payment Table Section */}
+          <div className="mb-8 mt-8"> {/* Add extra spacing above and below */}
+            <table className="w-full border-collapse border border-gray-400 text-xs">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-400 px-1 py-1">DATE</th>
+                  <th className="border border-gray-400 px-1 py-1">M.O.P</th>
+                  <th className="border border-gray-400 px-1 py-1">AMOUNT</th>
+                  <th className="border border-gray-400 px-1 py-1">TRANS ID</th>
+                  <th className="border border-gray-400 px-1 py-1">NAME</th>
+                  <th className="border border-gray-400 px-1 py-1">SIGN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 5 }).map((_, idx) => {
+                  const payment = paymentHistory[idx];
+                  return payment ? (
+                    <tr key={payment.id || idx}>
+                      <td className="border border-gray-400 px-1 py-3">{new Date(payment.paymentDate).toLocaleDateString('en-GB')}</td>
+                      <td className="border border-gray-400 px-1 py-3">{payment.paymentMethod?.type || 'N/A'}</td>
+                      <td className="border border-gray-400 px-1 py-3">{formatAmount(payment.amount)}</td>
+                      <td className="border border-gray-400 px-1 py-3">{payment.paymentReference?.slice(-8) || 'N/A'}</td>
+                      <td className="border border-gray-400 px-1 py-3">{payment.paidByName || 'N/A'}</td>
+                      <td className="border border-gray-400 px-1 py-3">{payment.approvedBy || ''}</td>
+                    </tr>
+                  ) : (
+                    <tr key={`empty-${idx}`}>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                      <td className="border border-gray-400 px-1 py-3 h-8"></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Signature Section */}
+          <div className="grid grid-cols-2 gap-4 mt-6 mb-2 text-sm">
+            <div>
+              <span className="font-bold">RECEIVED BY:</span>
+              <span className="ml-2">{receiverName}</span>
+              <div className="mt-2">
+                <span className="font-bold">Signature:</span>
+                <span className="ml-2 border-b border-gray-400 inline-block w-32 h-6 align-bottom"></span>
+              </div>
+              {/* Stamp field removed: receiverPosition not present in Invoice model */}
+            </div>
+            <div>
+              <span className="font-bold">Date:</span>
+              <span className="ml-2">{formatDate(invoice.date || new Date())}</span>
+              <div className="mt-2 flex items-center">
+                <span className="ml-2 w-[160px] h-[160px] border border-gray-100 bg-white p-1 flex-shrink-0 overflow-hidden qr-code-container">
+                  <span
+                    className="w-full h-full"
+                    data-qr-code
+                    dangerouslySetInnerHTML={{ __html: qrCodeSVG }}
+                  />
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* QR Code at Bottom Center removed, now shown at Tell Number */}
+
+          {/* Footer */}
+          <div className="mt-8 text-xs text-gray-600 text-center border-t pt-2">
+            Equity Shoppers Supermarket
+            <span className="ml-4">{new Date().toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -482,6 +433,12 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
           .underline {
             text-decoration: underline !important;
           }
+        }
+        .qr-code-container svg {
+          width: 100% !important;
+          height: 100% !important;
+          display: block;
+          object-fit: contain;
         }
       `}</style>
     </div>
