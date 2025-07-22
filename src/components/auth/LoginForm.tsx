@@ -92,6 +92,9 @@ export default function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProp
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="flex justify-center mb-6">
+          <img src="/equity-logo.png" alt="Equity Logo" className="h-16 w-auto object-contain" />
+        </div>
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to your retail management account</p>

@@ -795,8 +795,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     <div className={`${isExpanded ? 'w-64' : 'w-20'} bg-white border-r border-gray-100 flex flex-col py-6 transition-all duration-300 ease-in-out relative`}>
       {/* Logo and Toggle */}
       <div className="flex items-center px-6 mb-8">
-        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-xl">E</span>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border border-gray-200">
+          <img src="/equity-logo.png" alt="Equity Logo" className="w-full h-full object-contain" />
         </div>
         {isExpanded && (
           <div className="ml-3 overflow-hidden">

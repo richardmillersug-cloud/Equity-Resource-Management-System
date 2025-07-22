@@ -206,6 +206,9 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
           <div className="text-center mb-4">
             <h3 className="text-lg font-bold border border-gray-600 py-2 inline-block px-8">GOODS RECEIVED NOTE</h3>
             <div className="mt-2 text-xs">EQS{invoice.invoiceNumber || invoice.id?.slice(-4) || '0000'}</div>
+            {invoice.fdn && (
+              <div className="mt-1 text-xs font-semibold text-gray-700">FDN: <span className="font-mono">{invoice.fdn}</span></div>
+            )}
           </div>
 
           {/* Supplier and Description */}
@@ -232,9 +235,9 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
             <div>
               <span className="font-bold">Transport payment:</span>
               <span className="ml-2">
-                <input type="checkbox" checked={!!invoice.transportPaid} readOnly className="mr-1" />YES
-                <input type="checkbox" checked={!invoice.transportPaid} readOnly className="ml-4 mr-1" />NO
-                {invoice.transportPaid && (
+                <input type="checkbox" checked={!!invoice.hasTransportPayment} readOnly className="mr-1" />YES
+                <input type="checkbox" checked={!invoice.hasTransportPayment} readOnly className="ml-4 mr-1" />NO
+                {invoice.hasTransportPayment && (
                   <span className="ml-2">Amount: {formatAmount(invoice.transportAmount || 0)}</span>
                 )}
               </span>
@@ -244,10 +247,10 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
             <div>
               <span className="font-bold">Damages:</span>
               <span className="ml-2">
-                <input type="checkbox" checked={!!invoice.damages} readOnly className="mr-1" />YES
-                <input type="checkbox" checked={!invoice.damages} readOnly className="ml-4 mr-1" />NO
-                {invoice.damages && (
-                  <span className="ml-2">Amount: {formatAmount(invoice.damagesAmount || 0)}</span>
+                <input type="checkbox" checked={!!invoice.hasDamages} readOnly className="mr-1" />YES
+                <input type="checkbox" checked={!invoice.hasDamages} readOnly className="ml-4 mr-1" />NO
+                {invoice.hasDamages && invoice.damages && invoice.damages.length > 0 && (
+                  <span className="ml-2">Amount: {formatAmount(invoice.damages.reduce((sum, d) => sum + (d.estimatedValue || 0), 0))}</span>
                 )}
               </span>
             </div>
@@ -256,13 +259,7 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
           {/* Payment Details Section */}
           <div className="mt-8 mb-2">
             <div className="text-center text-lg font-bold mb-2">PAYMENT DETAILS</div>
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <span>
-                <input type="checkbox" checked={!!invoice.cashPayment} readOnly className="mr-1" />CASH PAYMENT
-                <input type="checkbox" checked={!!invoice.chequePayment} readOnly className="ml-4 mr-1" />CHEQUE
-                <input type="checkbox" checked={!!invoice.mobilePayment} readOnly className="ml-4 mr-1" />MOBILE
-              </span>
-            </div>
+            {/* Payment method checkboxes removed: not present in Invoice model */}
             <div className="flex flex-wrap items-center gap-2 mt-2 justify-start text-base">
               <span>Amount:</span>
               <span className="font-bold underline">{formatAmount(invoice.amount)}</span>
@@ -322,10 +319,7 @@ export default function InvoicePrintView({ invoice, onClose }: InvoicePrintViewP
                 <span className="font-bold">Signature:</span>
                 <span className="ml-2 border-b border-gray-400 inline-block w-32 h-6 align-bottom"></span>
               </div>
-              <div className="mt-2">
-                <span className="font-bold">Stamp:</span>
-                <span className="ml-2">{invoice.receiverPosition || ''}</span>
-              </div>
+              {/* Stamp field removed: receiverPosition not present in Invoice model */}
             </div>
             <div>
               <span className="font-bold">Date:</span>
