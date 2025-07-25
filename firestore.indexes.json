@@ -252,6 +252,16 @@
         { "fieldPath": "expiryDate", "order": "ASCENDING" },
         { "fieldPath": "__name__", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "employee_documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "documentType", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "uploadDate", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
