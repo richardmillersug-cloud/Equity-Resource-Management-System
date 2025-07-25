@@ -24,8 +24,10 @@ import {
   Trash2,
   Save,
   X,
-  Printer
+  Printer,
+  FileText
 } from 'lucide-react';
+import { getCompanyDisplayName, getCompanySubtitle } from '../../../../config/company';
 
 interface SupplierStats {
   total: number;
@@ -351,6 +353,125 @@ export default function SuppliersPage() {
     }
   };
 
+  // Print a blank supplier data-collection form that can be filled out by hand
+  const printSupplierForm = () => {
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Please allow pop-ups to enable printing');
+        return;
+      }
+
+      const today = new Date().toLocaleDateString();
+      const companyName = getCompanyDisplayName();
+      const companySubtitle = getCompanySubtitle();
+
+      const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Supplier Data Collection Form - ${companyName}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+      .header { text-align: center; margin-bottom: 36px; }
+      .header h1 { margin: 0; font-size: 24px; color: #4F46E5; }
+      .header h2 { margin: 4px 0 0; font-size: 14px; color: #6B7280; font-weight: normal; }
+      .form-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 24px; text-decoration: underline; }
+      .meta { text-align: right; margin-bottom: 24px; font-size: 12px; }
+      .section { margin-bottom: 24px; }
+      .section-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #4F46E5; }
+      .field { margin-bottom: 10px; font-size: 14px; }
+      .label { display: inline-block; width: 230px; font-weight: bold; }
+      .line { display: inline-block; border-bottom: 1px solid #000; width: 340px; height: 18px; vertical-align: bottom; }
+      .line.long { width: 100%; height: 20px; }
+      .line.tall { width: 100%; height: 60px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+      td { padding: 6px 4px; border: 1px solid #d1d5db; }
+      .signature { margin-top: 40px; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>${companyName}</h1>
+      <h2>${companySubtitle}</h2>
+    </div>
+
+    <div class="form-title">Supplier Data Collection Form</div>
+    <div class="meta">Date: ${today}</div>
+
+    <div class="section">
+      <div class="section-title">1. General Information</div>
+
+      <div class="field"><span class="label">Supplier Legal / Trading Name:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Tax Identification Number (TIN):</span><span class="line"></span></div>
+      <div class="field"><span class="label">Business Registration No.:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Date of Registration:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Physical Address:</span><span class="line long"></span></div>
+      <div class="field"><span class="label">Primary Contact Person:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Position / Title:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Phone Number(s):</span><span class="line long"></span></div>
+      <div class="field"><span class="label">Email Address:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Website:</span><span class="line"></span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">2. Goods / Services</div>
+      <div class="field"><span class="label">Main Product / Service Category:</span><span class="line long"></span></div>
+      <div class="field"><span class="label">Description of Goods / Services Provided:</span><span class="line tall"></span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">3. Banking Details</div>
+      <table>
+        <tr><td><strong>Bank Name</strong></td><td></td></tr>
+        <tr><td><strong>Branch</strong></td><td></td></tr>
+        <tr><td><strong>Account Title</strong></td><td></td></tr>
+        <tr><td><strong>Account Number</strong></td><td></td></tr>
+        <tr><td><strong>Mobile Money Provider</strong></td><td></td></tr>
+        <tr><td><strong>Mobile Money Number</strong></td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">4. Logistics & Delivery</div>
+      <div class="field"><span class="label">Preferred Delivery Schedule (Days / Times):</span><span class="line long"></span></div>
+      <div class="field"><span class="label">Route Days:</span><span class="line long"></span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">5. Compliance</div>
+      <div class="field"><span class="label">Tax Compliance Certificate No.:</span><span class="line"></span></div>
+      <div class="field"><span class="label">Certificate Expiry Date:</span><span class="line"></span></div>
+      <div class="field"><span class="label">NSDP Registration No.:</span><span class="line"></span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">6. Additional Notes</div>
+      <div class="field"><span class="line tall"></span></div>
+    </div>
+
+    <div class="signature">
+      <table width="100%">
+        <tr>
+          <td style="height:80px; vertical-align:bottom;">Supplier Signature &amp; Stamp</td>
+          <td style="height:80px; vertical-align:bottom;">Date</td>
+          <td style="height:80px; vertical-align:bottom;">Purchasing Manager Signature</td>
+          <td style="height:80px; vertical-align:bottom;">Date</td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>`;
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 500);
+    } catch (error) {
+      console.error('Error printing supplier form:', error);
+      alert('Error generating print form. Please try again.');
+    }
+  };
+
   const printSuppliers = () => {
     try {
       const printWindow = window.open('', '_blank');
@@ -632,17 +753,11 @@ export default function SuppliersPage() {
                   <span className="font-semibold">Pending Edits</span>
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      await initializeSuppliers();
-                      await loadSuppliers();
-                    } catch (error) {
-                      console.error('Error seeding:', error);
-                    }
-                  }}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-4 py-2 rounded-xl text-sm hover:bg-white/20 transition-all duration-300"
+                  onClick={printSupplierForm}
+                  className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-4 py-2 rounded-xl text-sm hover:bg-white/20 transition-all duration-300 flex items-center gap-2"
                 >
-                  Seed Data
+                  <FileText className="w-4 h-4" />
+                  <span className="font-semibold">Supplier Form</span>
                 </button>
                 <button
                   onClick={handleAddSupplier}
