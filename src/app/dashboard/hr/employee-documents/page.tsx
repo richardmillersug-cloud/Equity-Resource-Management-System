@@ -70,6 +70,42 @@ export default function EmployeeDocumentsPage() {
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [expiringDocuments, setExpiringDocuments] = useState<EmployeeDocument[]>([]);
 
+  const templates = [
+    {
+      title: 'Employment Contract',
+      description: 'Standard contract for new hires to sign',
+      href: '/dashboard/hr/contracts/employee-contract',
+      icon: FileText,
+      bg: 'bg-purple-50',
+      color: 'text-purple-600'
+    },
+    {
+      title: 'Employee Rules & Regulations',
+      description: 'Company policies employees must acknowledge',
+      href: '/dashboard/hr/docs/employee-rules',
+      icon: List,
+      bg: 'bg-yellow-50',
+      color: 'text-yellow-700'
+    },
+    {
+      title: 'Employee Information Form',
+      description: 'Personal & employment details form for new hires',
+      href: '/dashboard/hr/forms/employee-information',
+      icon: Users,
+      bg: 'bg-green-50',
+      color: 'text-green-700'
+    },
+    {
+      title: 'Mode of Operation',
+      description: 'Daily duties and non-negotiables for staff',
+      href: '/dashboard/hr/docs/mode-of-operation',
+      icon: BarChart3,
+      bg: 'bg-blue-50',
+      color: 'text-blue-700'
+    },
+    // Future templates can be added here
+  ];
+
   useEffect(() => {
     loadData();
   }, []);
@@ -276,6 +312,26 @@ export default function EmployeeDocumentsPage() {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Printable Templates */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Printable HR Templates</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {templates.map(t => (
+            <a
+              key={t.title}
+              href={t.href}
+              className={`flex items-start gap-4 p-6 rounded-lg border border-gray-200 hover:shadow-md transition ${t.bg}`}
+            >
+              <t.icon className={`w-8 h-8 ${t.color}`} />
+              <div>
+                <p className="font-medium text-gray-900">{t.title}</p>
+                <p className="text-sm text-gray-600">{t.description}</p>
+              </div>
+            </a>
+          ))}
         </div>
       </div>
 

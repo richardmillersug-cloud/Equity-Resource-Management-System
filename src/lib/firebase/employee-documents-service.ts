@@ -377,7 +377,39 @@ export class EmployeeDocumentsService {
       }
 
       return documents;
-    } catch (error) {
+    } catch (error: any) {
+      if (typeof error?.code === 'string' && error.code.includes('failed-precondition')) {
+        console.warn('Composite index missing for searchDocuments – falling back to client filtering.');
+
+        const snapshot = await getDocs(query(collection(db, this.documentsCollection), where('isActive', '==', true)));
+
+        let documents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument));
+
+        // Apply same client-side filters as above
+        if (documentType) {
+          documents = documents.filter(doc => doc.documentType === documentType);
+        }
+
+        if (searchTerm) {
+          const searchLower = searchTerm.toLowerCase();
+          documents = documents.filter(doc =>
+            doc.employeeName.toLowerCase().includes(searchLower) ||
+            doc.documentName.toLowerCase().includes(searchLower) ||
+            doc.description?.toLowerCase().includes(searchLower) ||
+            doc.tags.some(tag => tag.toLowerCase().includes(searchLower))
+          );
+        }
+
+        if (accessLevel) {
+          documents = documents.filter(doc => doc.accessLevel === accessLevel);
+        }
+
+        // Sort by uploadDate desc (default)
+        documents.sort((a, b) => b.uploadDate.seconds - a.uploadDate.seconds);
+
+        return documents;
+      }
+
       console.error('Error searching documents:', error);
       throw new Error('Failed to search documents');
     }
@@ -385,26 +417,45 @@ export class EmployeeDocumentsService {
 
   // Get documents expiring soon
   static async getExpiringDocuments(daysAhead: number = 30): Promise<EmployeeDocument[]> {
-    try {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + daysAhead);
+     try {
+       const futureDate = new Date();
+       futureDate.setDate(futureDate.getDate() + daysAhead);
 
-      const snapshot = await getDocs(
-        query(
-          collection(db, this.documentsCollection),
-          where('isActive', '==', true),
-          orderBy('expiryDate', 'asc')
-        )
-      );
+       const q = query(
+         collection(db, this.documentsCollection),
+         where('isActive', '==', true),
+         orderBy('expiryDate', 'asc')
+       );
 
-      return snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument))
-        .filter(doc => 
-          doc.expiryDate && 
-          doc.expiryDate.toDate() <= futureDate &&
-          doc.expiryDate.toDate() >= new Date()
+       const snapshot = await getDocs(q);
+
+       return snapshot.docs
+         .map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument))
+         .filter(doc => 
+           doc.expiryDate && 
+           doc.expiryDate.toDate() <= futureDate &&
+           doc.expiryDate.toDate() >= new Date()
+         );
+     } catch (error: any) {
+      // If query fails due to missing composite index, fall back to client-side filtering
+      if (typeof error?.code === 'string' && error.code.includes('failed-precondition')) {
+        console.warn('Composite index missing for expiringDocuments query – falling back to client filtering.');
+
+        const snapshot = await getDocs(
+          query(collection(db, this.documentsCollection), where('isActive', '==', true))
         );
-    } catch (error) {
+
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + daysAhead);
+
+        return snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument))
+          .filter(doc =>
+            doc.expiryDate &&
+            doc.expiryDate.toDate() <= futureDate &&
+            doc.expiryDate.toDate() >= new Date()
+          );
+      }
       console.error('Error fetching expiring documents:', error);
       throw new Error('Failed to fetch expiring documents');
     }

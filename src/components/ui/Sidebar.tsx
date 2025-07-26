@@ -171,7 +171,7 @@ const navigationItems: NavigationItem[] = [
   // HR specific
   { 
     id: 'hr-dashboard', 
-    icon: <Users className="w-5 h-5" />, 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'HR Dashboard', 
     path: '/dashboard/hr',
     roles: ['HR', 'HR Manager', 'Manager', 'Admin']
@@ -690,7 +690,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       item.roles.includes(userRole) || 
       item.roles.includes('*') ||
       item.id === 'settings' // Always show settings
-    );
+    )
+    .filter(item => item.id !== 'dashboard');
   };
 
   const handleItemClick = (item: NavigationItem) => {
@@ -835,7 +836,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
             onClick={() => handleItemClick(item)}
               className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative w-full ${
               isActiveItem(item)
-                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200'
+                ? 'bg-gray-200 text-gray-900 border border-gray-300'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
             }`}
             title={!isExpanded ? item.label : undefined}
