@@ -195,7 +195,21 @@ export class EmployeeDocumentsService {
         id: doc.id,
         ...doc.data()
       } as EmployeeDocument));
-    } catch (error) {
+    } catch (error: any) {
+      if (typeof error?.code === 'string' && error.code.includes('failed-precondition')) {
+        console.warn('Composite index missing for getEmployeeDocuments – falling back to client filtering.');
+
+        const snapshot = await getDocs(query(collection(db, this.documentsCollection), where('employeeId', '==', employeeId), where('isActive', '==', true)));
+
+        let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeeDocument));
+
+        if (documentType) docs = docs.filter(d => d.documentType === documentType);
+
+        // sort desc by uploadDate
+        docs.sort((a,b)=> b.uploadDate.seconds - a.uploadDate.seconds);
+
+        return docs;
+      }
       console.error('Error fetching employee documents:', error);
       throw new Error('Failed to fetch employee documents');
     }

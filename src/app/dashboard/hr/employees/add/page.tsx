@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { authService } from '../../../../../lib/firebase/auth';
 import { firestoreServices } from '../../../../../lib/firebase/firestore-service';
 import { photoService } from '../../../../../lib/services/photo-service';
+import { EmployeeDocumentsService } from '../../../../../lib/firebase/employee-documents-service';
+import { DocumentType } from '../../../../../lib/constants/document-types';
 import { 
   ArrowLeft, 
   Save, 
@@ -96,6 +98,12 @@ export default function AddEmployeePage() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // optional docs state
+  const [chairmanLetter, setChairmanLetter] = useState<File|null>(null);
+  const [employeeIdPdf, setEmployeeIdPdf] = useState<File|null>(null);
+  const [nextOfKinIdPdf, setNextOfKinIdPdf] = useState<File|null>(null);
+  const [applicationLetter, setApplicationLetter] = useState<File|null>(null);
   
   const [formData, setFormData] = useState<FormData>({
     firstName: '',
@@ -220,6 +228,11 @@ export default function AddEmployeePage() {
 
   const triggerPhotoUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleDocSelect = (setter: React.Dispatch<React.SetStateAction<File|null>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if(file) setter(file);
   };
 
   const validateForm = (): boolean => {
@@ -630,6 +643,31 @@ export default function AddEmployeePage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Optional Documents */}
+        <h2 className="text-md font-semibold text-gray-900 mt-8 mb-4">Optional Documents (PDF)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Chairman Letter (PDF)</label>
+            <input type="file" accept="application/pdf" onChange={handleDocSelect(setChairmanLetter)} />
+            {chairmanLetter && <p className="text-xs text-gray-600 mt-1">{chairmanLetter.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Employee National ID (PDF)</label>
+            <input type="file" accept="application/pdf" onChange={handleDocSelect(setEmployeeIdPdf)} />
+            {employeeIdPdf && <p className="text-xs text-gray-600 mt-1">{employeeIdPdf.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Next-of-Kin National ID (PDF)</label>
+            <input type="file" accept="application/pdf" onChange={handleDocSelect(setNextOfKinIdPdf)} />
+            {nextOfKinIdPdf && <p className="text-xs text-gray-600 mt-1">{nextOfKinIdPdf.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Application Letter (PDF)</label>
+            <input type="file" accept="application/pdf" onChange={handleDocSelect(setApplicationLetter)} />
+            {applicationLetter && <p className="text-xs text-gray-600 mt-1">{applicationLetter.name}</p>}
           </div>
         </div>
 
