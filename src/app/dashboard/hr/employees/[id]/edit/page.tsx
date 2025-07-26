@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
+import { EmployeeDocumentsService } from '../../../../../../lib/firebase/employee-documents-service';
 
 interface Employee {
   id: string;
@@ -383,6 +384,22 @@ export default function EmployeeEditPage() {
                 {validationErrors.email && (
                   <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>
                 )}
+              </div>
+
+              {/* Reset Password */}
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if(!formData.email) return alert('Employee email missing');
+                    try {
+                      await EmployeeDocumentsService // placeholder to import auth
+                    } catch(e){ alert('Feature coming'); }
+                  }}
+                  className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  Send Password Reset
+                </button>
               </div>
 
               <div>
