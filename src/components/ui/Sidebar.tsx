@@ -166,6 +166,13 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager/cash-tracking',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
+  { 
+    id: 'supplier-totals', 
+    icon: <Calculator className="w-5 h-5" />, 
+    label: 'Supplier Totals', 
+    path: '/dashboard/purchase-manager/supplier-totals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
 
   
   // HR specific
