@@ -166,6 +166,13 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager/cash-tracking',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
+  { 
+    id: 'supplier-totals', 
+    icon: <Calculator className="w-5 h-5" />, 
+    label: 'Supplier Totals', 
+    path: '/dashboard/purchase-manager/supplier-totals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
 
   
   // HR specific
@@ -266,6 +273,15 @@ const navigationItems: NavigationItem[] = [
     label: 'Inventory', 
     path: '/dashboard/stock-manager',
     roles: ['Stock Manager', 'Admin']
+  },
+
+  // Receiver specific
+  { 
+    id: 'receiver-dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'Receiver Dashboard', 
+    path: '/dashboard/receiver',
+    roles: ['Receiver', 'Admin']
   },
   { 
     id: 'damage-reports', 
