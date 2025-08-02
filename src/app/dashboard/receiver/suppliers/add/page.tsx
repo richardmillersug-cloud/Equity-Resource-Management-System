@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { enhancedSupplierService, CreateSupplierInput } from '../../../../../lib/firebase/enhanced-supplier';
+import { authService } from '../../../../../lib/firebase/auth';
 import { 
   Save, 
   ArrowLeft, 
@@ -56,6 +57,7 @@ export default function AddSupplierPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [currentEmployeeName, setCurrentEmployeeName] = useState<string>('');
 
   const [formData, setFormData] = useState<SupplierFormData>({
     SupplierName: '',
@@ -69,6 +71,21 @@ export default function AddSupplierPage() {
     EmployeeID: '',
     RouteDays: []
   });
+
+  // Auto-populate Employee ID from current user
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (user?.uid && user?.employee) {
+      setFormData(prev => ({
+        ...prev,
+        EmployeeID: user.uid
+      }));
+      
+      // Set employee name for display
+      const fullName = `${user.employee.firstName} ${user.employee.lastName}`;
+      setCurrentEmployeeName(fullName);
+    }
+  }, []);
 
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -430,27 +447,24 @@ export default function AddSupplierPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Managing Employee ID <span className="text-red-500">*</span>
+                  Managing Employee <span className="text-green-600">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600 w-4 h-4" />
                   <input
                     type="text"
-                    name="EmployeeID"
-                    value={formData.EmployeeID}
-                    onChange={handleInputChange}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                      errors.EmployeeID ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Employee ID"
+                    value={currentEmployeeName || 'Loading...'}
+                    readOnly
+                    className="w-full pl-10 pr-4 py-2 border border-green-300 bg-green-50 rounded-lg text-green-700 cursor-not-allowed"
+                    placeholder="Current user"
                   />
                 </div>
-                {errors.EmployeeID && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.EmployeeID}
-                  </p>
-                )}
+                <p className="mt-1 text-sm text-green-600 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  Automatically set to current user
+                </p>
+                {/* Hidden field for the actual employee ID */}
+                <input type="hidden" name="EmployeeID" value={formData.EmployeeID} />
               </div>
 
               <div>
