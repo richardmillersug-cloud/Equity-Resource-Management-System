@@ -65,7 +65,7 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Dashboard', 
     path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Cashier', 'Customer Service']
   },
   
   // Admin specific
@@ -84,6 +84,8 @@ const navigationItems: NavigationItem[] = [
     roles: ['Admin']
   },
   
+
+
   // Manager specific
   { 
     id: 'performance', 

@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
-import { firestoreServices } from '../../../../lib/firebase/firestore-service';
+import { EmployeeService, LeaveRequestService } from '../../../../lib/firebase/firestore-service';
 import { 
   Calendar, 
   Clock, 
@@ -74,20 +73,45 @@ export default function LeaveRequestsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Initialize services
+      const employeeService = new EmployeeService();
+      const leaveRequestService = new LeaveRequestService();
+      
+      // Load data from Firestore
       const [employeesData, leaveData] = await Promise.all([
-        HRQueries.getEmployeeOverview(),
-        HRQueries.getLeaveRequests()
+        employeeService.getAll(),
+        leaveRequestService.getAll()
       ]);
       
       setEmployees(employeesData);
       
-      // Generate mock leave requests for demonstration
-      const mockLeaveRequests = generateMockLeaveRequests(employeesData);
-      setLeaveRequests(mockLeaveRequests);
+      // Use real leave requests if available, otherwise generate mock data
+      if (leaveData && leaveData.length > 0) {
+        console.log('✅ Using real leave requests from Firestore:', leaveData.length);
+        setLeaveRequests(leaveData);
+      } else {
+        console.log('📋 No leave requests found, generating mock data');
+        const mockLeaveRequests = generateMockLeaveRequests(employeesData);
+        setLeaveRequests(mockLeaveRequests);
+      }
       
     } catch (err) {
-      console.error('Error loading leave requests:', err);
-      setError('Failed to load leave requests');
+      console.error('❌ Error loading leave requests from Firestore:', err);
+      
+      // Fallback to mock data
+      try {
+        const employeeService = new EmployeeService();
+        const employeesData = await employeeService.getAll();
+        setEmployees(employeesData);
+        
+        const mockLeaveRequests = generateMockLeaveRequests(employeesData);
+        setLeaveRequests(mockLeaveRequests);
+        setError('Using demo data - some features may be limited');
+      } catch (fallbackErr) {
+        console.error('❌ Fallback failed:', fallbackErr);
+        setError('Failed to load leave requests');
+      }
     } finally {
       setLoading(false);
     }

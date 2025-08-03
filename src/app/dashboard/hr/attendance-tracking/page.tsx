@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { hrService } from '../../../../lib/services/hr-service';
 import { scanTrackingService } from '../../../../lib/services/scan-tracking-service';
@@ -121,7 +121,10 @@ export default function AttendanceTrackingPage() {
       setLoading(true);
       setError(null);
       
-      const employeesData = await HRQueries.getEmployeeOverview();
+      console.log('📊 Loading employees from Firestore...');
+      const employeeService = new EmployeeService();
+      const employeesData = await employeeService.getAll();
+      console.log('✅ Employees loaded from Firestore:', employeesData?.length || 0);
       
       // Ensure employeesData is valid
       if (!employeesData || !Array.isArray(employeesData)) {

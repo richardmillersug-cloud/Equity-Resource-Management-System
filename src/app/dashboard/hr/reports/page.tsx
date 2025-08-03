@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+// Note: Reports page uses mock data for demo purposes
 import { 
   BarChart3, 
   TrendingUp, 

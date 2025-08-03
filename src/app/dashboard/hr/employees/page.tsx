@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { 
   Users, 
@@ -90,12 +90,15 @@ export default function EmployeesPage() {
   const loadEmployees = async () => {
     try {
       setLoading(true);
-      const employeesData = await HRQueries.getEmployeeOverview();
+      console.log('📊 Loading employees from Firestore...');
+      const employeeService = new EmployeeService();
+      const employeesData = await employeeService.getAll();
+      console.log('✅ Employees loaded from Firestore:', employeesData?.length || 0);
       setEmployees(employeesData);
       setError(null);
     } catch (err) {
-      console.error('Error loading employees:', err);
-      setError('Failed to load employees');
+      console.error('❌ Error loading employees from Firestore:', err);
+      setError('Failed to load employees from database');
     } finally {
       setLoading(false);
     }

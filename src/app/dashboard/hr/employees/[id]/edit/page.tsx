@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { HRQueries } from '../../../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../../../lib/firebase/firestore-service';
 import { 
   ArrowLeft, 
@@ -59,13 +59,14 @@ interface FormData {
 }
 
 const jobTitles = [
-  'Manager', 'Assistant Manager', 'Supervisor', 'Team Lead',
-  'Senior Developer', 'Developer', 'Junior Developer',
-  'Accountant', 'Financial Analyst', 'Bookkeeper',
+      'Admin', 'Manager', 'Assistant Manager', 'Team Lead',
   'HR Manager', 'HR Assistant', 'Recruiter',
-  'Sales Manager', 'Sales Representative', 'Customer Service',
+  'Accountant', 'Financial Analyst', 'Bookkeeper',
+  'Purchasing Manager', 'Stock Manager', 'Receiver',
+  'Sales Manager', 'Sales Representative',
   'Marketing Manager', 'Marketing Coordinator',
   'Operations Manager', 'Operations Coordinator',
+  'Senior Developer', 'Developer', 'Junior Developer',
   'Quality Assurance', 'Data Analyst', 'Administrative Assistant'
 ];
 
@@ -100,7 +101,8 @@ export default function EmployeeEditPage() {
   const loadEmployee = async (employeeId: string) => {
     try {
       setLoading(true);
-      const employees = await HRQueries.getEmployeeOverview();
+      const employeeService = new EmployeeService();
+      const employees = await employeeService.getAll();
       const foundEmployee = employees.find(emp => emp.id === employeeId);
       
       if (!foundEmployee) {

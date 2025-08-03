@@ -144,7 +144,7 @@ export class PermissionFixer {
       'Admin': 'Administration',
       'Manager': 'Management',
       'Accountant': 'Finance',
-      'Managing Director': 'Executive',
+
       'Purchase Manager': 'Procurement',
       'Purchasing Manager': 'Procurement',
       'HR': 'Human Resources',
@@ -165,7 +165,7 @@ export class PermissionFixer {
       'Admin': 1500000,
       'Manager': 2000000,
       'Accountant': 1200000,
-      'Managing Director': 5000000,
+
       'Purchase Manager': 1100000,
       'Purchasing Manager': 1100000,
       'HR': 1300000,
