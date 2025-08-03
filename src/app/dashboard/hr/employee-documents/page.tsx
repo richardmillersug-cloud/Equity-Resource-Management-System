@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { EmployeeDocumentsService, EmployeeDocument } from '../../../../lib/firebase/employee-documents-service';
 import { PDFViewerModal } from '../../../../components/ui/PDFViewer';
 import { 
@@ -118,7 +118,7 @@ export default function EmployeeDocumentsPage() {
     try {
       setLoading(true);
       const [employeeData, documentsData, statsData, expiringData] = await Promise.all([
-        HRQueries.getEmployeeOverview(),
+        new EmployeeService().getAll(),
         EmployeeDocumentsService.searchDocuments(''),
         EmployeeDocumentsService.getDocumentStatistics(),
         EmployeeDocumentsService.getExpiringDocuments(30)

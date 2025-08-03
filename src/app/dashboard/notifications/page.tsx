@@ -246,8 +246,8 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="w-full h-full">
+      <div className="w-full">
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">
           <div className="relative overflow-hidden">

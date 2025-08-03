@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { HRQueries } from '../../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../../lib/firebase/firestore-service';
 import { EmployeeDocumentsService, EmployeeDocument } from '../../../../../lib/firebase/employee-documents-service';
 import PDFViewer, { PDFViewerModal, PDFPreview } from '../../../../../components/ui/PDFViewer';
 import { 
@@ -86,7 +86,8 @@ export default function EmployeeViewPage() {
   const loadEmployee = async (employeeId: string) => {
     try {
       setLoading(true);
-      const employees = await HRQueries.getEmployeeOverview();
+      const employeeService = new EmployeeService();
+      const employees = await employeeService.getAll();
       const foundEmployee = employees.find(emp => emp.id === employeeId);
       
       if (!foundEmployee) {

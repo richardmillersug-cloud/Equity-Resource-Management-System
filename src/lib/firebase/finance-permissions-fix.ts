@@ -256,7 +256,7 @@ service cloud.firestore {
 
     // Rule 1.1: Only accountants can create CashAllocation
     match /cashAllocations/{allocationId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Managing Director']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager']);
       allow create: if hasRole('Accountant'); // Rule 1.1
       allow update: if hasRole('Accountant');
       allow delete: if hasRole('Admin');

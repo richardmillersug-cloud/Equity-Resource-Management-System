@@ -108,7 +108,7 @@ export const hasPermission = (action: string): boolean => {
     'Admin': ['*'], // All permissions
     'Manager': ['VIEW_ALL_BRANCHES', 'VIEW_PERFORMANCE', 'MANAGE_EMPLOYEES'],
     'Accountant': ['CREATE_CASH_ALLOCATION', 'MANAGE_EXPENSES', 'VIEW_FINANCIAL_DATA'],
-    'Managing Director': ['VIEW_FINANCIAL_DATA', 'VIEW_ALL_BRANCHES', 'VIEW_PERFORMANCE'],
+
     'Purchase Manager': ['ACKNOWLEDGE_FUNDS', 'MANAGE_SUPPLIERS', 'MANAGE_RESTOCK'],
     'Purchasing Manager': ['ACKNOWLEDGE_FUNDS', 'MANAGE_SUPPLIERS', 'MANAGE_RESTOCK'], // Added alias
     'HR': ['MANAGE_EMPLOYEES', 'VIEW_ATTENDANCE', 'MANAGE_LEAVE'],

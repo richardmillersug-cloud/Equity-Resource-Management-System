@@ -44,6 +44,34 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
   ]);
   const [availableRoles] = useState<JobRole[]>([
     { 
+      jobRoleId: 'admin',
+      jobTitle: 'Admin', 
+      baseSalary: 1500000,
+      description: 'System administrator with full access to all features',
+      assignedDate: new Date() as any
+    },
+    { 
+      jobRoleId: 'hr',
+      jobTitle: 'HR Manager', 
+      baseSalary: 1300000,
+      description: 'Manages human resources, employee relations, and payroll',
+      assignedDate: new Date() as any
+    },
+    { 
+      jobRoleId: 'accountant',
+      jobTitle: 'Accountant', 
+      baseSalary: 1200000,
+      description: 'Handles all accounting and financial operations',
+      assignedDate: new Date() as any
+    },
+    { 
+      jobRoleId: 'purchasing-manager',
+      jobTitle: 'Purchasing Manager', 
+      baseSalary: 1100000,
+      description: 'Manages purchasing operations and supplier relationships',
+      assignedDate: new Date() as any
+    },
+    { 
       jobRoleId: 'stock-manager',
       jobTitle: 'Stock Manager', 
       baseSalary: 800000,
@@ -55,34 +83,6 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
       jobTitle: 'Receiver', 
       baseSalary: 600000,
       description: 'Receives and processes incoming goods',
-      assignedDate: new Date() as any
-    },
-    { 
-      jobRoleId: 'supervisor',
-      jobTitle: 'Supervisor', 
-      baseSalary: 900000,
-      description: 'Supervises daily operations',
-      assignedDate: new Date() as any
-    },
-    { 
-      jobRoleId: 'purchasing-manager',
-      jobTitle: 'Purchasing Manager', 
-      baseSalary: 1100000,
-      description: 'Manages purchasing operations and supplier relationships',
-      assignedDate: new Date() as any
-    },
-    { 
-      jobRoleId: 'accountant',
-      jobTitle: 'Accountant', 
-      baseSalary: 1200000,
-      description: 'Handles all accounting and financial operations',
-      assignedDate: new Date() as any
-    },
-    { 
-      jobRoleId: 'hr',
-      jobTitle: 'HR', 
-      baseSalary: 1300000,
-      description: 'Manages human resources, employee relations, and payroll',
       assignedDate: new Date() as any
     }
   ]);

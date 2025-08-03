@@ -101,12 +101,14 @@ export default function DashboardPage() {
 
         // Route to role-specific dashboard
         const roleRoutes: Record<string, string> = {
+      
           'Admin': '/dashboard/admin',
           'Manager': '/dashboard/manager',
           'Accountant': '/dashboard/accountant',
           'Purchase Manager': '/dashboard/purchase-manager',
           'Purchasing Manager': '/dashboard/purchase-manager', // Added alias for consistency
-          'HR': '/dashboard/hr',
+          'HR Manager': '/dashboard/hr',
+          'HR': '/dashboard/hr', // Keep for backward compatibility
           'Stock Manager': '/dashboard/stock-manager',
           'Receiver': '/dashboard/receiver',
           'Auditor': '/dashboard/auditor'

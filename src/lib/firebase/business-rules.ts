@@ -16,7 +16,6 @@ import { firestoreServices } from './firestore-service';
 
 export enum UserRole {
   ADMIN = 'admin',
-  MANAGING_DIRECTOR = 'managing_director',
   HR = 'hr',
   ACCOUNTANT = 'accountant',
   ACCOUNTANT_OPERATIONS = 'accountant_operations',
@@ -46,15 +45,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManagePayroll: true,
     canViewReports: true,
     canAdminSystem: true
-  },
-  [UserRole.MANAGING_DIRECTOR]: {
-    canManageCash: true,
-    canManageInvoices: true,
-    canManageSuppliers: false,
-    canManageEmployees: false,
-    canManagePayroll: false,
-    canViewReports: true,
-    canAdminSystem: false
   },
   [UserRole.HR]: {
     canManageCash: false,

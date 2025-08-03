@@ -897,9 +897,9 @@ export default function ReturnNotesPage() {
   const units = ['pcs', 'kg', 'lbs', 'boxes', 'cases', 'liters', 'meters', 'sets'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100">
+    <div className="w-full h-full">
       {/* Modern Hero Header */}
-      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
+      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
         <div className="relative p-8 text-white">
           <div className="flex items-center justify-between">
