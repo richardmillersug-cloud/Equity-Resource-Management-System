@@ -6,6 +6,7 @@ import { Sidebar } from '../../components/ui/Sidebar';
 import { authService, AuthUser } from '../../lib/firebase/auth';
 import { notificationService } from '../../lib/firebase/notification-service';
 import { LogOut, User, ChevronDown, Bell, Settings } from 'lucide-react';
+import { QuickThemeToggle } from '../../components/ui/ThemeToggle';
 
 export default function DashboardLayout({
   children,
@@ -179,6 +180,9 @@ export default function DashboardLayout({
                   </span>
                 )}
               </button>
+              
+              {/* Theme Toggle */}
+              <QuickThemeToggle />
               
               {/* Settings */}
               <button 

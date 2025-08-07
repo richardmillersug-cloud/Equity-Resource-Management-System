@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedReturnNoteService, ReturnNote, ReturnItem, ReturnNoteStats, RETURN_REASONS, RETURN_STATUSES } from '../../../../lib/firebase/enhanced-return-note';
 import { EnhancedSupplierService } from '../../../../lib/firebase/enhanced-supplier';
-import { Package, Plus, Search, RefreshCw, Calendar, CheckCircle, XCircle, AlertCircle, Clock, Edit, Trash2, Download, FileText, FileSpreadsheet, File, Filter, AlertTriangle, ArrowLeft, Eye, Truck } from 'lucide-react';
+import { Package, Plus, Search, RefreshCw, Calendar, CheckCircle, XCircle, AlertCircle, Clock, Edit, Trash2, Download, FileText, FileSpreadsheet, File, Filter, AlertTriangle, ArrowLeft, Eye, Truck, Hash } from 'lucide-react';
 import { authService } from '../../../../lib/firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 
@@ -89,11 +89,11 @@ export default function ReturnNotesPage() {
       return { isValid: false, message: 'Please select a return date.' };
     }
 
-    const returnDate = new Date(newReturnNote.returnDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Parse dates properly to avoid timezone issues
+    const returnDateStr = newReturnNote.returnDate;
+    const todayStr = new Date().toISOString().split('T')[0];
     
-    if (returnDate > today) {
+    if (returnDateStr > todayStr) {
       return { isValid: false, message: 'Return date cannot be in the future.' };
     }
 
@@ -118,8 +118,7 @@ export default function ReturnNotesPage() {
 
     // Check expected pickup date if provided
     if (newReturnNote.expectedPickupDate) {
-      const expectedDate = new Date(newReturnNote.expectedPickupDate);
-      if (expectedDate <= returnDate) {
+      if (newReturnNote.expectedPickupDate <= returnDateStr) {
         return { isValid: false, message: 'Expected pickup date must be after the return date.' };
       }
     }
@@ -162,14 +161,17 @@ export default function ReturnNotesPage() {
 
     // Validate expiry date if provided
     if (item.expiryDate) {
-      const expiryDate = new Date(item.expiryDate);
-      const today = new Date();
+      const expiryDateStr = item.expiryDate;
+      const todayStr = new Date().toISOString().split('T')[0];
       
-      if (item.reason === 'Expired goods' && expiryDate > today) {
+      if (item.reason === 'Expired goods' && expiryDateStr > todayStr) {
         return { isValid: false, message: 'For expired goods, expiry date must be in the past.' };
       }
       
       if (item.reason === 'Short expiry dates') {
+        // Convert to dates for calculation only
+        const expiryDate = new Date(expiryDateStr + 'T00:00:00');
+        const today = new Date(todayStr + 'T00:00:00');
         const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         if (daysUntilExpiry > 30) {
           return { isValid: false, message: 'For short expiry dates, expiry should be within 30 days.' };
@@ -331,7 +333,7 @@ export default function ReturnNotesPage() {
       }
 
       const totalQuantity = newReturnNote.items.reduce((sum, item) => sum + item.quantity, 0);
-      const totalValue = newReturnNote.items.reduce((sum, item) => sum + item.totalValue, 0);
+      const totalValue = newReturnNote.items.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0);
 
       const updateData = {
         supplierId: newReturnNote.supplierId,
@@ -439,6 +441,17 @@ export default function ReturnNotesPage() {
     }
   };
 
+  const handleBackfillReturnNoteNumbers = async () => {
+    try {
+      await enhancedReturnNoteService.backfillReturnNoteNumbers();
+      showSuccess('Return note numbers assigned successfully!');
+      await loadReturnNotes(); // Refresh the list
+    } catch (error) {
+      console.error('Error during backfill:', error);
+      showError('Failed to assign return note numbers. Please try again.');
+    }
+  };
+
   // Handler functions for modals
 
 
@@ -480,7 +493,7 @@ export default function ReturnNotesPage() {
         showSuccess('Return note updated successfully!');
         setEditingReturnNote(null);
       } else {
-        await enhancedReturnNoteService.create(returnNoteData);
+        await enhancedReturnNoteService.createReturnNote(returnNoteData);
         showSuccess('Return note created successfully!');
       }
 
@@ -612,7 +625,7 @@ export default function ReturnNotesPage() {
       }
 
       const totalQuantity = newReturnNote.items.reduce((sum, item) => sum + item.quantity, 0);
-      const totalValue = newReturnNote.items.reduce((sum, item) => sum + item.totalValue, 0);
+      const totalValue = newReturnNote.items.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0);
 
       const returnNoteData = {
         supplierId: newReturnNote.supplierId,
@@ -897,9 +910,9 @@ export default function ReturnNotesPage() {
   const units = ['pcs', 'kg', 'lbs', 'boxes', 'cases', 'liters', 'meters', 'sets'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100">
+    <div className="w-full h-full">
       {/* Modern Hero Header */}
-      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
+      <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
         <div className="relative p-8 text-white">
           <div className="flex items-center justify-between">
@@ -921,6 +934,13 @@ export default function ReturnNotesPage() {
               >
                 <RefreshCw className="w-5 h-5" />
                 Refresh Data
+              </button>
+              <button
+                onClick={handleBackfillReturnNoteNumbers}
+                className="bg-white/20 backdrop-blur-sm border border-white/30 text-orange-300 px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <Hash className="w-5 h-5" />
+                Assign Numbers
               </button>
               <button
                 onClick={handleCreateReturnNoteClick}
@@ -1176,6 +1196,7 @@ export default function ReturnNotesPage() {
           setNewItem={setNewItem}
           categories={categories}
           units={units}
+          editingItemIndex={editingItemIndex}
           onClose={() => {
             setShowItemModal(false);
             setEditingItemIndex(-1);
@@ -1287,12 +1308,12 @@ const ReturnNoteCard = ({ returnNote, onView, onEdit, onDelete, onUpdateStatus }
             
             <div>
               <span className="font-medium text-gray-600">Items:</span>
-              <p className="text-gray-900">{returnNote.totalQuantity} items</p>
+              <p className="text-gray-900">{returnNote.totalQuantity || returnNote.items?.length || 0} items</p>
             </div>
             
             <div>
               <span className="font-medium text-gray-600">Total Value:</span>
-              <p className="text-gray-900">${returnNote.totalValue.toLocaleString()}</p>
+              <p className="text-gray-900">UGX {(returnNote.totalValue || returnNote.items?.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0) || 0).toLocaleString()}</p>
             </div>
           </div>
 
@@ -1300,6 +1321,24 @@ const ReturnNoteCard = ({ returnNote, onView, onEdit, onDelete, onUpdateStatus }
             <span className="font-medium text-gray-600">Reason:</span>
             <p className="text-gray-900">{returnNote.reason}</p>
           </div>
+
+          {/* Notes Preview */}
+          {returnNote.notes && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="font-medium text-blue-900 text-sm">Notes:</span>
+                  <p className="text-blue-800 text-sm mt-1 line-clamp-2">
+                    {returnNote.notes.length > 100 
+                      ? `${returnNote.notes.substring(0, 100)}...` 
+                      : returnNote.notes
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1311,40 +1350,11 @@ const ReturnNoteCard = ({ returnNote, onView, onEdit, onDelete, onUpdateStatus }
         <div className="flex space-x-2">
           <button
             onClick={() => onView(returnNote)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition-colors flex items-center"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded transition-colors flex items-center"
           >
-            <Eye className="w-4 h-4 mr-1" />
-            View
+            <Eye className="w-4 h-4 mr-2" />
+            View & Manage
           </button>
-          
-          {(returnNote.status === 'draft' || returnNote.status === 'pending') && (
-            <button
-              onClick={() => onEdit(returnNote)}
-              className="bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-1 rounded transition-colors flex items-center"
-              title={`Edit return note ${returnNote.returnNoteNumber}`}
-            >
-              <Edit className="w-4 h-4 mr-1" />
-              Edit
-            </button>
-          )}
-          
-          {returnNote.status === 'draft' && (
-            <button
-              onClick={() => onUpdateStatus(returnNote.id, 'pending')}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-1 rounded transition-colors"
-            >
-              Submit
-            </button>
-          )}
-          
-          {returnNote.status === 'pending' && (
-            <button
-              onClick={() => onUpdateStatus(returnNote.id, 'approved')}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1 rounded transition-colors"
-            >
-              Approve
-            </button>
-          )}
           
           {returnNote.status === 'approved' && (
             <button
@@ -1422,7 +1432,7 @@ const AddReturnNoteModal = ({
 
   const totalItems = newReturnNote.items.length;
   const totalQuantity = newReturnNote.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-  const totalValue = newReturnNote.items.reduce((sum: number, item: any) => sum + item.totalValue, 0);
+  const totalValue = newReturnNote.items.reduce((sum: number, item: any) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0);
 
   return (
     <>
@@ -1508,15 +1518,28 @@ const AddReturnNoteModal = ({
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  Return Note Notes
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Optional</span>
+                </div>
               </label>
-              <textarea
-                value={newReturnNote.notes}
-                onChange={(e) => setNewReturnNote(prev => ({ ...prev, notes: e.target.value }))}
-                rows={3}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter any additional notes about this return..."
-              />
+              <div className="relative">
+                <textarea
+                  value={newReturnNote.notes}
+                  onChange={(e) => setNewReturnNote(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={4}
+                  maxLength={500}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter any important notes about this return note (e.g., special handling instructions, reasons for return, etc.)"
+                />
+                <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+                  {newReturnNote.notes.length}/500
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                These notes will be visible to all users viewing this return note and can include special instructions or important information.
+              </p>
             </div>
 
             {/* Items Section */}
@@ -1571,11 +1594,11 @@ const AddReturnNoteModal = ({
                             </div>
                             <div>
                               <span className="font-medium text-gray-600">Unit Price:</span>
-                              <p className="text-gray-900">${item.unitPrice.toFixed(2)}</p>
+                              <p className="text-gray-900">UGX {item.unitPrice.toLocaleString()}</p>
                             </div>
                             <div>
                               <span className="font-medium text-gray-600">Total:</span>
-                              <p className="text-gray-900 font-semibold">${item.totalValue.toFixed(2)}</p>
+                              <p className="text-gray-900 font-semibold">UGX {(item.totalValue || (item.quantity * item.unitPrice) || 0).toLocaleString()}</p>
                             </div>
                           </div>
                           
@@ -1645,7 +1668,7 @@ const AddReturnNoteModal = ({
                     </div>
                     <div className="text-center">
                       <p className="font-medium text-blue-900">Total Value</p>
-                      <p className="text-xl font-bold text-blue-700">${totalValue.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-blue-700">UGX {totalValue.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
@@ -1693,6 +1716,7 @@ const AddReturnNoteModal = ({
           editingItemIndex={editingItemIndex}
           onSubmit={onAddItem}
           onClose={() => setShowItemModal(false)}
+          isEditing={editingItemIndex >= 0}
         />
       )}
     </>
@@ -1707,7 +1731,8 @@ const ItemModal = ({
   units, 
   editingItemIndex, 
   onSubmit, 
-  onClose 
+  onClose,
+  isEditing = false
 }: {
   newItem: any;
   setNewItem: any;
@@ -1716,9 +1741,8 @@ const ItemModal = ({
   editingItemIndex: number;
   onSubmit: () => void;
   onClose: () => void;
+  isEditing?: boolean;
 }) => {
-  const isEditing = editingItemIndex >= 0;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit();
@@ -1915,7 +1939,7 @@ const ItemModal = ({
               <div className="text-center">
                 <p className="text-sm font-medium text-green-800">Total Value</p>
                 <p className="text-2xl font-bold text-green-700">
-                  ${(newItem.quantity * newItem.unitPrice).toFixed(2)}
+                  UGX {(newItem.quantity * newItem.unitPrice).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -1932,7 +1956,7 @@ const ItemModal = ({
             </button>
             <button
               type="submit"
-              disabled={!newItem.itemName.trim() || !newItem.reason || newItem.quantity <= 0 || newItem.unitPrice <= 0}
+              disabled={!newItem.itemName?.trim() || !newItem.reason || newItem.quantity <= 0 || newItem.unitPrice < 0}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isEditing ? (
@@ -2025,16 +2049,57 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
               padding-bottom: 20px;
             }
             
+            .company-section {
+              display: flex;
+              align-items: flex-start;
+              gap: 12px;
+            }
+            
+            .company-logo {
+              padding: 4px;
+              border: 1px solid #d1d5db;
+              background: white;
+              border-radius: 4px;
+            }
+            
+            .company-info {
+              flex: 1;
+            }
+            
             .company-info h1 {
-              font-size: 28px;
-              color: #2563eb;
-              margin-bottom: 5px;
+              font-size: 16px;
+              color: #1f2937;
+              margin: 0;
+              margin-bottom: 4px;
               font-weight: bold;
+              line-height: 1.2;
             }
             
             .company-info p {
-              color: #666;
-              font-size: 14px;
+              color: #6b7280;
+              font-size: 12px;
+              margin: 2px 0;
+            }
+            
+            .document-title {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            
+            .title-box {
+              font-size: 18px;
+              font-weight: bold;
+              border: 2px solid #374151;
+              padding: 8px 24px;
+              display: inline-block;
+              margin-bottom: 8px;
+              background: white;
+            }
+            
+            .document-number {
+              font-size: 12px;
+              color: #374151;
+              font-weight: bold;
             }
             
             .invoice-title {
@@ -2239,15 +2304,29 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
           <div class="invoice-container">
             <!-- Header -->
             <div class="invoice-header">
-              <div class="company-info">
-                <h1>EQUI SYSTEM</h1>
-                <p>Inventory Management System</p>
-                <p>Return Note Department</p>
+              <div class="company-section">
+                <div class="company-logo">
+                  <img src="/equity-logo.png" alt="Equity Logo" style="width: 48px; height: 48px; object-fit: contain; border: 1px solid #ccc; background: white;">
+                </div>
+                <div class="company-info">
+                  <h1 style="font-size: 16px; font-weight: bold; color: #1f2937; line-height: 1.2; margin: 0;">
+                    UNISON TECHNOLOGIES AND INNOVATION LTD
+                  </h1>
+                  <p style="font-size: 12px; color: #6b7280; margin: 2px 0;">EQUITY SHOPPERS SUPERMARKET</p>
+                  <p style="font-size: 12px; color: #6b7280; margin: 2px 0;">KYENGERA, KAMPALA-MASAKA</p>
+                  <p style="font-size: 12px; color: #2563eb; margin: 2px 0;">unisontechnologiesaninnovation@gmail.com</p>
+                  <p style="font-size: 12px; color: #2563eb; margin: 2px 0;">equityshoppers@gmail.com</p>
+                </div>
               </div>
               <div class="invoice-title">
-                <h2>RETURN NOTE</h2>
                 <div class="status">${returnNote.status.toUpperCase()}</div>
               </div>
+            </div>
+            
+            <!-- Return Note Title and Number -->
+            <div class="document-title">
+              <h3 class="title-box">RETURN NOTE</h3>
+              <div class="document-number">RN${returnNote.returnNoteNumber || returnNote.id?.slice(-4) || '0000'}</div>
             </div>
             
             <!-- Invoice Details -->
@@ -2290,7 +2369,7 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                 </div>
                 <div class="detail-row">
                   <span class="label">Total Quantity:</span>
-                  <span class="value">${returnNote.totalQuantity}</span>
+                  <span class="value">${returnNote.totalQuantity || returnNote.items?.length || 0}</span>
                 </div>
               </div>
             </div>
@@ -2322,8 +2401,8 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                     <td>${item.category || 'N/A'}</td>
                     <td style="text-align: center; font-weight: 600;">${item.quantity}</td>
                     <td style="text-align: center;">${item.unit}</td>
-                    <td style="text-align: right;">$${item.unitPrice.toFixed(2)}</td>
-                    <td style="text-align: right; font-weight: 600;">$${item.totalValue.toFixed(2)}</td>
+                    <td style="text-align: right;">UGX ${item.unitPrice.toLocaleString()}</td>
+                    <td style="text-align: right; font-weight: 600;">UGX ${(item.totalValue || (item.quantity * item.unitPrice) || 0).toLocaleString()}</td>
                     <td><span class="reason-badge">${item.reason}</span></td>
                   </tr>
                 `).join('')}
@@ -2339,11 +2418,11 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                 </div>
                 <div class="total-row">
                   <span>Total Quantity:</span>
-                  <span>${returnNote.totalQuantity}</span>
+                  <span>${returnNote.totalQuantity || returnNote.items?.length || 0}</span>
                 </div>
                 <div class="total-row final">
                   <span>Total Value:</span>
-                  <span>$${returnNote.totalValue.toLocaleString()}</span>
+                  <span>UGX ${(returnNote.totalValue || returnNote.items?.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0) || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -2375,7 +2454,7 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
             <!-- Footer -->
             <div class="footer">
               <p>This is a computer-generated return note. No signature is required.</p>
-              <p>Generated on ${new Date().toLocaleString()} | EQUI Inventory Management System</p>
+              <p>Generated on ${new Date().toLocaleString()} | Equity Shoppers Supermarket</p>
             </div>
           </div>
         </body>
@@ -2481,12 +2560,12 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                 
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Quantity:</span>
-                  <span className="font-semibold text-gray-900">{returnNote.totalQuantity}</span>
+                  <span className="font-semibold text-gray-900">{returnNote.totalQuantity || returnNote.items?.length || 0}</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Value:</span>
-                  <span className="font-semibold text-gray-900">${returnNote.totalValue.toLocaleString()}</span>
+                  <span className="font-semibold text-gray-900">UGX {(returnNote.totalValue || returnNote.items?.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0) || 0).toLocaleString()}</span>
                 </div>
                 
                 <div className="border-t border-gray-200 pt-4">
@@ -2506,6 +2585,19 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
             </div>
           </div>
         </div>
+
+        {/* Main Return Note Notes */}
+        {returnNote.notes && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <div className="flex items-start gap-3">
+              <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">Return Note Notes</h3>
+                <p className="text-blue-800 leading-relaxed whitespace-pre-wrap">{returnNote.notes}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Return Items */}
         <div>
@@ -2543,12 +2635,12 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">Unit Price</label>
-                      <p className="text-gray-900">${item.unitPrice.toFixed(2)}</p>
+                      <p className="text-gray-900">UGX {item.unitPrice.toLocaleString()}</p>
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">Total Value</label>
-                      <p className="text-gray-900 font-semibold">${item.totalValue.toFixed(2)}</p>
+                      <p className="text-gray-900 font-semibold">UGX {(item.totalValue || (item.quantity * item.unitPrice) || 0).toLocaleString()}</p>
                     </div>
                   </div>
                   
@@ -2595,8 +2687,10 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between pt-6 border-t border-gray-200 mt-8">
-          <div className="flex space-x-3">
+        <div className="bg-gray-50 rounded-lg p-4 mt-8">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Available Actions</h4>
+          <div className="flex justify-between">
+            <div className="flex space-x-3">
             <button
               onClick={handlePrintReturnNote}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
@@ -2656,6 +2750,19 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
                     Mark as Picked Up
                   </button>
                 )}
+                
+                {returnNote.status === 'picked_up' && (
+                  <button
+                    onClick={() => {
+                      onUpdateStatus(returnNote.id, 'received');
+                      onClose();
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Confirm Items Received
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -2666,6 +2773,7 @@ const ViewReturnNoteModal = ({ returnNote, onClose, onEdit, onUpdateStatus }: {
           >
             Close
           </button>
+          </div>
         </div>
       </div>
     </div>

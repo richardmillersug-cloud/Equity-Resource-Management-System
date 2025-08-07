@@ -100,7 +100,7 @@ service cloud.firestore {
     // =====================================================
     
     match /cashAllocations/{allocationId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
       allow create: if hasRole('Accountant');
       allow update: if hasRole('Accountant');
       allow delete: if hasRole('Admin');

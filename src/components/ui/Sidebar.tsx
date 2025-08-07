@@ -18,6 +18,7 @@ import {
   Settings,
   Building2,
   Receipt,
+  Upload,
   AlertTriangle,
   UserCheck,
   ClipboardList,
@@ -28,6 +29,7 @@ import {
   Eye,
   RefreshCw,
   CreditCard,
+  Activity,
   CheckCircle,
   XCircle,
   Clock,
@@ -65,8 +67,34 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Dashboard', 
     path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Managing Director', 'Cashier', 'Customer Service']
+    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Cashier', 'Customer Service', 'Managing Director']
   },
+  
+  // Managing Director specific
+  { 
+    id: 'executive-dashboard', 
+    icon: <BarChart3 className="w-5 h-5" />, 
+    label: 'Executive Dashboard', 
+    path: '/dashboard/managing-director',
+    roles: ['Managing Director']
+  },
+  { 
+    id: 'business-analytics', 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    label: 'Business Analytics', 
+    path: '/dashboard/managing-director/analytics',
+    roles: ['Managing Director']
+  },
+  { 
+    id: 'forecasting', 
+    icon: <Activity className="w-5 h-5" />, 
+    label: 'Forecasting & Insights', 
+    path: '/dashboard/managing-director/forecasting',
+    roles: ['Managing Director']
+  },
+  
+
+
   
   // Admin specific
   { 
@@ -84,6 +112,8 @@ const navigationItems: NavigationItem[] = [
     roles: ['Admin']
   },
   
+
+
   // Manager specific
   { 
     id: 'performance', 
@@ -303,8 +333,21 @@ const navigationItems: NavigationItem[] = [
     id: 'return-notes', 
     icon: <FileText className="w-5 h-5" />, 
     label: 'Return Notes', 
-    path: '/dashboard/receiver/returns',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver', 'Admin'],
+    submenu: [
+      {
+        id: 'return-notes-management',
+        icon: <ClipboardList className="w-4 h-4" />,
+        label: 'Return Notes Management',
+        path: '/dashboard/receiver/returns'
+      },
+      {
+        id: 'return-notes-tracking',
+        icon: <RefreshCw className="w-4 h-4" />,
+        label: 'Return Notes Tracking',
+        path: '/dashboard/receiver/returns/tracking'
+      }
+    ]
   },
   { 
     id: 'suppliers', 

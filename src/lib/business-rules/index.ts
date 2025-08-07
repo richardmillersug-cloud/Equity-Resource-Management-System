@@ -138,8 +138,7 @@ export class RetailBusinessRules implements BusinessRules {
   canProcessPayment(employee: Employee): boolean {
     return [
       EmployeeRole.ACCOUNTANT,
-      EmployeeRole.ACCOUNTANT_OPS,
-      EmployeeRole.MANAGING_DIRECTOR
+      EmployeeRole.ACCOUNTANT_OPS
     ].includes(employee.role);
   }
 
@@ -192,11 +191,6 @@ export class RetailBusinessRules implements BusinessRules {
       
       [EmployeeRole.SUPERVISOR]: [
         'analytics.read', 'reports.read'
-      ],
-      
-      [EmployeeRole.MANAGING_DIRECTOR]: [
-        'banking.read', 'financial_overview.read',
-        'cash_injection.approve', 'high_value_transactions.approve'
       ]
     };
 
@@ -284,15 +278,15 @@ export class RetailBusinessRules implements BusinessRules {
   }
 
   private canApproveGeneralExpenses(employee: Employee): boolean {
-    return [EmployeeRole.ACCOUNTANT, EmployeeRole.MANAGING_DIRECTOR].includes(employee.role);
+    return [EmployeeRole.ACCOUNTANT].includes(employee.role);
   }
 
   private canApproveURAExpenses(employee: Employee): boolean {
-    return [EmployeeRole.ACCOUNTANT, EmployeeRole.MANAGING_DIRECTOR].includes(employee.role);
+    return [EmployeeRole.ACCOUNTANT].includes(employee.role);
   }
 
   private canApproveEmergencyExpenses(employee: Employee): boolean {
-    return [EmployeeRole.ACCOUNTANT, EmployeeRole.MANAGING_DIRECTOR, EmployeeRole.SUPERVISOR].includes(employee.role);
+    return [EmployeeRole.ACCOUNTANT, EmployeeRole.SUPERVISOR].includes(employee.role);
   }
 
   private canApproveDayToDayExpenses(employee: Employee): boolean {

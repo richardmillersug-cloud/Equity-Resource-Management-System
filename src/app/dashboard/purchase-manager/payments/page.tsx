@@ -236,8 +236,8 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="w-full h-full">
+      <div className="w-full space-y-8">
         
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">

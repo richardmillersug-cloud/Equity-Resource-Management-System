@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { 
   Clock, 
@@ -60,7 +60,7 @@ export default function AttendancePage() {
     try {
       setLoading(true);
       const [employeesData] = await Promise.all([
-        HRQueries.getEmployeeOverview()
+        new EmployeeService().getAll()
       ]);
       
       setEmployees(employeesData);

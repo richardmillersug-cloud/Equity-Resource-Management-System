@@ -339,7 +339,7 @@ service cloud.firestore {
 
     // CASH ALLOCATIONS
     match /cashAllocations/{allocationId} {
-      allow read: if hasAnyRole(['Admin', 'Accountant', 'Managing Director', 'Purchasing Manager', 'Purchase Manager']);
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
       allow write: if hasAnyRole(['Admin', 'Accountant']);
     }
 

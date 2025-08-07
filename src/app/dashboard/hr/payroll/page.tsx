@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HRQueries } from '../../../../lib/firebase/role-based-queries';
+import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { 
   DollarSign, 
@@ -86,7 +86,10 @@ export default function PayrollPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const employeesData = await HRQueries.getEmployeeOverview();
+      console.log('📊 Loading employees from Firestore for payroll...');
+      const employeeService = new EmployeeService();
+      const employeesData = await employeeService.getAll();
+      console.log('✅ Employees loaded from Firestore:', employeesData?.length || 0);
       setEmployees(employeesData);
       
       // Generate mock payroll records for demonstration

@@ -55,16 +55,13 @@ interface Branch {
 }
 
 const jobRoles = [
+  
   { id: 'admin', title: 'Admin', defaultSalary: 1500000 },
   { id: 'hr', title: 'HR Manager', defaultSalary: 1300000 },
   { id: 'accountant', title: 'Accountant', defaultSalary: 1200000 },
   { id: 'purchasing-manager', title: 'Purchasing Manager', defaultSalary: 1100000 },
   { id: 'stock-manager', title: 'Stock Manager', defaultSalary: 1000000 },
-  { id: 'receiver', title: 'Receiver', defaultSalary: 800000 },
-  { id: 'supervisor', title: 'Supervisor', defaultSalary: 900000 },
-  { id: 'managing-director', title: 'Managing Director', defaultSalary: 5000000 },
-  { id: 'cashier', title: 'Cashier', defaultSalary: 220000 },
-  { id: 'customer-service', title: 'Customer Service', defaultSalary: 150000 }
+  { id: 'receiver', title: 'Receiver', defaultSalary: 800000 }
 ];
 
 const supermarketSections = [
@@ -174,8 +171,8 @@ export default function AddEmployeePage() {
           ...prev, 
           baseSalary: selectedRole.defaultSalary.toString(),
           employeeSalary: selectedRole.defaultSalary.toString(),
-          // Clear working section if not Customer Service
-          workingSection: value === 'Customer Service' ? prev.workingSection : ''
+          // Clear working section for all roles
+          workingSection: ''
         }));
       }
     }
@@ -253,10 +250,7 @@ export default function AddEmployeePage() {
       newErrors.baseSalary = 'Base salary must be a valid positive number';
     }
     
-    // Validate working section for Customer Service employees
-    if (formData.jobTitle === 'Customer Service' && !formData.workingSection) {
-      newErrors.workingSection = 'Working section is required for Customer Service employees';
-    }
+    // Working section validation removed as Customer Service role is no longer available
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -737,31 +731,7 @@ export default function AddEmployeePage() {
               {errors.baseSalary && <p className="text-red-500 text-xs mt-1">{errors.baseSalary}</p>}
             </div>
 
-            {/* Working Section - Only shown for Customer Service */}
-            {formData.jobTitle === 'Customer Service' && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Working Section *
-                </label>
-                <select
-                  name="workingSection"
-                  value={formData.workingSection}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.workingSection ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="">Select working section</option>
-                  {supermarketSections.map(section => (
-                    <option key={section} value={section}>{section}</option>
-                  ))}
-                </select>
-                {errors.workingSection && <p className="text-red-500 text-xs mt-1">{errors.workingSection}</p>}
-                <p className="text-xs text-gray-500 mt-1">
-                  Select the supermarket section where this employee will primarily work
-                </p>
-              </div>
-            )}
+            {/* Working Section removed - Customer Service role no longer available */}
           </div>
         </div>
 
