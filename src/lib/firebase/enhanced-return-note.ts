@@ -6,6 +6,7 @@ import {
   deleteDoc, 
   getDocs, 
   getDoc, 
+  setDoc,
   query, 
   where, 
   orderBy, 
@@ -45,7 +46,7 @@ export interface ReturnNote {
   returnDate: any; // Firestore Timestamp
   expectedPickupDate?: any; // Firestore Timestamp
   actualPickupDate?: any; // Firestore Timestamp
-  status: 'draft' | 'pending' | 'approved' | 'picked_up' | 'processed' | 'rejected' | 'cancelled';
+  status: 'draft' | 'pending' | 'approved' | 'picked_up' | 'received' | 'processed' | 'rejected' | 'cancelled';
   reason: string;
   notes?: string;
   createdBy: string;
@@ -83,6 +84,7 @@ export const RETURN_STATUSES = [
   { value: 'pending', label: 'Pending Approval', color: 'yellow' },
   { value: 'approved', label: 'Approved', color: 'green' },
   { value: 'picked_up', label: 'Picked Up', color: 'blue' },
+  { value: 'received', label: 'Items Received', color: 'green' },
   { value: 'processed', label: 'Processed', color: 'purple' },
   { value: 'rejected', label: 'Rejected', color: 'red' },
   { value: 'cancelled', label: 'Cancelled', color: 'gray' }
@@ -94,13 +96,28 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
   }
 
   // Generate return note number
-  private generateReturnNoteNumber(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `RN${year}${month}${day}${random}`;
+  private async generateReturnNoteNumber(): Promise<string> {
+    try {
+      // Get the current count from a counter document
+      const counterRef = doc(db, 'counters', 'returnNotes');
+      const counterDoc = await getDoc(counterRef);
+      
+      let nextNumber = 1;
+      if (counterDoc.exists()) {
+        nextNumber = (counterDoc.data().count || 0) + 1;
+      }
+      
+      // Update the counter
+      await setDoc(counterRef, { count: nextNumber }, { merge: true });
+      
+      // Format as RN0001, RN0002, etc.
+      return `RN${nextNumber.toString().padStart(4, '0')}`;
+    } catch (error) {
+      console.error('Error generating return note number:', error);
+      // Fallback to timestamp-based number if counter fails
+      const timestamp = Date.now().toString();
+      return `RN${timestamp.slice(-4)}`;
+    }
   }
 
   // Create return note
@@ -109,9 +126,13 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
       console.log('EnhancedReturnNoteService: Starting createReturnNote');
       console.log('Input data:', returnNoteData);
       
+      // Generate the return note number
+      const returnNoteNumber = await this.generateReturnNoteNumber();
+      console.log('Generated return note number:', returnNoteNumber);
+      
       const returnNote: Omit<ReturnNote, 'id' | 'createdAt' | 'updatedAt'> = {
         ...returnNoteData,
-        returnNoteNumber: this.generateReturnNoteNumber()
+        returnNoteNumber: returnNoteNumber
       };
 
       console.log('Generated return note:', returnNote);
@@ -267,5 +288,34 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
     return await this.getAll([
       { field: 'status', operator: 'in', value: ['pending', 'approved'] }
     ], { orderBy: 'createdAt', orderDirection: 'asc' });
+  }
+
+  // Backfill missing return note numbers for existing return notes
+  async backfillReturnNoteNumbers(): Promise<void> {
+    try {
+      console.log('Starting backfill of return note numbers...');
+      
+      // Get all return notes
+      const allReturnNotes = await this.getAll();
+      
+      // Find return notes without numbers
+      const returnNotesWithoutNumbers = allReturnNotes.filter(note => 
+        !note.returnNoteNumber || note.returnNoteNumber.trim() === ''
+      );
+      
+      console.log(`Found ${returnNotesWithoutNumbers.length} return notes without numbers`);
+      
+      // Assign numbers to each one
+      for (const returnNote of returnNotesWithoutNumbers) {
+        const returnNoteNumber = await this.generateReturnNoteNumber();
+        await this.update(returnNote.id, { returnNoteNumber });
+        console.log(`Assigned ${returnNoteNumber} to return note ${returnNote.id}`);
+      }
+      
+      console.log('Backfill completed successfully');
+    } catch (error) {
+      console.error('Error during backfill:', error);
+      throw error;
+    }
   }
 } 
