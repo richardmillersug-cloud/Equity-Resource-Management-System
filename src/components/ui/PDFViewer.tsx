@@ -122,10 +122,27 @@ export default function PDFViewer({
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(documentUrl);
-      alert('Document URL copied to clipboard!');
+      // Check if clipboard API is available
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(documentUrl);
+        alert('Document URL copied to clipboard!');
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = documentUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+        alert('Document URL copied to clipboard!');
+      }
     } catch (err) {
       console.error('Clipboard error:', err);
+      alert('Copy functionality not supported in this browser. Please copy manually: ' + documentUrl);
     }
   };
 

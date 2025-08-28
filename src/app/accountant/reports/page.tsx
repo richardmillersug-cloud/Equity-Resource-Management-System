@@ -189,8 +189,8 @@ export default function FinancialReportsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Financial Reports</h1>
-          <p className="text-gray-600">Comprehensive financial analysis and reporting</p>
+          <h1 className="text-2xl font-bold text-gray-900">Equity Wallet</h1>
+          <p className="text-gray-600">Track gross profit & expense fund accumulation across daily, weekly, and monthly periods</p>
         </div>
         <div className="flex space-x-3">
           <button 

@@ -9,6 +9,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
+import { fundingSourceService } from './funding-source-service';
 
 // =====================================================
 // DATABASE INITIALIZATION SERVICE
@@ -56,6 +57,9 @@ export class DatabaseInitialization {
       await this.initializeAuditLogsCollection();
       await this.initializeUserSessionsCollection();
       await this.initializeUsersCollection();
+
+      // Financial Collections
+      await this.initializeFundBalancesCollection();
 
       console.log('✅ All collections initialized successfully!');
     } catch (error) {
@@ -1790,6 +1794,24 @@ export class DatabaseInitialization {
       throw error;
     }
   }
+
+  /**
+   * Initialize Fund Balances Collection
+   */
+  static async initializeFundBalancesCollection(): Promise<void> {
+    console.log('🏦 Initializing fund balances...');
+    
+    try {
+      // Initialize fund balances for the default branch
+      const defaultBranchId = 'kyengera'; // or get from current user context
+      await fundingSourceService.initializeFundBalances(defaultBranchId);
+      
+      console.log('✅ Fund balances initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing fund balances:', error);
+      // Don't throw error to prevent stopping other initializations
+    }
+  }
 }
 
 // =====================================================
@@ -1803,7 +1825,8 @@ if (typeof window !== 'undefined') {
     clear: () => DatabaseInitialization.clearAllCollections(),
     purchasingManager: () => DatabaseInitialization.initializePurchasingManagerCollections(),
     receiver: () => DatabaseInitialization.initializeReceiverCollections(),
-    shared: () => DatabaseInitialization.initializeSharedCollections()
+    shared: () => DatabaseInitialization.initializeSharedCollections(),
+    fundBalances: () => DatabaseInitialization.initializeFundBalancesCollection()
   };
   
   console.log('🗄️  Database Initialization loaded!');
@@ -1814,4 +1837,5 @@ if (typeof window !== 'undefined') {
   console.log('- dbInit.purchasingManager() - Initialize purchasing manager collections only');
   console.log('- dbInit.receiver() - Initialize receiver collections only');
   console.log('- dbInit.shared() - Initialize shared collections only');
+  console.log('- dbInit.fundBalances() - Initialize fund balances for expense payments');
 }

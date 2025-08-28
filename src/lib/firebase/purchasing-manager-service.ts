@@ -202,6 +202,7 @@ export interface Expense {
   rejectedAt?: Date;
   rejectedBy?: string;
   rejectionReason?: string;
+  fundingSource?: 'DAILY_EXPENSE_FUND' | 'WALLET_GROSS_PROFIT'; // Funding source for payment allocation
 }
 
 // New interface for payment analytics
@@ -275,12 +276,12 @@ export class PurchasingManagerService {
   }
 
   /**
-   * Calculate profit margin (12%) from cash closes
+   * Calculate profit from cash closes using direct percentage of total cash close
    */
-  static calculateProfitMetrics(cashCloses: CashClose[]) {
+  static calculateProfitMetrics(cashCloses: CashClose[], profitPercentage: number = 12) {
     const totalRevenue = cashCloses.reduce((sum, close) => sum + close.closeCash, 0);
-    const profitMargin = 0.12; // 12%
-    const estimatedProfit = totalRevenue * profitMargin;
+    const profitMargin = profitPercentage / 100; // Convert percentage to decimal
+    const estimatedProfit = totalRevenue * profitMargin; // Direct percentage of total cash close
     
     return {
       totalRevenue,

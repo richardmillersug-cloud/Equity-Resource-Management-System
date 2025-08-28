@@ -318,4 +318,146 @@ export class EnhancedReturnNoteService extends FirestoreService<ReturnNote> {
       throw error;
     }
   }
+
+  // Get return notes with their items for purchasing manager
+  async getReturnNotesForPurchasing(): Promise<ReturnNote[]> {
+    return await this.getAll([], { 
+      orderBy: 'createdAt', 
+      orderDirection: 'desc' 
+    });
+  }
+
+  // Get items that have been returned and need restocking
+  async getItemsForRestocking(): Promise<any[]> {
+    try {
+      const receivedNotes = await this.getAll([
+        { field: 'status', operator: '==', value: 'received' }
+      ]);
+      
+      const restockingItems: any[] = [];
+      
+      receivedNotes.forEach(note => {
+        note.items.forEach(item => {
+          restockingItems.push({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalValue: item.totalValue || (item.quantity * item.unitPrice),
+            returnNoteId: note.id,
+            returnNoteNumber: note.returnNoteNumber || 'N/A',
+            supplierName: note.supplierName,
+            returnDate: note.returnDate,
+            reason: note.reason,
+            status: 'pending_restock',
+            priority: this.calculateRestockPriority(item)
+          });
+        });
+      });
+      
+      return restockingItems;
+    } catch (error) {
+      console.error('Error getting items for restocking:', error);
+      throw error;
+    }
+  }
+
+  // Calculate restocking priority based on item characteristics
+  private calculateRestockPriority(item: any): 'high' | 'medium' | 'low' {
+    const quantity = item.quantity || 0;
+    const value = item.totalValue || (item.quantity * item.unitPrice) || 0;
+    
+    // High priority: large quantities or high value items
+    if (quantity > 100 || value > 1000000) return 'high'; // UGX 1M+
+    
+    // Low priority: small quantities and low value
+    if (quantity < 10 && value < 100000) return 'low'; // UGX 100K-
+    
+    // Medium priority: everything else
+    return 'medium';
+  }
+
+  // Get statistics for purchasing dashboard
+  async getPurchasingStats(): Promise<{
+    totalReturns: number;
+    pendingReturns: number;
+    receivedItems: number;
+    itemsNeedingRestock: number;
+    totalReturnValue: number;
+    monthlyTrend: { month: string; returns: number; value: number }[];
+  }> {
+    try {
+      const allNotes = await this.getAll();
+      const restockingItems = await this.getItemsForRestocking();
+      
+      const receivedNotes = allNotes.filter(note => note.status === 'received');
+      const totalReturnValue = receivedNotes.reduce((sum, note) => sum + (note.totalValue || 0), 0);
+      
+      // Calculate monthly trend for last 6 months
+      const monthlyTrend = this.calculateMonthlyTrend(allNotes);
+      
+      return {
+        totalReturns: allNotes.length,
+        pendingReturns: allNotes.filter(note => ['pending', 'approved', 'picked_up'].includes(note.status)).length,
+        receivedItems: receivedNotes.length,
+        itemsNeedingRestock: restockingItems.length,
+        totalReturnValue: totalReturnValue,
+        monthlyTrend: monthlyTrend
+      };
+    } catch (error) {
+      console.error('Error getting purchasing stats:', error);
+      throw error;
+    }
+  }
+
+  // Calculate monthly trend data
+  private calculateMonthlyTrend(notes: ReturnNote[]): { month: string; returns: number; value: number }[] {
+    const last6Months = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      
+      const monthNotes = notes.filter(note => {
+        const returnDate = note.returnDate.toDate();
+        const noteMonthKey = `${returnDate.getFullYear()}-${String(returnDate.getMonth() + 1).padStart(2, '0')}`;
+        return noteMonthKey === monthKey;
+      });
+      
+      const monthValue = monthNotes
+        .filter(note => note.status === 'received')
+        .reduce((sum, note) => sum + (note.totalValue || 0), 0);
+      
+      last6Months.push({
+        month: monthName,
+        returns: monthNotes.length,
+        value: monthValue
+      });
+    }
+    
+    return last6Months;
+  }
+
+  // Mark item as restocked
+  async markItemAsRestocked(returnNoteId: string, itemIndex: number): Promise<void> {
+    try {
+      // This would typically update an inventory system
+      // For now, we'll add a note to the return note
+      const returnNote = await this.getById(returnNoteId);
+      if (returnNote && returnNote.items[itemIndex]) {
+        const updatedItems = [...returnNote.items];
+        updatedItems[itemIndex] = {
+          ...updatedItems[itemIndex],
+          restockedAt: new Date(),
+          restockStatus: 'restocked'
+        };
+        
+        await this.update(returnNoteId, { items: updatedItems });
+      }
+    } catch (error) {
+      console.error('Error marking item as restocked:', error);
+      throw error;
+    }
+  }
 } 

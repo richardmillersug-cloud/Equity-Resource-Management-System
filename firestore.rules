@@ -200,15 +200,24 @@ service cloud.firestore {
     }
     
     // =====================================================
-    // RETURN NOTES (Rule 7.3) - Enhanced permissions
+    // RETURN NOTES (Rule 7.3) - Enhanced permissions for PM restocking
     // =====================================================
     
     match /returnNotes/{returnId} {
       allow read: if hasAnyRole(['Admin', 'Receiver', 'Stock Manager', 'Purchasing Manager', 'Purchase Manager']);
       allow create: if hasAnyRole(['Receiver', 'Admin']);
-      allow update: if hasAnyRole(['Admin', 'Receiver']) && 
-        (request.resource.data.keys().hasAll(['status']) || 
-         resource.data.createdBy == request.auth.uid);
+      allow update: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']) && (
+        // Receivers can update status and general fields
+        (hasAnyRole(['Receiver', 'Admin']) && (
+          request.resource.data.keys().hasAll(['status']) || 
+          resource.data.createdBy == request.auth.uid
+        )) ||
+        // Purchasing Managers can update items for restocking status
+        (hasAnyRole(['Purchasing Manager', 'Purchase Manager']) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'updatedAt']) ||
+          request.resource.data.keys().hasAll(['items'])
+        ))
+      );
       allow delete: if hasRole('Admin');
     }
     
@@ -220,6 +229,39 @@ service cloud.firestore {
       allow read: if hasAnyRole(['Admin', 'Stock Manager', 'Manager', 'Receiver']);
       allow create: if hasAnyRole(['Stock Manager', 'Receiver', 'Admin']);
       allow update: if hasAnyRole(['Admin', 'Stock Manager', 'Receiver']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // COUNTERS - For sequential numbering (return notes, restock orders, etc.)
+    // =====================================================
+    
+    match /counters/{counterId} {
+      allow read: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']);
+      allow update: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']) && 
+        request.resource.data.keys().hasAll(['count']);
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
+    // RESTOCK ORDERS - For expected items management
+    // =====================================================
+    
+    match /restockOrders/{orderId} {
+      allow read: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']);
+      allow create: if hasAnyRole(['Purchasing Manager', 'Purchase Manager', 'Admin']);
+      allow update: if hasAnyRole(['Admin', 'Receiver', 'Purchasing Manager', 'Purchase Manager']) && (
+        // Purchasing Managers can update all fields for their orders
+        (hasAnyRole(['Purchasing Manager', 'Purchase Manager']) && (
+          resource.data.createdBy == request.auth.uid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        )) ||
+        // Receivers can update verification-related fields
+        (hasAnyRole(['Receiver', 'Admin']) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'status', 'receiverNotes', 'actualDeliveryDate', 'verifiedAt', 'totalReceivedValue', 'updatedAt'])
+        ))
+      );
       allow delete: if hasRole('Admin');
     }
     
@@ -277,13 +319,19 @@ service cloud.firestore {
     }
     
     // =====================================================
-    // INVENTORY - New collection for stock management
+    // INVENTORY - Enhanced for purchasing manager restocking
     // =====================================================
     
     match /inventory/{itemId} {
       allow read: if hasAnyRole(['Admin', 'Stock Manager', 'Receiver', 'Purchase Manager', 'Purchasing Manager']);
-      allow create: if hasAnyRole(['Stock Manager', 'Receiver', 'Admin']);
-      allow update: if hasAnyRole(['Stock Manager', 'Receiver', 'Admin']);
+      allow create: if hasAnyRole(['Stock Manager', 'Receiver', 'Admin', 'Purchase Manager', 'Purchasing Manager']);
+      allow update: if hasAnyRole(['Stock Manager', 'Receiver', 'Admin', 'Purchase Manager', 'Purchasing Manager']) && (
+        // Stock managers and receivers can update all fields
+        hasAnyRole(['Stock Manager', 'Receiver', 'Admin']) ||
+        // Purchasing managers can update restocking-related fields
+        (hasAnyRole(['Purchase Manager', 'Purchasing Manager']) && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'lastRestocked', 'restockHistory', 'updatedAt']))
+      );
       allow delete: if hasRole('Admin');
     }
     

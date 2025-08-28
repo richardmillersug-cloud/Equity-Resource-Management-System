@@ -190,10 +190,11 @@ export class FirebaseBusinessRules {
       errors.push('Cash allocation must include at least one fund type');
     }
 
-    // Rule 1.3: 12% savings is mandatory
-    const expectedSavings = allocation.cashCloseTotal * 0.12;
+    // Rule 1.3: Profit percentage is configurable
+    const profitPercentage = allocation.profitPercentage || 12; // Default to 12% if not specified
+    const expectedSavings = allocation.totalCashInTill * (profitPercentage / 100);
     if (Math.abs(allocation.savings - expectedSavings) > 0.01) {
-      warnings.push(`Savings should be 12% of cash close total (${expectedSavings.toFixed(2)})`);
+      warnings.push(`Savings should be ${profitPercentage}% of total cash in till (${expectedSavings.toFixed(2)})`);
     }
 
     // Rule 1.5: Total allocation cannot exceed cash close total
@@ -532,15 +533,17 @@ export class FirebaseBusinessRules {
     return 'Pending';
   }
 
-  calculateCashAllocationDefaults(cashCloseTotal: number): {
+  calculateCashAllocationDefaults(totalCashInTill: number, specialFundsAmount?: number, profitPercentage: number = 12): {
     savings: number;
     specialFunds: number;
     purchasingManager: number;
   } {
-    const savings = cashCloseTotal * 0.12; // 12% mandatory savings
-    const remainingAmount = cashCloseTotal - savings;
-    const specialFunds = remainingAmount * 0.3; // 30% to special funds
-    const purchasingManager = remainingAmount * 0.7; // 70% to purchasing manager
+    const savings = totalCashInTill * (profitPercentage / 100); // Profit as direct percentage of total cash in till
+    const remainingAmount = totalCashInTill - savings; // For Distribution = Total Cash in Till - Profit
+    
+    // Use provided special funds amount, or default to 0 if not specified
+    const specialFunds = specialFundsAmount || 0;
+    const purchasingManager = Math.max(0, remainingAmount - specialFunds); // Remaining after special funds
 
     return {
       savings: Math.round(savings * 100) / 100,
