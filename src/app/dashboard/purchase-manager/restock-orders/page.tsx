@@ -1,0 +1,875 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  Package, 
+  Plus, 
+  RefreshCw, 
+  Search, 
+  Filter, 
+  Eye, 
+  Edit,
+  Trash2,
+  Send,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Truck,
+  Calendar,
+  User,
+  FileText,
+  DollarSign,
+  TrendingUp,
+  AlertCircle
+} from 'lucide-react';
+import { RestockOrderService, RestockOrder, RestockItem, RESTOCK_ORDER_STATUSES, PRIORITY_LEVELS } from '../../../../lib/firebase/restock-order-service';
+import { authService } from '../../../../lib/firebase/auth';
+
+const restockOrderService = new RestockOrderService();
+
+export default function RestockOrdersPage() {
+  const [restockOrders, setRestockOrders] = useState<RestockOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<RestockOrder | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    inTransitOrders: 0,
+    deliveredOrders: 0,
+    completedOrders: 0
+  });
+
+  // New order form state
+  const [newOrder, setNewOrder] = useState<Partial<RestockOrder>>({
+    title: '',
+    description: '',
+    expectedDeliveryDate: new Date(),
+    supplier: '',
+    priority: 'medium',
+    items: [],
+    notes: ''
+  });
+
+  // New item form state
+  const [newItem, setNewItem] = useState<Partial<RestockItem>>({
+    itemName: '',
+    expectedQuantity: 0,
+    unitPrice: 0,
+    supplier: '',
+    category: '',
+    description: '',
+    expiryDate: undefined,
+    batchNumber: ''
+  });
+
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadRestockOrders();
+    }
+  }, [currentUser]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
+
+  const loadRestockOrders = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading restock orders...');
+      
+      // Check if user is authenticated
+      if (!currentUser) {
+        console.log('⚠️ No current user, waiting for authentication...');
+        return;
+      }
+      
+      console.log('👤 Current user:', currentUser?.email, 'Role:', currentUser?.role);
+      
+      const orders = await restockOrderService.getOrdersForPurchasing();
+      console.log('📦 Loaded orders:', orders?.length || 0);
+      setRestockOrders(orders || []);
+      
+      // Calculate stats
+      try {
+        const stats = await restockOrderService.getRestockOrderStats();
+        console.log('📊 Stats loaded:', stats);
+        setStats({
+          totalOrders: stats.totalOrders,
+          pendingOrders: stats.pendingOrders,
+          inTransitOrders: stats.inTransitOrders,
+          deliveredOrders: stats.deliveredOrders,
+          completedOrders: stats.completedOrders
+        });
+      } catch (statsError) {
+        console.error('⚠️ Error loading stats (non-critical):', statsError);
+        // Set default stats if stats loading fails
+        setStats({
+          totalOrders: orders?.length || 0,
+          pendingOrders: 0,
+          inTransitOrders: 0,
+          deliveredOrders: 0,
+          completedOrders: 0
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading restock orders:', error);
+      setRestockOrders([]);
+      // Show user-friendly error message
+      alert('Failed to load restock orders. Please check your permissions and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    try {
+      console.log('🚀 Starting order creation...');
+      
+      if (!currentUser?.uid) {
+        alert('Please log in to create restock orders');
+        console.error('❌ No current user for order creation');
+        return;
+      }
+
+      console.log('👤 Creating order for user:', currentUser.email);
+
+      if (!newOrder.title || !newOrder.supplier || !newOrder.expectedDeliveryDate) {
+        alert('Please fill in all required fields');
+        console.error('❌ Missing required fields:', { 
+          title: !!newOrder.title, 
+          supplier: !!newOrder.supplier, 
+          expectedDeliveryDate: !!newOrder.expectedDeliveryDate 
+        });
+        return;
+      }
+
+      if (!newOrder.items || newOrder.items.length === 0) {
+        alert('Please add at least one item to the restock order');
+        console.error('❌ No items in order');
+        return;
+      }
+
+      console.log('📦 Order details:', {
+        title: newOrder.title,
+        supplier: newOrder.supplier,
+        itemsCount: newOrder.items?.length,
+        priority: newOrder.priority
+      });
+
+      const orderData = {
+        ...newOrder,
+        createdBy: currentUser.uid,
+        status: 'draft' as const,
+        items: newOrder.items || []
+      };
+
+      console.log('💾 Saving order to database...');
+      const orderId = await restockOrderService.createRestockOrder(orderData as Omit<RestockOrder, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>);
+      console.log('✅ Order created with ID:', orderId);
+      
+      setShowCreateModal(false);
+      resetNewOrderForm();
+      await loadRestockOrders();
+      alert('Restock order created successfully!');
+    } catch (error) {
+      console.error('❌ Error creating restock order:', error);
+      alert(`Failed to create restock order: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleAddItem = () => {
+    if (!newItem.itemName || !newItem.expectedQuantity || !newItem.unitPrice) {
+      alert('Please fill in all required item fields');
+      return;
+    }
+
+    const item: RestockItem = {
+      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      itemName: newItem.itemName!,
+      expectedQuantity: newItem.expectedQuantity!,
+      unitPrice: newItem.unitPrice!,
+      totalExpectedValue: newItem.expectedQuantity! * newItem.unitPrice!,
+      supplier: newItem.supplier || newOrder.supplier || '',
+      category: newItem.category,
+      description: newItem.description,
+      expiryDate: newItem.expiryDate,
+      batchNumber: newItem.batchNumber,
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    setNewOrder(prev => ({
+      ...prev,
+      items: [...(prev.items || []), item]
+    }));
+
+    resetNewItemForm();
+    setShowAddItemModal(false);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    setNewOrder(prev => ({
+      ...prev,
+      items: prev.items?.filter(item => item.id !== itemId) || []
+    }));
+  };
+
+  const resetNewOrderForm = () => {
+    setNewOrder({
+      title: '',
+      description: '',
+      expectedDeliveryDate: new Date(),
+      supplier: '',
+      priority: 'medium',
+      items: [],
+      notes: ''
+    });
+  };
+
+  const resetNewItemForm = () => {
+    setNewItem({
+      itemName: '',
+      expectedQuantity: 0,
+      unitPrice: 0,
+      supplier: '',
+      category: '',
+      description: '',
+      expiryDate: undefined,
+      batchNumber: ''
+    });
+  };
+
+  const handleSubmitOrder = async (orderId: string) => {
+    try {
+      await restockOrderService.submitOrder(orderId);
+      await loadRestockOrders();
+      alert('Order submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      alert('Failed to submit order. Please try again.');
+    }
+  };
+
+  const filteredOrders = restockOrders.filter(order => {
+    const matchesSearch = (order?.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (order?.orderNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (order?.supplier || '').toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || order?.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusColor = (status: string) => {
+    const statusConfig = RESTOCK_ORDER_STATUSES.find(s => s.value === status);
+    return statusConfig?.color || 'gray';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statusConfig = RESTOCK_ORDER_STATUSES.find(s => s.value === status);
+    return statusConfig?.label || status;
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const priorityConfig = PRIORITY_LEVELS.find(p => p.value === priority);
+    return priorityConfig?.color || 'gray';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-lg">Loading restock orders...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Restock Orders Management</h1>
+              <p className="text-blue-100 text-lg">Create and manage expected items for restocking</p>
+            </div>
+            <div className="flex space-x-4">
+              <button
+                onClick={loadRestockOrders}
+                className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold"
+              >
+                <RefreshCw className="w-5 h-5" />
+                Refresh
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-white text-blue-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <Plus className="w-5 h-5" />
+                Create Restock Order
+              </button>
+              <button
+                onClick={async () => {
+                  console.log('🧪 Creating test order...');
+                  try {
+                    // Pre-fill form with test data
+                    setNewOrder({
+                      title: 'Test Weekly Produce Order',
+                      description: 'Sample order to test the system',
+                      expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                      supplier: 'Test Supplier Ltd',
+                      priority: 'medium',
+                      items: [
+                        {
+                          id: `temp_${Date.now()}_001`,
+                          itemName: 'Test Tomatoes',
+                          expectedQuantity: 25,
+                          unitPrice: 3000,
+                          totalExpectedValue: 75000,
+                          supplier: 'Test Supplier Ltd',
+                          category: 'Produce',
+                          description: 'Fresh red tomatoes for testing',
+                          status: 'pending',
+                          createdAt: new Date(),
+                          updatedAt: new Date()
+                        }
+                      ],
+                      notes: 'This is a test order to verify the system works'
+                    });
+                    setShowCreateModal(true);
+                  } catch (error) {
+                    console.error('Error creating test order:', error);
+                  }
+                }}
+                className="bg-yellow-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-yellow-600 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <AlertTriangle className="w-5 h-5" />
+                Create Test Order
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <FileText className="w-8 h-8 text-blue-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <Clock className="w-8 h-8 text-yellow-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <Truck className="w-8 h-8 text-orange-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">In Transit</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.inTransitOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <Package className="w-8 h-8 text-purple-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Delivered</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.deliveredOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <CheckCircle className="w-8 h-8 text-green-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.completedOrders}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by title, order number, or supplier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div className="relative">
+              <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+              >
+                <option value="all">All Statuses</option>
+                {RESTOCK_ORDER_STATUSES.map(status => (
+                  <option key={status.value} value={status.value}>{status.label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <button
+              onClick={loadRestockOrders}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Restock Orders List */}
+        <div className="bg-white rounded-lg shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Restock Orders</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Delivery</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Value</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                        <div className="text-sm text-gray-500">{order.title}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order?.supplier || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.expectedDeliveryDate && order.expectedDeliveryDate.toDate ? 
+                        order.expectedDeliveryDate.toDate().toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(order?.items || []).length} items
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      UGX {(order?.totalExpectedValue || 0).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getPriorityColor(order.priority)}-100 text-${getPriorityColor(order.priority)}-800`}>
+                        {order?.priority || 'medium'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getStatusColor(order.status)}-100 text-${getStatusColor(order.status)}-800`}>
+                        {getStatusLabel(order?.status || '')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setShowViewModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {order.status === 'draft' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setNewOrder(order);
+                              setEditingOrderId(order.id);
+                              setShowCreateModal(true);
+                            }}
+                            className="text-yellow-600 hover:text-yellow-900"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSubmitOrder(order.id)}
+                            className="text-green-600 hover:text-green-900"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Create/Edit Order Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                {editingOrderId ? 'Edit Restock Order' : 'Create New Restock Order'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditingOrderId(null);
+                  resetNewOrderForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Order Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={newOrder.title || ''}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter order title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Supplier *
+                  </label>
+                  <input
+                    type="text"
+                    value={newOrder.supplier || ''}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, supplier: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter supplier name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Expected Delivery Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={newOrder.expectedDeliveryDate ? new Date(newOrder.expectedDeliveryDate).toISOString().split('T')[0] : ''}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, expectedDeliveryDate: new Date(e.target.value) }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Priority
+                  </label>
+                  <select
+                    value={newOrder.priority || 'medium'}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, priority: e.target.value as any }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {PRIORITY_LEVELS.map(priority => (
+                      <option key={priority.value} value={priority.value}>{priority.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newOrder.description || ''}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter order description"
+                />
+              </div>
+
+              {/* Items Section */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-md font-medium text-gray-900">Expected Items</h4>
+                  <button
+                    onClick={() => setShowAddItemModal(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </button>
+                </div>
+
+                {/* Items List */}
+                <div className="border border-gray-200 rounded-lg">
+                  {(newOrder.items || []).length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>No items added yet. Click "Add Item" to get started.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {(newOrder.items || []).map((item) => (
+                            <tr key={item.id}>
+                              <td className="px-4 py-4">
+                                <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
+                                <div className="text-sm text-gray-500">{item.description}</div>
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900">{item.expectedQuantity}</td>
+                              <td className="px-4 py-4 text-sm text-gray-900">UGX {item.unitPrice?.toLocaleString()}</td>
+                              <td className="px-4 py-4 text-sm text-gray-900">UGX {(item.totalExpectedValue || 0).toLocaleString()}</td>
+                              <td className="px-4 py-4">
+                                <button
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  value={newOrder.notes || ''}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Additional notes for this order"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setEditingOrderId(null);
+                  resetNewOrderForm();
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateOrder}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {editingOrderId ? 'Update Order' : 'Create Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Item Modal */}
+      {showAddItemModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-60">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Add Expected Item</h3>
+              <button
+                onClick={() => {
+                  setShowAddItemModal(false);
+                  resetNewItemForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  value={newItem.itemName || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, itemName: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter item name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expected Quantity *
+                </label>
+                <input
+                  type="number"
+                  value={newItem.expectedQuantity || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, expectedQuantity: parseInt(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Unit Price (UGX) *
+                </label>
+                <input
+                  type="number"
+                  value={newItem.unitPrice || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={newItem.category || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Item category"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newItem.description || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Item description"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  value={newItem.expiryDate ? new Date(newItem.expiryDate).toISOString().split('T')[0] : ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, expiryDate: e.target.value ? new Date(e.target.value) : undefined }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Batch Number
+                </label>
+                <input
+                  type="text"
+                  value={newItem.batchNumber || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, batchNumber: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Batch number (if applicable)"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddItemModal(false);
+                  resetNewItemForm();
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddItem}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

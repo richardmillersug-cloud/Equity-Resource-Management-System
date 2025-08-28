@@ -22,7 +22,8 @@ export default function ExpenseForm({ isOpen, onClose, onSubmit, initialData, mo
     notes: initialData?.notes || '',
     priority: initialData?.priority || 'medium',
     vendor: initialData?.vendor || '',
-    receiptNumber: initialData?.receiptNumber || ''
+    receiptNumber: initialData?.receiptNumber || '',
+    // Funding source will be assigned at payment time, not during expense creation
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -78,6 +79,10 @@ export default function ExpenseForm({ isOpen, onClose, onSubmit, initialData, mo
       newErrors.expenseDate = 'Expense date is required';
     }
 
+    if (!formData.fundingSource) {
+      newErrors.fundingSource = 'Funding source is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -98,7 +103,8 @@ export default function ExpenseForm({ isOpen, onClose, onSubmit, initialData, mo
         expenseDate: new Date(formData.expenseDate),
         paidAmount: 0,
         status: 'pending',
-        paymentStatus: 'UNPAID'
+        paymentStatus: 'UNPAID',
+        // No funding source - will be assigned at payment time
       };
 
       await onSubmit(expenseData);
@@ -113,7 +119,8 @@ export default function ExpenseForm({ isOpen, onClose, onSubmit, initialData, mo
         notes: '',
         priority: 'medium',
         vendor: '',
-        receiptNumber: ''
+        receiptNumber: '',
+        // No funding source assigned at creation
       });
     } catch (error) {
       console.error('Error submitting expense:', error);
@@ -218,6 +225,19 @@ export default function ExpenseForm({ isOpen, onClose, onSubmit, initialData, mo
               {errors.category && (
                 <p className="text-red-600 text-sm mt-1">{errors.category}</p>
               )}
+            </div>
+          </div>
+
+          {/* Note about funding source assignment */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <span className="text-blue-600 mr-2">📝</span>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Funding Source Assignment</p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Funding sources will be assigned when making payments, not during expense creation.
+                </p>
+              </div>
             </div>
           </div>
 

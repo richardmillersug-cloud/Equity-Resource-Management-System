@@ -44,6 +44,13 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
   ]);
   const [availableRoles] = useState<JobRole[]>([
     { 
+      jobRoleId: 'managing-director',
+      jobTitle: 'Managing Director', 
+      baseSalary: 8000000,
+      description: 'Executive leadership with comprehensive analytics access and strategic oversight across all business operations',
+      assignedDate: new Date() as any
+    },
+    { 
       jobRoleId: 'admin',
       jobTitle: 'Admin', 
       baseSalary: 1500000,

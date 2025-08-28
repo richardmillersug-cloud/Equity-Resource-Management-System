@@ -18,6 +18,7 @@ import {
   Settings,
   Building2,
   Receipt,
+  CreditCard,
   Upload,
   AlertTriangle,
   UserCheck,
@@ -28,7 +29,6 @@ import {
   Plus,
   Eye,
   RefreshCw,
-  CreditCard,
   Activity,
   CheckCircle,
   XCircle,
@@ -38,7 +38,8 @@ import {
   Calendar,
   Sun,
   Moon,
-  LogOut
+  LogOut,
+  Wallet
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -68,6 +69,15 @@ const navigationItems: NavigationItem[] = [
     label: 'Dashboard', 
     path: '/dashboard',
     roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Cashier', 'Customer Service', 'Managing Director']
+  },
+  
+  // Analytics Dashboard - For business intelligence and data analysis
+  { 
+    id: 'analytics', 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    label: 'Analytics Dashboard', 
+    path: '/dashboard/analytics',
+    roles: ['Admin', 'Manager', 'Accountant', 'Managing Director']
   },
   
   // Managing Director specific
@@ -139,6 +149,20 @@ const navigationItems: NavigationItem[] = [
     roles: ['Accountant', 'Admin']
   },
   { 
+    id: 'cash-close', 
+    icon: <DollarSign className="w-5 h-5" />, 
+    label: 'Daily Cash Close', 
+    path: '/dashboard/accountant/cash-close',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'profit-analysis', 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    label: 'Profit Analysis', 
+    path: '/dashboard/accountant/profits',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
     id: 'expenses', 
     icon: <Receipt className="w-5 h-5" />, 
     label: 'Expenses', 
@@ -146,9 +170,30 @@ const navigationItems: NavigationItem[] = [
     roles: ['Accountant', 'Admin']
   },
   { 
-    id: 'financial-reports', 
-    icon: <BarChart3 className="w-5 h-5" />, 
-    label: 'Financial Reports', 
+    id: 'expense-payments', 
+    icon: <CreditCard className="w-5 h-5" />, 
+    label: 'Expense Payments', 
+    path: '/dashboard/accountant/expenses/payments',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'expense-types', 
+    icon: <Settings className="w-5 h-5" />, 
+    label: 'Expense Types', 
+    path: '/dashboard/accountant/expense-types',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'fund-balances', 
+    icon: <DollarSign className="w-5 h-5" />, 
+    label: 'Fund Balances', 
+    path: '/dashboard/accountant/fund-balances',
+    roles: ['Accountant', 'Admin']
+  },
+  { 
+    id: 'equity-wallet', 
+    icon: <Wallet className="w-5 h-5" />, 
+    label: 'Equity Wallet', 
     path: '/dashboard/accountant/reports',
     roles: ['Accountant', 'Manager', 'Admin']
   },
@@ -201,6 +246,20 @@ const navigationItems: NavigationItem[] = [
     icon: <Calculator className="w-5 h-5" />, 
     label: 'Supplier Totals', 
     path: '/dashboard/purchase-manager/supplier-totals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'pm-return-notes', 
+    icon: <RefreshCw className="w-5 h-5" />, 
+    label: 'Return Notes & Restocking', 
+    path: '/dashboard/purchase-manager/return-notes',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'restock-orders', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Restock Orders', 
+    path: '/dashboard/purchase-manager/restock-orders',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
 
@@ -341,14 +400,21 @@ const navigationItems: NavigationItem[] = [
         label: 'Return Notes Management',
         path: '/dashboard/receiver/returns'
       },
-      {
-        id: 'return-notes-tracking',
-        icon: <RefreshCw className="w-4 h-4" />,
-        label: 'Return Notes Tracking',
-        path: '/dashboard/receiver/returns/tracking'
-      }
-    ]
-  },
+              {
+          id: 'return-notes-tracking',
+          icon: <RefreshCw className="w-4 h-4" />,
+          label: 'Return Notes Tracking',
+          path: '/dashboard/receiver/returns/tracking'
+        }
+      ]
+    },
+    {
+      id: 'restock-verification',
+      icon: <Package className="w-5 h-5" />,
+      label: 'Restock Verification',
+      path: '/dashboard/receiver/restock-verification',
+      roles: ['Receiver', 'Admin']
+    },
   { 
     id: 'suppliers', 
     icon: <Factory className="w-5 h-5" />, 

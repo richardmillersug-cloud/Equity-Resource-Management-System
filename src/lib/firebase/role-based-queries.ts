@@ -316,8 +316,9 @@ export class AccountantQueries {
   }
 
   private static validateSavingsPercentage(allocation: any): string {
-    const expectedSavings = allocation.cashCloseTotal * 0.12;
-    return allocation.savings === expectedSavings ? 'CORRECT' : 'INCORRECT';
+    const profitPercentage = allocation.profitPercentage || 12; // Default to 12% if not specified
+    const expectedSavings = allocation.totalCashInTill * (profitPercentage / 100);
+    return Math.abs(allocation.savings - expectedSavings) < 0.01 ? 'CORRECT' : 'INCORRECT';
   }
 
   private static calculatePaymentStatus(amount: number, paidAmount: number): string {

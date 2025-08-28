@@ -90,24 +90,128 @@ export interface SpecialFundsTracker {
 }
 
 export interface CashClose {
+  // Document Metadata
   id: string;
-  employeeId: string; // Reference to Employee
-  branchId: string; // Reference to Branch
-  cashCloseDate: Timestamp;
-  closeCashTime: Timestamp;
-  shift: string;
-  tillNumber: string;
-  actualAmount: number;
-  expectedAmount: number;
-  // Payment method breakdowns
-  cashPresent: number;
-  airtel: number;
-  stanbicBank: number;
-  mtn: number;
-  equityBank: number;
-  absaBank: number;
-  pesaPal: number;
   createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  branchId: string;
+  cashCloseDate: Timestamp;
+  
+  // Global Settings
+  profitPercentage: number;
+  taxRate: number; // 18% tax
+  notes: string;
+  
+  // Shift Data
+  shifts: ShiftData[];
+  
+  // Calculated Totals
+  totalRevenue: number;
+  totalCashInTill: number; // Combined cash + network money before subtractions
+  totalNetworkPayments: number;
+  totalExpectedCash: number; // Expected physical cash only
+  totalActualCash: number; // Actual physical cash present
+  totalTillUsed: number;
+  totalExpenses: number;
+  
+  // Variances
+  totalShortage: number;
+  totalExcess: number;
+  totalNetworkShortage: number;
+  totalNetworkExcess: number;
+  
+  // Financial Calculations
+  taxAmount: number;
+  afterTaxAmount: number;
+  profitAmount: number;
+  remainingAmount: number;
+  specialFunds: number;
+  purchasingManager: number;
+  
+  // Workflow
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: Timestamp;
+  rejectionReason?: string;
+}
+
+// Supporting interfaces for CashClose
+export interface TillNetworkPayment {
+  id: string;
+  paymentMethod: 'mobile' | 'visa_machine';
+  serviceProvider: string; // For mobile: 'airtel', 'mtn', etc. For visa: bank names
+  amount: number;
+  timestamp?: Timestamp;
+  verificationStatus?: 'pending' | 'verified' | 'failed';
+  notes?: string;
+}
+
+export interface TillExpense {
+  id: string;
+  description: string;
+  amount: number;
+  paidAmount: number;
+  remainingBalance: number;
+  expenseDate: Date;
+  expenseTime: Date;
+  category: string;
+  expenseType: 'GENERAL' | 'URA' | 'EMERGENCIES' | 'DAY_TO_DAY';
+  status: 'pending' | 'approved' | 'rejected' | 'processing';
+  paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'FULLY_PAID' | 'OVERPAID' | 'OVERDUE';
+  priority: 'urgent' | 'high' | 'medium' | 'low';
+  vendor: string;
+  receiptNumber: string;
+  notes: string;
+  employeeId: string;
+  employeeName: string;
+  dueDate: Date;
+  tags: string[];
+  department: string;
+  projectCode?: string;
+  tillNumber: number;
+  shiftType: 'day' | 'night';
+  approvalRequired: boolean;
+  fundingSource: 'DAILY_EXPENSE_FUND' | 'WALLET_GROSS_PROFIT'; // Funding source for all expenses
+  receipts?: string[];
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectedBy?: string;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+}
+
+export interface TillData {
+  tillNumber: number;
+  tillName?: string; // Optional till name for identification
+  
+  // Core Cash Fields
+  cashAmount: number; // Physical cash in till
+  tillUsed: number; // Amount used before cash close
+  expenses: number; // Total expenses per till (calculated from expenseDetails)
+  expenseDetails: TillExpense[]; // Detailed expense records for this till
+  cashAtHand: number; // Actual cash present
+  totalCashInTill: number; // Total physical cash in the till at close
+  
+  // Network Money Tracking
+  expectedNetworkMoney: number; // Expected network money for this till
+  actualNetworkMoney: number; // Actual network money recorded for this till
+  networkPayments: TillNetworkPayment[]; // Network payments specific to this till
+  
+  // Till Metadata
+  tillOperator?: string;
+  tillLocation?: string;
+  tillNotes?: string;
+}
+
+export interface ShiftData {
+  shift: 'day' | 'night';
+  tills: TillData[];
+  
+  // Shift Metadata
+  shiftStartTime?: Timestamp;
+  shiftEndTime?: Timestamp;
+  shiftSupervisor?: string;
 }
 
 export interface Expense {
@@ -124,6 +228,24 @@ export interface Expense {
   approvedBy?: string; // Reference to Employee
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  
+  // Enhanced fields from cash close integration
+  tillExpenseId?: string; // Reference to original till expense
+  cashCloseId?: string; // Reference to source cash close
+  tillNumber?: number; // Which till this came from
+  shiftType?: 'day' | 'night'; // Which shift
+  category?: string; // Free text category
+  vendor?: string; // Vendor/supplier
+  receiptNumber?: string; // Receipt reference
+  dueDate?: Date; // When payment is due
+  tags?: string[]; // Categorization tags
+  department?: string; // Department
+  projectCode?: string; // Project reference
+  priority?: 'urgent' | 'high' | 'medium' | 'low'; // Priority level
+  paymentStatus?: 'UNPAID' | 'PARTIALLY_PAID' | 'FULLY_PAID' | 'OVERPAID' | 'OVERDUE'; // Payment tracking
+  approvalRequired?: boolean; // Whether approval is needed
+  remainingBalance?: number; // Outstanding amount
+  fundingSource?: 'DAILY_EXPENSE_FUND' | 'WALLET_GROSS_PROFIT'; // Funding source for payment allocation
 }
 
 export interface CashInjection {

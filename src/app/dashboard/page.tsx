@@ -103,6 +103,7 @@ export default function DashboardPage() {
         const roleRoutes: Record<string, string> = {
       
           'Admin': '/dashboard/admin',
+          'Managing Director': '/dashboard/managing-director',
           'Manager': '/dashboard/manager',
           'Accountant': '/dashboard/accountant',
           'Purchase Manager': '/dashboard/purchase-manager',
@@ -437,11 +438,15 @@ export default function DashboardPage() {
                 const rules = getUpdatedFirestoreRules();
                 console.log('📋 UPDATED FIRESTORE RULES:');
                 console.log(rules);
-                navigator.clipboard.writeText(rules).then(() => {
-                  alert('📋 Firestore rules copied to clipboard! Paste them in Firebase Console → Firestore → Rules');
-                }).catch(() => {
+                if (navigator.clipboard && window.isSecureContext) {
+                  navigator.clipboard.writeText(rules).then(() => {
+                    alert('📋 Firestore rules copied to clipboard! Paste them in Firebase Console → Firestore → Rules');
+                  }).catch(() => {
+                    alert('📋 Rules logged to console. Copy them manually to Firebase Console.');
+                  });
+                } else {
                   alert('📋 Rules logged to console. Copy them manually to Firebase Console.');
-                });
+                }
               }}
               className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
             >
@@ -455,11 +460,15 @@ export default function DashboardPage() {
                   const rules = getFinanceFirestoreRules();
                   console.log('💰 FINANCE FIRESTORE RULES:');
                   console.log(rules);
-                  navigator.clipboard.writeText(rules).then(() => {
-                    alert('💰 Finance Firestore rules copied to clipboard! These include all business rules for finance tables.');
-                  }).catch(() => {
+                  if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(rules).then(() => {
+                      alert('💰 Finance Firestore rules copied to clipboard! These include all business rules for finance tables.');
+                    }).catch(() => {
+                      alert('💰 Finance rules logged to console. Copy them manually to Firebase Console.');
+                    });
+                  } else {
                     alert('💰 Finance rules logged to console. Copy them manually to Firebase Console.');
-                  });
+                  }
                 } catch (error) {
                   console.error('Failed to get finance rules:', error);
                   alert('❌ Failed to get finance rules. Check console.');
