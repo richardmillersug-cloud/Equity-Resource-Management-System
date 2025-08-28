@@ -16,13 +16,66 @@ const firebaseConfig = {
   measurementId: "G-KR0H4HEB4D"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with enhanced error handling
+console.log('🔥 Initializing Firebase...');
+let app: any;
+let db: any;
+let auth: any;
+let storage: any;
 
-// Initialize Firebase services
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('✅ Firebase app initialized successfully');
+  
+  // Initialize Firebase services with detailed logging
+  db = getFirestore(app);
+  console.log('✅ Firestore initialized:', {
+    type: typeof db,
+    constructor: db?.constructor?.name,
+    hasDelegate: !!db?._delegate
+  });
+  
+  auth = getAuth(app);
+  console.log('✅ Auth initialized');
+  
+  storage = getStorage(app);
+  console.log('✅ Storage initialized');
+  
+} catch (error) {
+  console.error('❌ Failed to initialize Firebase:', error);
+  throw new Error(`Firebase initialization failed: ${(error as Error).message}`);
+}
+
+// Verification function to ensure Firebase is ready
+export const verifyFirebaseInitialization = () => {
+  console.log('🔍 Verifying Firebase initialization...');
+  
+  if (!app) {
+    throw new Error('Firebase app not initialized');
+  }
+  
+  if (!db) {
+    throw new Error('Firestore database not initialized');
+  }
+  
+  if (!auth) {
+    throw new Error('Firebase Auth not initialized');
+  }
+  
+  console.log('✅ Firebase verification successful');
+  return true;
+};
+
+// Force verification on module load (browser only)
+if (typeof window !== 'undefined') {
+  try {
+    verifyFirebaseInitialization();
+  } catch (error) {
+    console.error('❌ Firebase verification failed:', error);
+  }
+}
+
+export { app, db, auth, storage };
 
 // Initialize Analytics (only in browser environment)
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;

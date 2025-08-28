@@ -318,11 +318,27 @@ export default function InvoicesPage() {
 
   const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      // You could add a toast notification here
-      console.log('Reference number copied to clipboard');
+      // Check if clipboard API is available
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        console.log('Reference number copied to clipboard');
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+        console.log('Reference number copied to clipboard (fallback)');
+      }
     } catch (err) {
       console.error('Failed to copy text: ', err);
+      alert('Copy functionality not supported in this browser. Please copy manually: ' + text);
     }
   };
 
@@ -564,7 +580,7 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="w-screen h-screen" style={{ padding: '20px' }}>
+    <div className="w-screen h-screen p-5">
       <div className="w-full space-y-8">
         
         {/* Modern Hero Header */}

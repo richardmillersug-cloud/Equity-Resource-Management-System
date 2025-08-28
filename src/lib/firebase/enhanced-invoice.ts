@@ -28,6 +28,7 @@ export interface Expense {
   invoiceId?: string; // Reference to related invoice
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  fundingSource?: 'DAILY_EXPENSE_FUND' | 'WALLET_GROSS_PROFIT'; // Funding source for payment allocation
 }
 
 export interface Damage {

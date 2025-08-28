@@ -246,7 +246,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full p-6">
       <div className="w-full">
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">

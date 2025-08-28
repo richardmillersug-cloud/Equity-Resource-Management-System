@@ -415,7 +415,7 @@ export default function ReceiverDashboard() {
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full p-6">
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
