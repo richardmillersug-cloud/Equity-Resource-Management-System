@@ -2,15 +2,15 @@
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, getDocs, query, orderBy, limit } = require('firebase/firestore');
 
-// Firebase config - you'll need to update this with your actual config
+// Firebase config
 const firebaseConfig = {
-  // Add your Firebase config here
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: "AIzaSyA3J6FwamZoYiOdqNEsz2bsYUSRb94ZxQI",
+  authDomain: "equitysys-41320.firebaseapp.com",
+  projectId: "equitysys-41320",
+  storageBucket: "equitysys-41320.firebasestorage.app",
+  messagingSenderId: "989839221549",
+  appId: "1:989839221549:web:4400f782d5f8c9bd6aa9a4",
+  measurementId: "G-KR0H4HEB4D"
 };
 
 async function checkCashCloseCollections() {

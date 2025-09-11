@@ -5,7 +5,7 @@ import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { authService } from '@/lib/firebase/auth';
 import { CashCloseService } from '@/lib/firebase/firestore-service';
 import { SimpleCashCloseService } from '@/lib/firebase/firestore-service-simple';
-import { autoAllocationService, AllocationResult } from '@/lib/firebase/auto-allocation-service';
+// Auto-allocation service removed per user request
 import { 
   Calculator, 
   DollarSign, 

@@ -149,7 +149,7 @@ export interface ComprehensiveCashClose {
   afterTaxAmount: number;
   profitAmount: number;
   remainingAmount: number;
-  specialFunds: number;
+  m_expenseFund: number;
   purchasingManager: number;
   
   // Workflow
@@ -168,14 +168,14 @@ export class ComprehensiveCashCloseService {
     afterTaxAmount: number;
     profitAmount: number;
     remainingAmount: number;
-    specialFunds: number;
+    m_expenseFund: number;
     purchasingManager: number;
   } {
     const taxAmount = totalCashInTill * taxRate;
     const afterTaxAmount = totalCashInTill - taxAmount;
     const profitAmount = totalCashInTill * (profitPercentage / 100); // Profit as direct percentage of total cash in till
     const remainingAmount = totalCashInTill - profitAmount; // For Distribution = Total Cash in Till - Profit
-    const specialFunds = remainingAmount * 0.3;
+    const m_expenseFund = remainingAmount * 0.3;
     const purchasingManager = remainingAmount * 0.7;
 
     return {
@@ -183,7 +183,7 @@ export class ComprehensiveCashCloseService {
       afterTaxAmount: Math.round(afterTaxAmount * 100) / 100,
       profitAmount: Math.round(profitAmount * 100) / 100,
       remainingAmount: Math.round(remainingAmount * 100) / 100,
-      specialFunds: Math.round(specialFunds * 100) / 100,
+      m_expenseFund: Math.round(m_expenseFund * 100) / 100,
       purchasingManager: Math.round(purchasingManager * 100) / 100,
     };
   }

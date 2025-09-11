@@ -5,19 +5,13 @@
 
 import { CashCloseService } from './firestore-service';
 import { SimpleCashCloseService } from './firestore-service-simple';
-import { autoAllocationService } from './auto-allocation-service';
+// autoAllocationService removed per user request
 import { authService } from './auth';
 
 export interface DatabaseStatus {
   connected: boolean;
   collections: {
     cashCloses: {
-      available: boolean;
-      count: number;
-      sampleData?: any;
-      error?: string;
-    };
-    allocationResults: {
       available: boolean;
       count: number;
       sampleData?: any;
@@ -32,7 +26,6 @@ export interface DatabaseStatus {
   };
   indexStatus: {
     cashClosesIndex: boolean;
-    allocationIndex: boolean;
   };
 }
 
@@ -46,13 +39,11 @@ export class AnalyticsDataLoader {
     const status: DatabaseStatus = {
       connected: false,
       collections: {
-        cashCloses: { available: false, count: 0 },
-        allocationResults: { available: false, count: 0 }
+        cashCloses: { available: false, count: 0 }
       },
       user: { authenticated: false },
       indexStatus: {
-        cashClosesIndex: false,
-        allocationIndex: false
+        cashClosesIndex: false
       }
     };
 
@@ -126,64 +117,14 @@ export class AnalyticsDataLoader {
         console.log('❌ Cash closes collection failed:', cashCloseError.message);
       }
 
-      // Test Allocation Results Collection
-      if (status.collections.cashCloses.available && status.collections.cashCloses.count > 0) {
-        try {
-          console.log('🔄 Testing allocation results collection...');
-          
-          // Get first cash close ID for testing
-          const simpleCashCloseService = new SimpleCashCloseService();
-          const testCashCloses = await simpleCashCloseService.getAllCashClosesSimple();
-          
-          let totalAllocations = 0;
-          let sampleAllocation = null;
-          
-          if (testCashCloses.length > 0) {
-            for (const cashClose of testCashCloses.slice(0, 3)) { // Test first 3
-              try {
-                const allocations = await autoAllocationService.getAllAllocationsByCashCloseId(cashClose.id);
-                totalAllocations += allocations.length;
-                if (allocations.length > 0 && !sampleAllocation) {
-                  sampleAllocation = {
-                    id: allocations[0].id,
-                    cashCloseId: allocations[0].cashCloseId,
-                    purchasingManagerAmount: allocations[0].purchasingManagerAmount,
-                    status: allocations[0].distributionStatus?.purchasingManager || 'unknown'
-                  };
-                }
-              } catch (allocError) {
-                console.warn(`⚠️ Failed to load allocations for ${cashClose.id}:`, allocError);
-              }
-            }
-          }
-
-          status.collections.allocationResults = {
-            available: true,
-            count: totalAllocations,
-            sampleData: sampleAllocation
-          };
-          
-          status.indexStatus.allocationIndex = true;
-          console.log(`✅ Allocation results loaded: ${totalAllocations} records`);
-
-        } catch (allocationError: any) {
-          status.collections.allocationResults = {
-            available: false,
-            count: 0,
-            error: allocationError.message
-          };
-          console.log('❌ Allocation results collection failed:', allocationError.message);
-        }
-      }
+      // Allocation Results collection removed per user request - no longer queried
 
       // Overall connection status
-      status.connected = status.user.authenticated && 
-                        (status.collections.cashCloses.available || status.collections.allocationResults.available);
+      status.connected = status.user.authenticated && status.collections.cashCloses.available;
 
       console.log('📊 Database verification complete:', {
         connected: status.connected,
-        cashCloses: status.collections.cashCloses.count,
-        allocations: status.collections.allocationResults.count
+        cashCloses: status.collections.cashCloses.count
       });
 
       return status;
@@ -325,6 +266,12 @@ export class AnalyticsDataLoader {
 
 // Export singleton instance
 export const analyticsDataLoader = new AnalyticsDataLoader();
+
+
+
+
+
+
 
 
 

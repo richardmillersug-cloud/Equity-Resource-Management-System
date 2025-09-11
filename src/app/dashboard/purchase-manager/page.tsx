@@ -18,7 +18,6 @@ import {
   BarChart3,
   ArrowUpRight,
   ArrowDownRight,
-  Target,
   Zap,
   Star,
   Bell,
@@ -29,8 +28,12 @@ import {
   TrendingDown,
   Activity,
   Wallet,
-  Receipt
+  Receipt,
+  Target
 } from 'lucide-react';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import { authService } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
 import { CashTrackingInterface } from '../../../components/purchase-manager/CashTrackingInterface';
@@ -281,6 +284,7 @@ export default function PurchaseManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   
   // Real database data states
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -289,6 +293,7 @@ export default function PurchaseManagerDashboard() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [cashAllocations, setCashAllocations] = useState<any[]>([]);
   const [cashCloses, setCashCloses] = useState<any[]>([]);
+  
   
   // Calculated metrics from real data
   const [metrics, setMetrics] = useState<PurchasingMetrics>({
@@ -312,8 +317,10 @@ export default function PurchaseManagerDashboard() {
   // Recent cash closes filtering
   const [cashClosesRowCount, setCashClosesRowCount] = useState<number>(5);
   const [cashCloseShiftFilter, setCashCloseShiftFilter] = useState<string>('all');
+  
   const [cashCloseFromDate, setCashCloseFromDate] = useState<string>('');
   const [cashCloseToDate, setCashCloseToDate] = useState<string>('');
+
 
     // Load and calculate purchasing analytics from database
   useEffect(() => {
@@ -372,15 +379,25 @@ export default function PurchaseManagerDashboard() {
       );
       subscriptions.push(unsubscribeExpenses);
 
-      // Subscribe to cash allocations data
+      // ✅ ENHANCED: Subscribe to cash allocations data with forced visibility
       const unsubscribeCashAllocations = InterfaceDatabaseConnector.subscribeToCashAllocationsData(
         (data) => {
-          console.log('Cash Allocations data received:', data);
+          console.log('💰 FORCE DATA CHECK - Cash Allocations received:', {
+            totalRecords: data.length,
+            allocatedStatus: data.filter(a => a.status === 'allocated').length,
+            acceptedStatus: data.filter(a => a.status === 'accepted').length,
+            moneyReceivedStatus: data.filter(a => a.status === 'money_received').length,
+            rawData: data.slice(0, 3) // Show first 3 for debugging
+          });
+          
           setCashAllocations(data);
+          
+          
+          setLastRefreshed(new Date());
         },
         (error) => {
-          console.error('Cash Allocations subscription error:', error);
-          setError('Failed to load cash allocations data. Please refresh the page.');
+          console.error('❌ FORCE DATA ERROR - Cash Allocations subscription error:', error);
+          setError('Failed to load cash allocations data. Using force refresh...');
         }
       );
       subscriptions.push(unsubscribeCashAllocations);
@@ -416,6 +433,88 @@ export default function PurchaseManagerDashboard() {
       subscriptions.forEach(unsubscribe => unsubscribe());
     };
   }, []);
+
+  // ✅ NEW: Force refresh allocation data
+  const forceRefreshAllocations = async () => {
+    
+    try {
+      console.log('💪 FORCE REFRESH: Loading allocation data from ALL possible sources...');
+      
+      let allAllocationsData: any[] = [];
+      
+      // Query 1: cash_allocations collection (primary)
+      const { collection, getDocs, query, where } = await import('firebase/firestore');
+      const allocationsSnapshot = await getDocs(collection(db, 'cash_allocations'));
+      
+      const cashAllocationsData = allocationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        source: 'cash_allocations',
+        ...doc.data()
+      }));
+      allAllocationsData.push(...cashAllocationsData);
+      
+      
+      // Remove duplicates and sort by creation date
+      const uniqueAllocations = Array.from(
+        new Map(allAllocationsData.map(item => [item.id, item])).values()
+      ).sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      console.log('💪 COMPREHENSIVE FORCE LOAD COMPLETE:', {
+        cashAllocations: cashAllocationsData.length,
+        totalUnique: uniqueAllocations.length,
+        pendingAcceptance: uniqueAllocations.filter(a => a.status === 'allocated').length,
+        accepted: uniqueAllocations.filter(a => a.status === 'accepted').length,
+        moneyReceived: uniqueAllocations.filter(a => a.status === 'money_received').length
+      });
+      
+      setCashAllocations(uniqueAllocations);
+      setLastRefreshed(new Date());
+      setError(null);
+      
+    } catch (error: any) {
+      console.error('❌ FORCE REFRESH FAILED:', error);
+      setError('Force refresh failed: ' + error.message);
+    } finally {
+      // Force refresh completed
+    }
+  };
+
+  // ✅ ENHANCED: Multiple force refresh mechanisms to ensure data visibility
+  useEffect(() => {
+    // Initial force refresh after 2 seconds to ensure data is loaded
+    const initialTimer = setTimeout(() => {
+      if (cashAllocations.length === 0) {
+        console.log('🔄 AUTO FORCE REFRESH: No allocations detected, forcing refresh...');
+        forceRefreshAllocations();
+      }
+    }, 2000);
+    
+    // Periodic refresh every 30 seconds to ensure data stays current
+    const periodicTimer = setInterval(() => {
+      console.log('🔄 PERIODIC REFRESH: Ensuring data is current...');
+      forceRefreshAllocations();
+    }, 30000);
+
+    // Refresh when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 VISIBILITY REFRESH: Page became visible, refreshing data...');
+        forceRefreshAllocations();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(periodicTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [cashAllocations.length]);
 
   // Calculate metrics when data changes
   useEffect(() => {
@@ -1450,6 +1549,9 @@ export default function PurchaseManagerDashboard() {
    
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
+        
+        {/* ✅ NEW: Professional Header with Force Refresh */}
+
         {/* Purchasing Analytics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Daily Purchases */}
@@ -1510,6 +1612,7 @@ export default function PurchaseManagerDashboard() {
               </div>
             </div>
           </div>
+
 
         {/* Main Analytics Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2319,6 +2422,20 @@ export default function PurchaseManagerDashboard() {
                   </div>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-green-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-2xl hover:bg-indigo-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/allocation-tracking')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <Target className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Allocation Tracking</p>
+                    <p className="text-xs text-gray-500">Sent & accepted amounts</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-indigo-600" />
               </div>
 
               <div className="flex items-center justify-between p-3 bg-orange-50 rounded-2xl hover:bg-orange-100 transition-colors cursor-pointer"

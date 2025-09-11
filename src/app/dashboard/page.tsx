@@ -9,6 +9,7 @@ import { quickFixPermissions, testPermissions } from '../../lib/firebase/permiss
 import { cleanupPurchasingManagers, createNewPurchasingManager, getDatabaseStats } from '../../lib/firebase/cleanup-purchasing-managers';
 import { fixAllPermissions, quickPermissionFix, getUpdatedFirestoreRules } from '../../lib/firebase/permissions-final-fix';
 import '../../lib/firebase/test-purchasing-manager';
+import HydrationSafeLoader from '../../components/ui/HydrationSafeLoader';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -153,7 +154,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <HydrationSafeLoader />
           <p className="text-gray-600">Loading your dashboard...</p>
           <p className="text-sm text-gray-500 mt-2">{debugInfo}</p>
         </div>
