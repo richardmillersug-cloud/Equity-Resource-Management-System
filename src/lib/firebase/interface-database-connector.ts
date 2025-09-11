@@ -25,24 +25,72 @@ export class InterfaceDatabaseConnector {
   // PURCHASING MANAGER INTERFACE CONNECTORS
   // =====================================================
 
+  // Helper function to safely convert dates
+  private static safeToDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (typeof dateValue.toDate === 'function') return dateValue.toDate();
+    if (typeof dateValue === 'string') return new Date(dateValue);
+    if (typeof dateValue === 'number') return new Date(dateValue);
+    return new Date();
+  }
+
   /**
    * Connect Cash Close Interface to Firestore
+   * ✅ Updated to use same data source as accountant ('cashCloses' collection)
    */
   static subscribeToCashCloseData(
     callback: (data: Record<string, unknown>[]) => void,
     errorCallback?: (error: Error) => void
   ): () => void {
-    const collectionRef = collection(db, 'cashClose');
-    const q = query(collectionRef, orderBy('date', 'desc'), limit(50));
+    console.log('🔄 InterfaceDB: Subscribing to cashCloses collection (same as accountant)...');
+    
+    const collectionRef = collection(db, 'cashCloses'); // ✅ Changed from 'cashClose' to 'cashCloses'
+    const q = query(collectionRef, orderBy('createdAt', 'desc'), limit(50)); // ✅ Changed from 'date' to 'createdAt'
 
     return onSnapshot(q, 
       (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().date?.toDate?.() || new Date(),
-          createdAt: doc.data().createdAt?.toDate?.() || new Date()
-        }));
+        console.log(`📊 InterfaceDB: Received ${snapshot.docs.length} cash close records from cashCloses collection`);
+        
+        const data = snapshot.docs.map(doc => {
+          const rawData = doc.data();
+          
+          // Map accountant's data structure to purchasing manager's expected format
+          return {
+            id: doc.id,
+            employeeId: rawData.employeeId || rawData.createdBy || 'unknown',
+            branchId: rawData.branchId || 'unknown',
+            shift: rawData.shift || 'day',
+            closeCash: rawData.totalRevenue || rawData.closeCash || 0,
+            actualAmount: rawData.totalActualCash || rawData.actualAmount || 0,
+            expectedAmount: rawData.totalExpectedCash || rawData.expectedAmount || 0,
+            cashPresent: rawData.cashPresent || 0,
+            airtel: rawData.airtel || 0,
+            mtn: rawData.mtn || 0,
+            stanbicBank: rawData.stanbicBank || 0,
+            equityBank: rawData.equityBank || 0,
+            absaBank: rawData.absaBank || 0,
+            pesaPal: rawData.pesaPal || 0,
+            shortage: rawData.totalShortage || rawData.shortage || 0,
+            excess: rawData.totalExcess || rawData.excess || 0,
+            profitMargin: rawData.profitMargin || 0,
+            
+            // Safe date conversions
+            date: this.safeToDate(rawData.cashCloseDate || rawData.date || rawData.createdAt),
+            time: rawData.time || this.safeToDate(rawData.cashCloseDate || rawData.createdAt).toLocaleTimeString(),
+            createdAt: this.safeToDate(rawData.createdAt),
+            updatedAt: this.safeToDate(rawData.updatedAt)
+          };
+        });
+        
+        console.log(`✅ InterfaceDB: Mapped ${data.length} cash closes for purchasing manager dashboard`);
+        console.log('🔍 InterfaceDB: Sample record:', data.length > 0 ? {
+          id: data[0].id,
+          closeCash: data[0].closeCash,
+          date: data[0].date,
+          dataSource: 'cashCloses (accountant collection)'
+        } : 'No records');
+        
         callback(data);
       },
       (error) => {
@@ -54,29 +102,37 @@ export class InterfaceDatabaseConnector {
 
   /**
    * Add new cash close entry
+   * ✅ Updated to use same collection as accountant ('cashCloses')
    */
   static async addCashClose(data: Record<string, unknown>): Promise<string> {
-    const collectionRef = collection(db, 'cashClose');
+    console.log('💰 InterfaceDB: Adding cash close to cashCloses collection (same as accountant)...');
+    
+    const collectionRef = collection(db, 'cashCloses'); // ✅ Changed from 'cashClose' to 'cashCloses'
     const docRef = await addDoc(collectionRef, {
       ...data,
-      date: serverTimestamp(),
+      cashCloseDate: serverTimestamp(), // ✅ Use accountant's field name
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    
+    console.log(`✅ InterfaceDB: Cash close added successfully with ID: ${docRef.id}`);
     return docRef.id;
   }
 
   /**
    * Clear all cash close data
+   * ✅ Updated to use same collection as accountant ('cashCloses')
    */
   static async clearCashCloseData(): Promise<void> {
-    const collectionRef = collection(db, 'cashClose');
+    console.log('🗑️ InterfaceDB: Clearing cash close data from cashCloses collection...');
+    
+    const collectionRef = collection(db, 'cashCloses'); // ✅ Changed from 'cashClose' to 'cashCloses'
     const snapshot = await getDocs(collectionRef);
     
     const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
     await Promise.all(deletePromises);
     
-    console.log(`✅ Cleared ${snapshot.size} cash close records`);
+    console.log(`✅ Cleared ${snapshot.size} cash close records from cashCloses collection`);
   }
 
   /**

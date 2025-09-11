@@ -177,6 +177,36 @@ export default function AdminDashboard() {
               </div>
             </div>
           </button>
+
+          <a
+            href="/dashboard/admin/cash-close-inspector"
+            className="p-4 bg-white rounded-lg border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all block"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Database className="h-5 w-5 text-orange-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-gray-900">Cash Close Inspector</h3>
+                <p className="text-sm text-gray-500">View all cash close fields</p>
+              </div>
+            </div>
+          </a>
+
+          <a
+            href="/dashboard/admin/migrate-cash-close-fields"
+            className="p-4 bg-white rounded-lg border border-gray-200 hover:border-red-300 hover:shadow-md transition-all block"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Settings className="h-5 w-5 text-red-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-gray-900">Field Migration</h3>
+                <p className="text-sm text-gray-500">Migrate cash close fields</p>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
 

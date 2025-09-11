@@ -1,0 +1,89 @@
+// Firestore Rules for Cash Allocation System
+// Add these rules to your existing firestore.rules file
+
+// Cash Allocations Collection
+match /cash_allocations/{allocationId} {
+  // Allow accountants to create allocations
+  allow create: if request.auth != null 
+    && getUserRole(request.auth.uid) == 'accountant'
+    && request.resource.data.allocatedBy == request.auth.uid
+    && request.resource.data.status == 'sending_to_pm'
+    && request.resource.data.amount is number
+    && request.resource.data.amount > 0
+    && request.resource.data.description is string
+    && request.resource.data.allocatedTo is string;
+
+  // Allow accountants to read their own allocations
+  allow read: if request.auth != null 
+    && (getUserRole(request.auth.uid) == 'accountant' && resource.data.allocatedBy == request.auth.uid)
+    || (getUserRole(request.auth.uid) == 'purchase-manager' && resource.data.allocatedTo == request.auth.uid)
+    || getUserRole(request.auth.uid) in ['admin', 'managing-director'];
+
+  // Allow purchase managers to update allocations allocated to them
+  allow update: if request.auth != null 
+    && getUserRole(request.auth.uid) == 'purchase-manager'
+    && resource.data.allocatedTo == request.auth.uid
+    && (
+      // PM can update status from sending_to_pm to awaiting_pm_approval
+      (resource.data.status == 'sending_to_pm' 
+       && request.resource.data.status == 'awaiting_pm_approval')
+      ||
+      // PM can approve/reject from awaiting_pm_approval
+      (resource.data.status == 'awaiting_pm_approval' 
+       && request.resource.data.status in ['approved_by_pm', 'rejected'])
+      ||
+      // PM can activate from approved_by_pm to active_for_use
+      (resource.data.status == 'approved_by_pm' 
+       && request.resource.data.status == 'active_for_use')
+      ||
+      // PM can complete from active_for_use
+      (resource.data.status == 'active_for_use' 
+       && request.resource.data.status == 'completed')
+    )
+    // Ensure only allowed fields are updated
+    && request.resource.data.diff(resource.data).affectedKeys()
+       .hasOnly(['status', 'updatedAt', 'approvedAt', 'activatedAt', 'pmNotes']);
+
+  // Allow admins full access
+  allow read, write: if request.auth != null 
+    && getUserRole(request.auth.uid) in ['admin', 'managing-director'];
+}
+
+// Helper function to get user role (add this if not already present)
+function getUserRole(userId) {
+  return get(/databases/$(database)/documents/users/$(userId)).data.role;
+}
+
+// Additional security rules for allocation-related queries:
+
+// Users collection - ensure role-based access
+match /users/{userId} {
+  // Allow users to read their own data
+  allow read: if request.auth != null && request.auth.uid == userId;
+  
+  // Allow accountants and PMs to read other users for allocation purposes
+  allow read: if request.auth != null 
+    && getUserRole(request.auth.uid) in ['accountant', 'purchase-manager', 'admin', 'managing-director'];
+  
+  // Other existing rules...
+}
+
+/* 
+INTEGRATION INSTRUCTIONS:
+
+1. Add these rules to your existing firestore.rules file
+2. Make sure the getUserRole function exists in your rules
+3. Deploy the rules using: firebase deploy --only firestore:rules
+4. Test the rules with the Firebase Emulator Suite before production deployment
+
+SECURITY FEATURES:
+- Accountants can only create allocations for themselves
+- Purchase Managers can only update allocations assigned to them  
+- Status transitions are strictly controlled
+- Only specific fields can be updated during status changes
+- Role-based access control for all operations
+- Admins have full access for monitoring and management
+*/
+
+
+

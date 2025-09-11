@@ -5,7 +5,7 @@ import { X, Save, Calculator, DollarSign, Users, Banknote, FileText, AlertCircle
 import { InterfaceDatabaseConnector } from '../../lib/firebase/interface-database-connector';
 import { authService } from '../../lib/firebase/auth';
 import { CashCloseService } from '../../lib/firebase/firestore-service';
-import { autoAllocationService, AllocationResult } from '../../lib/firebase/auto-allocation-service';
+import { AutomatedAllocationService } from '../../lib/firebase/automated-allocation-service';
 
 interface TillNetworkPayment {
   id: string;
@@ -110,6 +110,8 @@ interface CashCloseData {
   profitPercentage: number;
   taxRate: number; // 18% tax
   businessDate: string; // The actual business date (YYYY-MM-DD format)
+  monthlyExpenseFundDeduction: number; // Monthly expense fund deduction (100,000 UGX)
+  enableMonthlyExpenseFund: boolean; // Toggle to enable/disable monthly expense fund deduction
 
   userCashAllocation: number; // User-inputted cash allocation amount for validation
   notes: string;
@@ -145,6 +147,8 @@ export default function ComprehensiveCashCloseForm({
     profitPercentage: 12, // Default 12% for savings
     taxRate: 18,
     businessDate: new Date().toISOString().split('T')[0], // Default to today
+    monthlyExpenseFundDeduction: 100000, // Default 100,000 UGX monthly expense fund
+    enableMonthlyExpenseFund: false, // Disabled by default
 
     userCashAllocation: 0, // User-inputted cash allocation for validation
     notes: '',
@@ -603,9 +607,11 @@ export default function ComprehensiveCashCloseForm({
     const profitAmount = totalCashInTill * (cashCloseData.profitPercentage / 100);
     const remainingAmount = totalCashInTill - profitAmount; // For Distribution = Total Cash in Till - Profit
     
-    // Distribution - purchasing manager gets total cash in till - 12%
+    // Distribution - purchasing manager gets total cash in till - 12% - monthly expense fund (if enabled)
     const savingsAmount = totalCashInTill * 0.12; // 12% of total cash in till
-    const purchasingManager = Math.max(0, totalCashInTill - savingsAmount); // Total Cash in Till - 12%
+    const purchasingManagerBeforeDeduction = Math.max(0, totalCashInTill - savingsAmount); // Total Cash in Till - 12%
+    const monthlyExpenseDeduction = cashCloseData.enableMonthlyExpenseFund ? cashCloseData.monthlyExpenseFundDeduction : 0; // Only apply if enabled
+    const purchasingManager = Math.max(0, purchasingManagerBeforeDeduction - monthlyExpenseDeduction); // Subtract monthly expense fund if enabled
 
     const totalShortage = cashCloseData.shifts.reduce((sum, shift) => {
       return sum + shift.tills.reduce((shiftSum, till) => shiftSum + calculateTillTotals(till).shortage, 0);
@@ -662,29 +668,22 @@ export default function ComprehensiveCashCloseForm({
   const totals = calculateOverallTotals();
 
   // Calculate auto-allocation preview
-  const calculateAutoAllocationPreview = async () => {
+  const calculateAutoAllocationPreview = () => {
     if (!enableAutoAllocation || totals.totalCashInTill <= 0) {
       setAutoAllocationPreview(null);
       setShowAllocationPreview(false);
       return;
     }
 
-    try {
-      // Use a temporary cash close ID for preview
-      const tempCashCloseId = 'preview-' + Date.now();
-      const preview = await autoAllocationService.calculateAutoAllocation(
-        tempCashCloseId,
-        totals.totalCashInTill,
-        0 // No special funds
-      );
-      
-      setAutoAllocationPreview(preview);
-      setShowAllocationPreview(true);
-    } catch (error) {
-      console.error('Error calculating auto-allocation preview:', error);
-      setAutoAllocationPreview(null);
-      setShowAllocationPreview(false);
-    }
+    // Calculate allocation breakdown using the service
+    const preview = AutomatedAllocationService.calculateAllocationBreakdown(
+      totals.totalCashInTill,
+      'standard', // Use standard allocation method
+      0.12 // Default monthly gross profit percentage
+    );
+
+    setAutoAllocationPreview(preview);
+    setShowAllocationPreview(true);
   };
 
   // Trigger preview calculation when totals change
@@ -697,6 +696,20 @@ export default function ComprehensiveCashCloseForm({
       return () => clearTimeout(debounceTimer);
     }
   }, [totals.totalCashInTill, enableAutoAllocation]);
+
+  // Initialize notes field when monthly expense fund is enabled
+  useEffect(() => {
+    if (cashCloseData.enableMonthlyExpenseFund && !cashCloseData.notes.includes('Monthly Expense Fund:')) {
+      const monthlyFundNote = 'Monthly Expense Fund: ENABLED - UGX 100,000 deducted for monthly expenses';
+      setCashCloseData(prev => ({
+        ...prev,
+        notes: prev.notes
+          ? `${monthlyFundNote}\n\n${prev.notes}`
+          : monthlyFundNote,
+        m_expenseFund: 100000
+      }));
+    }
+  }, [cashCloseData.enableMonthlyExpenseFund]);
 
   // Calculate shift-specific purchasing manager allocation
   const calculateShiftPMAllocation = (shiftIndex: number): number => {
@@ -1002,6 +1015,7 @@ export default function ComprehensiveCashCloseForm({
 
         specialFunds: 0, // Removed from form, only available in PM allocation
         purchasingManager: totals.purchasingManager,
+        m_expensefund: cashCloseData.enableMonthlyExpenseFund ? cashCloseData.monthlyExpenseFundDeduction : 0, // Monthly expense fund deduction (only if enabled)
         
         // Cash Allocation (auto-calculated)
         userCashAllocation: (() => {
@@ -1053,57 +1067,7 @@ export default function ComprehensiveCashCloseForm({
         console.log(`${totalExpenses} expense records have been automatically created in the expenses collection`);
       }
 
-      // Create allocations for EVERY shift immediately after cash close
-      if (enableAutoAllocation) {
-        try {
-          console.log('🚀 Creating per-shift allocations for cash close:', cashCloseId);
-          const allocationResults = [];
-          
-          // Calculate total special funds to distribute proportionally across shifts
-          const totalRevenue = totals.totalCashInTill;
-          
-          for (let shiftIndex = 0; shiftIndex < cashCloseData.shifts.length; shiftIndex++) {
-            const shift = cashCloseData.shifts[shiftIndex];
-            const shiftTotalCashInTill = shift.tills.reduce((sum, till) => sum + till.totalCashInTill, 0);
-            
-            console.log(`📊 ${shift.shift} shift allocation:`, {
-              shiftIndex,
-              shiftTotalCashInTill
-            });
-            
-            // Create allocation for this shift (even if amounts are zero)
-            const allocationResult = await autoAllocationService.calculateShiftAllocation(
-              cashCloseId,
-              shift.shift,
-              shiftIndex,
-              shiftTotalCashInTill,
-              0 // No special funds
-            );
-            
-            allocationResults.push(allocationResult);
-            
-            // Auto-approve if within limits
-            if (allocationResult.autoApproved) {
-              await autoAllocationService.approveAllocation(allocationResult.id, currentUser.uid);
-              console.log(`✅ Auto-approved ${shift.shift} shift allocation:`, allocationResult.id);
-            }
-          }
-          
-          console.log(`✅ Created ${allocationResults.length} shift allocations:`, {
-            totalShifts: cashCloseData.shifts.length,
-            totalAllocated: allocationResults.reduce((sum, result) => sum + result.totalAllocated, 0),
-            allocations: allocationResults.map(result => ({
-              shiftType: result.shiftType,
-              totalAllocated: result.totalAllocated,
-              purchasingManagerAmount: result.purchasingManagerAmount,
-              autoApproved: result.autoApproved
-            }))
-          });
-        } catch (allocationError) {
-          console.error('⚠️ Failed to create shift allocations:', allocationError);
-          // Don't fail the entire cash close if allocation fails
-        }
-      }
+      // Automatic allocation system removed per user request
       
       // Reset form
       setCashCloseData({
@@ -1118,6 +1082,8 @@ export default function ComprehensiveCashCloseForm({
         profitPercentage: 12,
         taxRate: 18,
         businessDate: new Date().toISOString().split('T')[0], // Reset to today
+        monthlyExpenseFundDeduction: 100000, // Default 100,000 UGX monthly expense fund
+        enableMonthlyExpenseFund: false, // Disabled by default
 
         userCashAllocation: 0, // Reset cash allocation
         notes: ''
@@ -1310,39 +1276,7 @@ export default function ComprehensiveCashCloseForm({
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {/* Allocation Status & Button */}
-                      {shift.allocation?.allocated ? (
-                        <div className="flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-md text-sm">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          <span>Allocated</span>
-                          <span className="ml-2 font-medium">
-                            UGX {shift.allocation.allocationAmount.toLocaleString()}
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedShiftForAllocation(actualShiftIndex);
-                            setShowAllocationModal(true);
-                          }}
-                          disabled={!isShiftBalanced(actualShiftIndex)}
-                          className={`flex items-center px-3 py-1 text-sm rounded-md transition-colors ${
-                            isShiftBalanced(actualShiftIndex)
-                              ? 'bg-green-600 text-white hover:bg-green-700'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                          title={!isShiftBalanced(actualShiftIndex) ? 'Complete shift balancing first' : 'Allocate purchasing manager funds'}
-                        >
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          Allocate PM
-                          {isShiftBalanced(actualShiftIndex) && (
-                            <span className="ml-2 bg-white text-green-600 px-2 py-0.5 rounded text-xs font-medium">
-                              UGX {calculateShiftPMAllocation(actualShiftIndex).toLocaleString()}
-                            </span>
-                          )}
-                        </button>
-                      )}
+                      {/* Allocation functionality removed per user request */}
                       
                       <button
                         type="button"
@@ -1673,8 +1607,8 @@ export default function ComprehensiveCashCloseForm({
             </div>
           </div>
 
-          {/* Tax and Gross Profit Settings */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Tax, Gross Profit, and Monthly Expense Fund Settings */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tax Rate (%)</label>
               <input
@@ -1698,8 +1632,68 @@ export default function ComprehensiveCashCloseForm({
                 <p className="text-red-600 text-sm mt-1">{errors.profitPercentage}</p>
               )}
             </div>
+            <div>
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="enableMonthlyExpenseFund"
+                  checked={cashCloseData.enableMonthlyExpenseFund}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    const monthlyFundNote = `Monthly Expense Fund: ${isChecked ? 'ENABLED' : 'DISABLED'} - ${isChecked ? 'UGX 100,000 deducted for monthly expenses' : 'Monthly deduction removed'}`;
 
+                    setCashCloseData(prev => {
+                      let updatedNotes = prev.notes || '';
 
+                      if (isChecked) {
+                        // Add note if not already present
+                        if (!updatedNotes.includes('Monthly Expense Fund:')) {
+                          updatedNotes = updatedNotes
+                            ? `${monthlyFundNote}\n\n${updatedNotes}`
+                            : monthlyFundNote;
+                        }
+                      } else {
+                        // Remove monthly fund note when unchecked
+                        updatedNotes = updatedNotes
+                          .split('\n\n')
+                          .filter(note => !note.includes('Monthly Expense Fund:'))
+                          .join('\n\n')
+                          .trim();
+                      }
+
+                      return {
+                        ...prev,
+                        enableMonthlyExpenseFund: isChecked,
+                        notes: updatedNotes,
+                        m_expenseFund: isChecked ? 100000 : 0
+                      };
+                    });
+                  }}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="enableMonthlyExpenseFund" className="ml-2 text-sm font-medium text-gray-700">
+                  Enable Monthly Expense Fund Deduction
+                </label>
+              </div>
+              <input
+                type="number"
+                value={cashCloseData.monthlyExpenseFundDeduction}
+                onChange={(e) => setCashCloseData(prev => ({ ...prev, monthlyExpenseFundDeduction: parseFloat(e.target.value) || 100000 }))}
+                disabled={!cashCloseData.enableMonthlyExpenseFund}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  !cashCloseData.enableMonthlyExpenseFund
+                    ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'border-gray-300'
+                }`}
+                placeholder="100000"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {cashCloseData.enableMonthlyExpenseFund
+                  ? 'Amount deducted daily from PM fund for monthly expenses'
+                  : 'Check the box above to enable monthly expense fund deduction'
+                }
+              </p>
+            </div>
           </div>
 
           {/* Financial Summary - Real-time Calculations */}
@@ -1814,117 +1808,7 @@ export default function ComprehensiveCashCloseForm({
               </div>
             </div>
 
-            {/* Wallet Tracking */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-md font-medium text-gray-800 flex items-center">
-                  <Wallet className="h-5 w-5 mr-2 text-green-600" />
-                  Wallet Tracking - 12% Profit & 100K Daily Fund Accumulation
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={cashCloseData.walletData?.currentPeriod || 'daily'}
-                    onChange={(e) => handleWalletPeriodChange(e.target.value as 'daily' | 'weekly' | 'monthly')}
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="daily">Daily View</option>
-                    <option value="weekly">Weekly View</option>
-                    <option value="monthly">Monthly View</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={addWalletEntry}
-                    className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200 transition-colors flex items-center"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Entry
-                  </button>
-                </div>
-              </div>
-
-              {/* Current Period Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="bg-white rounded-lg p-4 border border-green-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-500">Current Gross Profit</div>
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="text-xl font-bold text-green-600">
-                    UGX {calculateGrossProfit().toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">12% of Total Cash in Till</div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-blue-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-500">Daily Expense Fund</div>
-                    <DollarSign className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="text-xl font-bold text-blue-600">
-                    UGX {calculateDailyExpenseFund().toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Fixed 100,000 UGX daily set aside</div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-purple-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-500">Total Accumulated</div>
-                    <Wallet className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div className="text-xl font-bold text-purple-600">
-                    UGX {(calculateGrossProfit() + calculateDailyExpenseFund()).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">12% Profit + 100,000 Daily Fund</div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-indigo-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-500">Period Summary</div>
-                    <Calendar className="h-4 w-4 text-indigo-600" />
-                  </div>
-                  <div className="text-xl font-bold text-indigo-600">
-                    UGX {cashCloseData.walletData?.summary.totalAccumulated.toLocaleString() || '0'}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1 capitalize">
-                    {cashCloseData.walletData?.currentPeriod || 'daily'} total
-                  </div>
-                </div>
-              </div>
-
-              {/* Wallet Entries Table */}
-              {cashCloseData.walletData && cashCloseData.walletData.entries.length > 0 && (
-                <div className="bg-white rounded-lg border">
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <h5 className="text-sm font-medium text-gray-900">Recent Wallet Entries</h5>
-                  </div>
-                  <div className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
-                    {cashCloseData.walletData.entries
-                      .slice(-10) // Show last 10 entries
-                      .reverse() // Show newest first
-                      .map((entry) => (
-                        <div key={entry.id} className="px-4 py-3 hover:bg-gray-50">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">
-                                  {entry.date.toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-gray-500">{entry.notes}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-medium text-gray-900">
-                                UGX {entry.totalAccumulated.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Profit: {entry.grossProfit.toLocaleString()} | Fund: {entry.dailyExpenseFund.toLocaleString()}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Wallet tracking functionality removed per user request */}
             
             {/* Allocation & Variances */}
             <div>
@@ -1936,8 +1820,19 @@ export default function ComprehensiveCashCloseForm({
                   <div className="text-lg font-bold text-green-600">UGX {totals.purchasingManager.toLocaleString()}</div>
                   <div className="text-xs text-gray-400 mt-1">
                     <span className="font-medium text-green-600">
-                      Total Cash in Till - 12%
+                      {cashCloseData.enableMonthlyExpenseFund
+                        ? 'Total Cash - 12% - Monthly Expense Fund'
+                        : 'Total Cash - 12%'
+                      }
                     </span>
+                    {cashCloseData.enableMonthlyExpenseFund && (
+                      <>
+                        <br />
+                        <span className="text-orange-600">
+                          Monthly Expense Fund: UGX {cashCloseData.monthlyExpenseFundDeduction.toLocaleString()}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="bg-white rounded-lg p-4">

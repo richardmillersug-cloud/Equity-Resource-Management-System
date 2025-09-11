@@ -7,7 +7,7 @@
 import { SimpleCashCloseService } from './firestore-service-simple';
 import { CashCloseService } from './firestore-service';
 import { AccountantQueries } from './role-based-queries';
-import { autoAllocationService } from './auto-allocation-service';
+// Auto-allocation service removed per user request
 import { authService } from './auth';
 import { SimpleExpensesService } from './expenses-service-simple';
 import { SimpleSpecialFundsService } from './special-funds-service-simple';

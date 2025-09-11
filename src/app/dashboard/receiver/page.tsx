@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
+import HydrationSafeLoader from '../../../components/ui/HydrationSafeLoader';
 
 // Types
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -390,7 +391,7 @@ export default function ReceiverDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        <HydrationSafeLoader />
         <div className="ml-4 text-lg text-gray-600">Loading receiver dashboard...</div>
       </div>
     );
