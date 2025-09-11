@@ -48,7 +48,7 @@ import {
 } from 'recharts';
 import { CashCloseService } from '@/lib/firebase/firestore-service';
 import { SimpleCashCloseService } from '@/lib/firebase/firestore-service-simple';
-import { autoAllocationService, AllocationResult } from '@/lib/firebase/auto-allocation-service';
+// Auto-allocation service removed per user request
 import { authService } from '@/lib/firebase/auth';
 import { DataVerificationUtility, DataAvailabilityReport } from '@/lib/firebase/data-verification-utility';
 import { AuthDebugUtility } from '@/lib/firebase/auth-debug-utility';
@@ -68,7 +68,7 @@ ChartJS.register(
 
 interface AnalyticsData {
   cashCloses: any[];
-  allocations: AllocationResult[];
+  // Allocations removed per user request
   timeRange: 'week' | 'month' | 'quarter' | 'year';
 }
 
@@ -92,7 +92,6 @@ interface PredictionData {
 export default function AnalyticsDashboard() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     cashCloses: [],
-    allocations: [],
     timeRange: 'month'
   });
   const [loading, setLoading] = useState(true);
@@ -202,32 +201,7 @@ export default function AnalyticsDashboard() {
         timeRange: selectedTimeRange
       });
       
-      // Load allocations for filtered cash closes
-      console.log('🎯 Loading allocation data for filtered records...');
-      const allAllocations: AllocationResult[] = [];
-      const allocationPromises: Promise<void>[] = [];
-      
-      filteredCashCloses.forEach((close: any) => {
-        const promise = autoAllocationService.getAllAllocationsByCashCloseId(close.id)
-          .then(allocations => {
-            if (allocations.length > 0) {
-              allAllocations.push(...allocations);
-              console.log(`📊 Found ${allocations.length} allocations for ${close.id.substring(0, 8)}...`);
-            }
-          })
-          .catch(error => {
-            console.warn(`⚠️ Failed to load allocations for ${close.id}:`, error);
-          });
-        allocationPromises.push(promise);
-      });
-      
-      await Promise.all(allocationPromises);
-      
-      console.log('💰 Total allocations loaded:', allAllocations.length);
-      if (allAllocations.length > 0) {
-        const totalPMAllocated = allAllocations.reduce((sum, a) => sum + a.purchasingManagerAmount, 0);
-        console.log('💸 Total PM money allocated:', totalPMAllocated.toLocaleString());
-      }
+      // Allocation loading removed per user request
 
       // Generate predictions based on real data
       const predictionsData = generateSalesPredictions(filteredCashCloses);
@@ -244,13 +218,11 @@ export default function AnalyticsDashboard() {
       // Set final analytics data
       setAnalyticsData({
         cashCloses: filteredCashCloses,
-        allocations: allAllocations,
         timeRange: selectedTimeRange
       });
 
       console.log('✅ Real database analytics data loaded successfully:', {
         cashCloses: filteredCashCloses.length,
-        allocations: allAllocations.length,
         predictions: predictionsData.length,
         dataSource,
         timeRange: selectedTimeRange
@@ -446,16 +418,17 @@ export default function AnalyticsDashboard() {
   };
 
   const getExpenseBreakdownData = () => {
-    const { allocations } = analyticsData;
+    const { cashCloses } = analyticsData;
     
-    const totalSavings = allocations.reduce((sum, a) => sum + a.savingsAmount, 0);
-    const totalSpecialFunds = allocations.reduce((sum, a) => sum + a.specialFundsAmount, 0);
-    const totalPM = allocations.reduce((sum, a) => sum + a.purchasingManagerAmount, 0);
+    // Calculate breakdown based on cash closes since allocations were removed
+    const totalRevenue = cashCloses.reduce((sum, close) => sum + (close.totalRevenue || 0), 0);
+    const totalProfit = cashCloses.reduce((sum, close) => sum + (close.profitAmount || 0), 0);
+    const totalExpenses = totalRevenue - totalProfit;
 
     return [
-      { name: 'Gross Profit (12%)', value: totalSavings, color: '#10B981' },
-      { name: 'Daily Expense Fund', value: totalSpecialFunds, color: '#3B82F6' },
-      { name: 'Purchasing Manager', value: totalPM, color: '#8B5CF6' }
+      { name: 'Gross Profit', value: totalProfit, color: '#10B981' },
+      { name: 'Operating Expenses', value: totalExpenses, color: '#3B82F6' },
+      { name: 'Revenue', value: totalRevenue, color: '#8B5CF6' }
     ];
   };
 

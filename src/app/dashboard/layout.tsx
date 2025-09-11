@@ -7,6 +7,7 @@ import { authService, AuthUser } from '../../lib/firebase/auth';
 import { notificationService } from '../../lib/firebase/notification-service';
 import { LogOut, User, ChevronDown, Bell, Settings } from 'lucide-react';
 import { QuickThemeToggle } from '../../components/ui/ThemeToggle';
+import HydrationSafeLoader from '../../components/ui/HydrationSafeLoader';
 
 export default function DashboardLayout({
   children,
@@ -101,7 +102,7 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <HydrationSafeLoader />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -113,7 +114,7 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <HydrationSafeLoader />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -125,7 +126,7 @@ export default function DashboardLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <HydrationSafeLoader />
           <p className="text-gray-600">Redirecting to login...</p>
         </div>
       </div>

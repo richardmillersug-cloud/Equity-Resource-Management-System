@@ -21,6 +21,7 @@ import {
 export interface CashClose {
   id: string;
   employeeId: string;
+  employeeName?: string; // Employee name from record
   branchId: string;
   shift: 'day' | 'night';
   closeCash: number;
@@ -28,8 +29,7 @@ export interface CashClose {
   expectedAmount: number;
   cashPresent: number;
   airtel: number;
-  mtn: number;
-  stanbicBank: number;
+  mtn: numb
   equityBank: number;
   absaBank: number;
   pesaPal: number;
@@ -40,6 +40,11 @@ export interface CashClose {
   time: string;
   createdAt: Date;
   updatedAt: Date;
+  
+  // ✅ NEW: Actual user account information fields
+  accountEmail?: string;        // Actual account email from auth system
+  accountDisplayName?: string;  // Actual account display name from auth system
+  hasAccountInfo?: boolean;     // Whether account lookup was successful
 }
 
 export interface Invoice {
@@ -249,30 +254,143 @@ export class PurchasingManagerService {
   
   // ==================== CASH CLOSE TRACKING ====================
   
+  // Helper function to safely convert dates
+  private static safeToDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (typeof dateValue.toDate === 'function') return dateValue.toDate();
+    if (typeof dateValue === 'string') return new Date(dateValue);
+    if (typeof dateValue === 'number') return new Date(dateValue);
+    return new Date();
+  }
+
   /**
    * Get all cash closes with real-time updates
+   * ✅ Updated to use same data source as accountant ('cashCloses' collection)
    */
   static subscribeToCashCloses(callback: (cashCloses: CashClose[]) => void): () => void {
+    console.log('🔄 PM Service: Subscribing to cashCloses collection (same as accountant)...');
+    
     const q = query(
-      collection(db, 'cashClose'),
-      orderBy('date', 'desc'),
+      collection(db, 'cashCloses'), // ✅ Changed from 'cashClose' to 'cashCloses'
+      orderBy('createdAt', 'desc'),  // ✅ Changed from 'date' to 'createdAt' for consistency
       limit(100)
     );
     
     return onSnapshot(q, (snapshot) => {
+      console.log(`📊 PM Service: Received ${snapshot.docs.length} cash close records from cashCloses collection`);
+      
       const cashCloses = snapshot.docs.map(doc => {
         const data = doc.data();
+        
+        // Map accountant's data structure to PM's expected interface
         return {
           id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate() : data.date,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt
+          employeeId: data.employeeId || data.createdBy || 'unknown',
+          employeeName: data.employeeName || data.createdByName || data.employeeId || 'Unknown Employee', // ✅ Added field
+          branchId: data.branchId || 'unknown',
+          shift: data.shift || 'day',
+          closeCash: data.totalRevenue || data.closeCash || 0,
+          actualAmount: data.totalActualCash || data.actualAmount || 0,
+          expectedAmount: data.totalExpectedCash || data.expectedAmount || 0,
+          cashPresent: data.cashPresent || 0,
+          airtel: data.airtel || 0,
+          mtn: data.mtn || 0,
+          stanbicBank: data.stanbicBank || 0,
+          equityBank: data.equityBank || 0,
+          absaBank: data.absaBank || 0,
+          pesaPal: data.pesaPal || 0,
+          shortage: data.totalShortage || data.shortage || 0,
+          excess: data.totalExcess || data.excess || 0,
+          profitMargin: data.profitMargin || 0,
+          
+          // Safe date conversions
+          date: this.safeToDate(data.cashCloseDate || data.date || data.createdAt),
+          time: data.time || this.safeToDate(data.cashCloseDate || data.createdAt).toLocaleTimeString(),
+          createdAt: this.safeToDate(data.createdAt),
+          updatedAt: this.safeToDate(data.updatedAt)
         };
       }) as CashClose[];
       
+      console.log(`✅ PM Service: Mapped ${cashCloses.length} cash closes for purchasing manager`);
+      console.log('🔍 PM Service: Sample cash close:', cashCloses.length > 0 ? {
+        id: cashCloses[0].id,
+        closeCash: cashCloses[0].closeCash,
+        date: cashCloses[0].date,
+        dataSource: 'cashCloses (accountant collection)'
+      } : 'No records');
+      
       callback(cashCloses);
     });
+  }
+
+  /**
+   * Get all cash closes (static method) using same data source as accountant
+   * ✅ Alternative to real-time subscription for one-time data loading
+   */
+  static async getAllCashCloses(): Promise<CashClose[]> {
+    console.log('📊 PM Service: Loading cash closes from cashCloses collection (same as accountant)...');
+    
+    try {
+      const q = query(
+        collection(db, 'cashCloses'), // ✅ Same collection as accountant
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+      
+      const snapshot = await getDocs(q);
+      console.log(`📊 PM Service: Retrieved ${snapshot.docs.length} cash close records`);
+      
+      const cashCloses = snapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // Map accountant's data structure to PM's expected interface
+        return {
+          id: doc.id,
+          employeeId: data.employeeId || data.createdBy || 'unknown',
+          employeeName: data.employeeName || data.createdByName || data.employeeId || 'Unknown Employee', // ✅ Added field
+          branchId: data.branchId || 'unknown',
+          shift: data.shift || 'day',
+          closeCash: data.totalRevenue || data.closeCash || 0,
+          actualAmount: data.totalActualCash || data.actualAmount || 0,
+          expectedAmount: data.totalExpectedCash || data.expectedAmount || 0,
+          cashPresent: data.cashPresent || 0,
+          airtel: data.airtel || 0,
+          mtn: data.mtn || 0,
+          stanbicBank: data.stanbicBank || 0,
+          equityBank: data.equityBank || 0,
+          absaBank: data.absaBank || 0,
+          pesaPal: data.pesaPal || 0,
+          shortage: data.totalShortage || data.shortage || 0,
+          excess: data.totalExcess || data.excess || 0,
+          profitMargin: data.profitMargin || 0,
+          
+          // Safe date conversions
+          date: this.safeToDate(data.cashCloseDate || data.date || data.createdAt),
+          time: data.time || this.safeToDate(data.cashCloseDate || data.createdAt).toLocaleTimeString(),
+          createdAt: this.safeToDate(data.createdAt),
+          updatedAt: this.safeToDate(data.updatedAt)
+        };
+      }) as CashClose[];
+      
+      console.log(`✅ PM Service: Successfully loaded ${cashCloses.length} cash closes`);
+      console.log('🔍 PM Service: Data source verification:', {
+        collection: 'cashCloses',
+        sampleRecord: cashCloses.length > 0 ? {
+          id: cashCloses[0].id,
+          closeCash: cashCloses[0].closeCash,
+          date: cashCloses[0].date,
+          createdAt: cashCloses[0].createdAt
+        } : null,
+        dataConsistency: 'Using same source as accountant dashboard'
+      });
+      
+      return cashCloses;
+      
+    } catch (error) {
+      console.error('❌ PM Service: Failed to load cash closes:', error);
+      throw new Error(`Failed to load cash close data: ${error}`);
+    }
   }
 
   /**
@@ -630,6 +748,7 @@ export class PurchasingManagerService {
 
   /**
    * Make a payment towards an invoice (supports partial payments)
+   * ✅ ENHANCED: Now integrates with daily allocation system
    */
   static async makeInvoicePayment(
     invoiceId: string,
@@ -637,7 +756,8 @@ export class PurchasingManagerService {
     paymentMethod: PaymentMethod,
     paidBy: string,
     paidByName: string,
-    notes?: string
+    notes?: string,
+    allocationId?: string // ✅ NEW: Optional allocation to deduct from
   ): Promise<string> {
     const batch = writeBatch(db);
     
@@ -650,6 +770,37 @@ export class PurchasingManagerService {
     }
     
     const invoice = invoiceSnap.data() as Invoice;
+    
+    // ✅ NEW: Daily Allocation Integration
+    let allocationDeductionResult = null;
+    if (allocationId) {
+      console.log(`💳 Processing payment with daily allocation: ${allocationId}`);
+      
+      // Import the daily allocation service
+      const { dailyAllocationService } = await import('./daily-allocation-service');
+      
+      // Check if allocation has sufficient balance
+      const balanceCheck = await dailyAllocationService.checkAllocationBalance(allocationId, paymentAmount);
+      
+      if (!balanceCheck.hasBalance) {
+        throw new Error(balanceCheck.message);
+      }
+      
+      // Deduct from allocation (this will be committed only if payment succeeds)
+      allocationDeductionResult = await dailyAllocationService.deductPaymentFromAllocation(
+        allocationId,
+        paymentAmount,
+        '', // Will be set after payment is created
+        invoiceId,
+        `Payment for Invoice ${invoice.invoiceNumber} - ${invoice.supplierName}`
+      );
+      
+      if (!allocationDeductionResult.success) {
+        throw new Error(`Allocation deduction failed: ${allocationDeductionResult.message}`);
+      }
+      
+      console.log(`✅ Daily allocation deduction successful: ${allocationDeductionResult.message}`);
+    }
     
     // For cheques, don't update invoice amounts until cleared
     const isCheque = paymentMethod.type === 'cheque';
@@ -690,7 +841,7 @@ export class PurchasingManagerService {
     });
 
     // Create payment record - ensure no undefined values for Firestore
-    const paymentData: Omit<InvoicePayment, 'id'> = {
+    const paymentData: Omit<InvoicePayment, 'id'> & { allocationId?: string | null; allocationUsed?: boolean } = {
       invoiceId,
       invoiceNumber: invoice.invoiceNumber,
       supplierName: invoice.supplierName,
@@ -707,7 +858,11 @@ export class PurchasingManagerService {
       remainingAfterPayment: newRemainingAmount,
       paymentStatus,
       approvedBy: invoice.approvedBy || null, // Use null instead of undefined
-      approvedAt: invoice.approvedAt || null  // Use null instead of undefined
+      approvedAt: invoice.approvedAt || null,  // Use null instead of undefined
+      
+      // ✅ NEW: Daily allocation tracking
+      allocationId: allocationId || null,
+      allocationUsed: !!allocationId
     };
     
     const paymentRef = doc(collection(db, 'invoicePayments'));
@@ -764,6 +919,24 @@ export class PurchasingManagerService {
     }
     
     await batch.commit();
+    
+    // ✅ NEW: Update allocation record with final payment ID
+    if (allocationId && allocationDeductionResult?.success) {
+      try {
+        // Simple update to set the payment ID in the allocation record
+        const allocationRef = doc(db, 'dailyAllocations', allocationId);
+        await updateDoc(allocationRef, {
+          lastTransactionId: paymentRef.id,
+          updatedAt: Timestamp.now()
+        });
+        
+        console.log(`✅ Updated allocation ${allocationId} with payment ID: ${paymentRef.id}`);
+      } catch (allocationUpdateError) {
+        console.error('⚠️ Failed to update allocation with payment ID:', allocationUpdateError);
+        // Don't throw error here since payment was successful
+      }
+    }
+    
     return paymentRef.id;
   }
 
@@ -1327,6 +1500,165 @@ export class PurchasingManagerService {
       return dueDate < today;
     });
   }
+
+  // ================= DAILY ALLOCATION INTEGRATION =================
+
+  /**
+   * ✅ NEW: Get available daily allocations for payment processing
+   */
+  static async getAvailableDailyAllocations(branchId: string): Promise<{
+    totalAvailable: number;
+    activeAllocations: any[]; // DailyAllocation type
+    canMakePayment: (amount: number) => boolean;
+  }> {
+    try {
+      const { dailyAllocationService } = await import('./daily-allocation-service');
+      const balanceData = await dailyAllocationService.getAvailableBalance(branchId);
+      
+      return {
+        totalAvailable: balanceData.totalAvailable,
+        activeAllocations: balanceData.activeAllocations,
+        canMakePayment: (amount: number) => balanceData.totalAvailable >= amount
+      };
+    } catch (error) {
+      console.error('Error getting available daily allocations:', error);
+      return {
+        totalAvailable: 0,
+        activeAllocations: [],
+        canMakePayment: () => false
+      };
+    }
+  }
+
+  /**
+   * ✅ NEW: Make payment using daily allocation (wrapper method)
+   */
+  static async makePaymentWithAllocation(
+    invoiceId: string,
+    paymentAmount: number,
+    paymentMethod: PaymentMethod,
+    paidBy: string,
+    paidByName: string,
+    allocationId: string,
+    notes?: string
+  ): Promise<{ paymentId: string; allocationBalance: number; success: boolean; message: string }> {
+    try {
+      // First check if allocation has sufficient balance
+      const { dailyAllocationService } = await import('./daily-allocation-service');
+      const balanceCheck = await dailyAllocationService.checkAllocationBalance(allocationId, paymentAmount);
+      
+      if (!balanceCheck.hasBalance) {
+        return {
+          paymentId: '',
+          allocationBalance: balanceCheck.availableBalance,
+          success: false,
+          message: balanceCheck.message
+        };
+      }
+
+      // Make the payment (this will automatically deduct from allocation)
+      const paymentId = await this.makeInvoicePayment(
+        invoiceId,
+        paymentAmount,
+        paymentMethod,
+        paidBy,
+        paidByName,
+        notes,
+        allocationId // This triggers the allocation deduction
+      );
+
+      // Get updated balance
+      const allocation = await dailyAllocationService.getAllocationById(allocationId);
+      const newBalance = allocation?.availableBalance || 0;
+
+      return {
+        paymentId,
+        allocationBalance: newBalance,
+        success: true,
+        message: `Payment successful. Remaining allocation balance: UGX ${newBalance.toLocaleString()}`
+      };
+
+    } catch (error) {
+      console.error('Error making payment with allocation:', error);
+      return {
+        paymentId: '',
+        allocationBalance: 0,
+        success: false,
+        message: `Payment failed: ${error}`
+      };
+    }
+  }
+
+  /**
+   * ✅ NEW: Get daily allocation usage summary for reporting
+   */
+  static async getAllocationUsageSummary(branchId: string): Promise<{
+    totalAllocatedToday: number;
+    totalUsedToday: number;
+    totalAvailable: number;
+    usagePercentage: number;
+    activeAllocations: number;
+    recentPayments: any[]; // Payment records using allocations
+  }> {
+    try {
+      const { dailyAllocationService } = await import('./daily-allocation-service');
+      
+      // Get today's date
+      const today = new Date();
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Get allocation data
+      const balanceData = await dailyAllocationService.getAvailableBalance(branchId);
+      const allAllocations = await dailyAllocationService.getAllocationsForBranch(branchId);
+      
+      // Filter today's allocations
+      const todaysAllocations = allAllocations.filter(a => 
+        a.allocationDate >= startOfDay && a.allocationDate <= endOfDay
+      );
+
+      // Get recent payments that used allocations
+      const recentPaymentsQuery = query(
+        collection(db, 'invoicePayments'),
+        where('allocationUsed', '==', true),
+        where('paymentDate', '>=', startOfDay),
+        where('paymentDate', '<=', endOfDay)
+      );
+      
+      const paymentsSnapshot = await getDocs(recentPaymentsQuery);
+      const recentPayments = paymentsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        paymentDate: doc.data().paymentDate?.toDate() || new Date()
+      }));
+
+      const totalAllocatedToday = todaysAllocations.reduce((sum, a) => sum + a.totalAllocated, 0);
+      const totalUsedToday = todaysAllocations.reduce((sum, a) => sum + a.usedAmount, 0);
+      const usagePercentage = totalAllocatedToday > 0 ? (totalUsedToday / totalAllocatedToday) * 100 : 0;
+
+      return {
+        totalAllocatedToday,
+        totalUsedToday,
+        totalAvailable: balanceData.totalAvailable,
+        usagePercentage,
+        activeAllocations: balanceData.activeAllocations.length,
+        recentPayments
+      };
+      
+    } catch (error) {
+      console.error('Error getting allocation usage summary:', error);
+      return {
+        totalAllocatedToday: 0,
+        totalUsedToday: 0,
+        totalAvailable: 0,
+        usagePercentage: 0,
+        activeAllocations: 0,
+        recentPayments: []
+      };
+    }
+  }
 }
 
 // Export convenience functions
@@ -1355,5 +1687,10 @@ export const {
   updateChequeStatus,
 
   getDashboardMetrics,
-  calculateProfitMetrics
+  calculateProfitMetrics,
+  
+  // ✅ NEW: Daily allocation integration methods
+  getAvailableDailyAllocations,
+  makePaymentWithAllocation,
+  getAllocationUsageSummary
 } = PurchasingManagerService; 

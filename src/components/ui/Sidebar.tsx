@@ -39,7 +39,9 @@ import {
   Sun,
   Moon,
   LogOut,
-  Wallet
+  Wallet,
+  Database,
+  Send
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -115,6 +117,13 @@ const navigationItems: NavigationItem[] = [
     roles: ['Admin']
   },
   { 
+    id: 'allocation-data', 
+    icon: <Database className="w-5 h-5" />, 
+    label: 'Raw Allocation Data', 
+    path: '/dashboard/admin/raw-allocation-data',
+    roles: ['Admin']
+  },
+  { 
     id: 'user-management', 
     icon: <UserCheck className="w-5 h-5" />, 
     label: 'User Management', 
@@ -141,11 +150,12 @@ const navigationItems: NavigationItem[] = [
   },
   
   // Accountant specific
+  // Cash allocation removed per user request
   { 
-    id: 'cash-allocation', 
-    icon: <Calculator className="w-5 h-5" />, 
-    label: 'Cash Allocation', 
-    path: '/dashboard/accountant',
+    id: 'pm-allocations', 
+    icon: <Send className="w-5 h-5" />, 
+    label: 'PM Allocations', 
+    path: '/dashboard/accountant/allocations',
     roles: ['Accountant', 'Admin']
   },
   { 
@@ -207,6 +217,13 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
+    id: 'pm-allocations', 
+    icon: <Wallet className="w-5 h-5" />, 
+    label: 'My Allocations', 
+    path: '/dashboard/purchase-manager/allocations',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
     id: 'invoices', 
     icon: <FileText className="w-5 h-5" />, 
     label: 'Invoices', 
@@ -238,8 +255,21 @@ const navigationItems: NavigationItem[] = [
     id: 'cash-tracking', 
     icon: <Smartphone className="w-5 h-5" />, 
     label: 'Cash Tracking', 
-    path: '/dashboard/purchase-manager/cash-tracking',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin'],
+    submenu: [
+      {
+        id: 'daily-allocation-pm',
+        icon: <Wallet className="w-5 h-5" />,
+        label: 'Daily Allocation',
+        path: '/dashboard/purchase-manager/daily-allocation'
+      },
+      {
+        id: 'till-cash-closes',
+        icon: <Receipt className="w-5 h-5" />,
+        label: 'Till Cash Closes', 
+        path: '/dashboard/purchase-manager/till-cash-closes'
+      }
+    ]
   },
   { 
     id: 'supplier-totals', 
@@ -260,6 +290,13 @@ const navigationItems: NavigationItem[] = [
     icon: <Package className="w-5 h-5" />, 
     label: 'Restock Orders', 
     path: '/dashboard/purchase-manager/restock-orders',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'daily-allocation', 
+    icon: <Wallet className="w-5 h-5" />, 
+    label: 'Daily Fund Allocation', 
+    path: '/dashboard/purchase-manager/daily-allocation',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
 

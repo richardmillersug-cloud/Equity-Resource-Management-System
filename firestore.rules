@@ -564,6 +564,25 @@ service cloud.firestore {
     }
     
     // =====================================================
+    // ALLOCATION_PM COLLECTION - New PM Allocation System
+    // =====================================================
+    
+    match /allocation_PM/{allocationId} {
+      allow read: if isAuthenticated() && (
+        hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) ||
+        resource.data.pmId == request.auth.uid ||
+        resource.data.accountantId == request.auth.uid
+      );
+      allow create: if hasRole('Accountant');
+      allow update: if isAuthenticated() && (
+        (hasRole('Accountant') && resource.data.accountantId == request.auth.uid) ||
+        (hasAnyRole(['Purchasing Manager', 'Purchase Manager']) && resource.data.pmId == request.auth.uid) ||
+        hasRole('Admin')
+      );
+      allow delete: if hasRole('Admin');
+    }
+    
+    // =====================================================
     // DEVELOPMENT MODE - TEMPORARY OPEN ACCESS
     // Comment out for production use
     // =====================================================
