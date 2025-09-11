@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { getFirestore, collection, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Alert, AlertDescription } from '@/components/ui/Alert';
 
 export default function MigrateCashCloseFieldsPage() {
   const [isLoading, setIsLoading] = useState(false);
