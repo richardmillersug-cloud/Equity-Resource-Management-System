@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, 
   Search, 
@@ -35,7 +35,38 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [yearFilter, setYearFilter] = useState<string>('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  
+  // Get available years from invoices (2025 onwards)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    
+    // Add years from invoices (only 2025 onwards)
+    invoices.forEach(invoice => {
+      const invoiceDate = invoice.date || invoice.createdAt;
+      if (invoiceDate) {
+        const date = invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          if (year >= 2025) {
+            years.add(year);
+          }
+        }
+      }
+    });
+    
+    // Also add years from 2025 to current year (and next year for future-proofing)
+    // This ensures the dropdown always shows relevant years even if no invoices exist yet
+    for (let year = 2025; year <= currentYear + 1; year++) {
+      years.add(year);
+    }
+    
+    return Array.from(years).sort((a, b) => b - a); // Sort descending (newest first)
+  }, [invoices]);
   const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -57,10 +88,35 @@ export default function InvoicesPage() {
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
 
   useEffect(() => {
+    // Build filters object
+    const filters: {
+      status?: string;
+      dateRange?: { start: Date; end: Date };
+      year?: number;
+    } = {};
+
+    // Apply status filter (enforced at query level)
+    if (statusFilter && statusFilter !== 'all') {
+      filters.status = statusFilter;
+    }
+
+    // Apply date range filter if provided
+    if (dateRangeFilter.start && dateRangeFilter.end) {
+      filters.dateRange = {
+        start: new Date(dateRangeFilter.start),
+        end: new Date(dateRangeFilter.end)
+      };
+    }
+
+    // Apply year filter if provided
+    if (yearFilter) {
+      filters.year = parseInt(yearFilter);
+    }
+
     const unsubscribeInvoices = subscribeToInvoices((invoiceData) => {
       setInvoices(invoiceData);
       setLoading(false);
-    });
+    }, filters);
 
     const unsubscribePayments = subscribeToInvoicePayments((paymentData) => {
       setInvoicePayments(paymentData);
@@ -70,15 +126,14 @@ export default function InvoicesPage() {
       unsubscribeInvoices();
       unsubscribePayments();
     };
-  }, []);
+  }, [statusFilter, dateRangeFilter, yearFilter]);
 
   useEffect(() => {
+    // Status filtering is now done at the Firestore query level
+    // Apply client-side search filtering
     let filtered = [...invoices];
 
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(invoice => invoice.status === statusFilter);
-    }
-
+    // Apply search term filter
     if (searchTerm) {
       filtered = filtered.filter(invoice =>
         (invoice.supplierName && invoice.supplierName.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -87,7 +142,7 @@ export default function InvoicesPage() {
     }
 
     setFilteredInvoices(filtered);
-  }, [invoices, statusFilter, searchTerm]);
+  }, [invoices, searchTerm]);
 
   const handleApprove = async (invoiceId: string) => {
     try {
@@ -580,30 +635,30 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="w-screen h-screen p-5">
+    <div className="w-full h-full">
       <div className="w-full space-y-8">
         
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-          <div className="relative p-8 text-white">
-            <div className="flex items-center justify-between">
+          <div className="relative p-6 md:p-8 text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-6 h-6 md:w-8 md:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                     Invoice Management
                   </h1>
-                  <p className="text-purple-100 text-lg">Review, approve, and manage supplier invoices with ease</p>
+                  <p className="text-purple-100 text-sm md:text-lg">Review, approve, and manage supplier invoices with ease</p>
                 </div>
               </div>
               <button 
                 onClick={() => window.location.href = '/dashboard/receiver/invoices/add'}
-                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                className="bg-white text-purple-600 px-4 py-2 md:px-6 md:py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm md:text-base"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
                 <span>New Invoice</span>
               </button>
             </div>
@@ -705,43 +760,161 @@ export default function InvoicesPage() {
 
         {/* Advanced Search & Filters */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex-1 max-w-2xl">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-purple-500 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search invoices by supplier, invoice number, or amount..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-500"
-                />
+          <div className="flex flex-col gap-6">
+            {/* Main Search and Status Filter Row */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex-1 max-w-2xl">
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-purple-500 transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Search invoices by supplier, invoice number, or amount..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-500"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-500" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-gray-500" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 min-w-[160px]"
+                    title={statusFilter !== 'all' ? `Filtering by: ${statusFilter}` : 'Filter by status'}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial Payment</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  {statusFilter !== 'all' && (
+                    <span className="text-xs text-purple-600 font-medium ml-2">
+                      ({filteredInvoices.length} {filteredInvoices.length === 1 ? 'invoice' : 'invoices'})
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 font-medium relative ${
+                    showAdvancedFilters 
+                      ? 'bg-purple-500 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="paid">Paid</option>
-                  <option value="partial">Partial Payment</option>
-                  <option value="rejected">Rejected</option>
-                </select>
+                  <Filter className="w-4 h-4" />
+                  <span>More Filters</span>
+                  {(dateRangeFilter.start || dateRangeFilter.end || yearFilter) && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                  )}
+                </button>
+                <button 
+                  onClick={handleExportToCSV}
+                  className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export</span>
+                </button>
               </div>
-              <button 
-                onClick={handleExportToCSV}
-                className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
             </div>
+
+            {/* Advanced Filters Section */}
+            {showAdvancedFilters && (
+              <div className="border-t border-gray-200 pt-6 mt-4">
+                {/* Active Filters Summary */}
+                {(dateRangeFilter.start || dateRangeFilter.end || yearFilter) && (
+                  <div className="mb-4 p-3 bg-purple-50 rounded-xl border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-purple-600" />
+                        <span className="text-sm font-medium text-purple-900">Active Filters:</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setDateRangeFilter({ start: '', end: '' });
+                          setYearFilter('');
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-800 underline"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {yearFilter && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-lg text-xs font-medium">
+                          Year: {yearFilter}
+                        </span>
+                      )}
+                      {(dateRangeFilter.start || dateRangeFilter.end) && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-lg text-xs font-medium">
+                          Date: {dateRangeFilter.start || 'Start'} - {dateRangeFilter.end || 'End'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Year Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year
+                    </label>
+                    <select
+                      value={yearFilter}
+                      onChange={(e) => setYearFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                    >
+                      <option value="">All Years</option>
+                      {availableYears.map((year) => (
+                        <option key={year} value={year.toString()}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dateRangeFilter.start}
+                      onChange={(e) => setDateRangeFilter({ ...dateRangeFilter, start: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dateRangeFilter.end}
+                      onChange={(e) => setDateRangeFilter({ ...dateRangeFilter, end: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setDateRangeFilter({ start: '', end: '' });
+                      setYearFilter('');
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Clear Advanced Filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

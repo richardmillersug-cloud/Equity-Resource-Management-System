@@ -730,42 +730,42 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="w-full h-full">
+      <div className="w-full space-y-8">
         
         {/* Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-          <div className="relative p-8 text-white">
-          <div className="flex items-center justify-between">
+          <div className="relative p-6 md:p-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
-                    Suppliers Management
-                  </h1>
-                  <p className="text-purple-100 text-lg">Manage your supplier relationships and information with modern tools</p>
+                <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  Suppliers Management
+                </h1>
+                <p className="text-purple-100 text-sm md:text-lg">Manage your supplier relationships and information with modern tools</p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2 md:gap-4">
                 <button
                   onClick={() => router.push('/dashboard/purchase-manager/suppliers/pending')}
-                  className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-3 py-2 md:px-6 md:py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm md:text-base"
                 >
-                  <Clock className="w-5 h-5" />
+                  <Clock className="w-4 h-4 md:w-5 md:h-5" />
                   <span className="font-semibold">Pending Edits</span>
                 </button>
                 <button
                   onClick={printSupplierForm}
-                  className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-4 py-2 rounded-xl text-sm hover:bg-white/20 transition-all duration-300 flex items-center gap-2"
+                  className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-3 py-2 md:px-4 md:py-2 rounded-xl text-xs md:text-sm hover:bg-white/20 transition-all duration-300 flex items-center gap-2"
                 >
-                  <FileText className="w-4 h-4" />
+                  <FileText className="w-3 h-3 md:w-4 md:h-4" />
                   <span className="font-semibold">Supplier Form</span>
                 </button>
                 <button
                   onClick={handleAddSupplier}
-                  className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  className="bg-white text-purple-600 px-4 py-2 md:px-6 md:py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm md:text-base"
                 >
-                  <Plus className="w-5 h-5" />
-              <span>Add Supplier</span>
-            </button>
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  <span>Add Supplier</span>
+                </button>
               </div>
             </div>
           </div>

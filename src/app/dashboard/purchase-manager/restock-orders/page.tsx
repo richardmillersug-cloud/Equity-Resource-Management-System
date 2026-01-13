@@ -303,29 +303,35 @@ export default function RestockOrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">Restock Orders Management</h1>
-              <p className="text-blue-100 text-lg">Create and manage expected items for restocking</p>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Restock Orders</h1>
+                <p className="text-sm sm:text-base text-gray-600">Create and manage expected items for restocking</p>
+              </div>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4">
               <button
                 onClick={loadRestockOrders}
-                className="bg-white/20 backdrop-blur-sm border border-white/30 text-white px-6 py-3 rounded-2xl hover:bg-white/30 transition-all duration-300 flex items-center gap-2 font-semibold"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl flex items-center gap-2 font-semibold text-sm sm:text-base transition-all duration-300 flex-shrink-0"
               >
-                <RefreshCw className="w-5 h-5" />
-                Refresh
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-white text-blue-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-blue-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl flex items-center gap-2 font-semibold text-sm sm:text-base transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex-shrink-0"
               >
-                <Plus className="w-5 h-5" />
-                Create Restock Order
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Create Restock Order</span>
+                <span className="sm:hidden">Create</span>
               </button>
               <button
                 onClick={async () => {
@@ -360,195 +366,198 @@ export default function RestockOrdersPage() {
                     console.error('Error creating test order:', error);
                   }
                 }}
-                className="bg-yellow-500 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-yellow-600 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                className="bg-yellow-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl flex items-center gap-2 font-semibold text-sm sm:text-base hover:bg-yellow-600 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex-shrink-0"
               >
-                <AlertTriangle className="w-5 h-5" />
-                Create Test Order
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Create Test Order</span>
+                <span className="sm:hidden">Test</span>
               </button>
             </div>
           </div>
-        </div>
-      </div>
+          {/* Stats Dashboard */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Orders</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+                </div>
+                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500 flex-shrink-0 ml-2" />
+              </div>
+            </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <FileText className="w-8 h-8 text-blue-500 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Pending</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
+                </div>
+                <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500 flex-shrink-0 ml-2" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">In Transit</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.inTransitOrders}</p>
+                </div>
+                <Truck className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500 flex-shrink-0 ml-2" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Delivered</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.deliveredOrders}</p>
+                </div>
+                <Package className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500 flex-shrink-0 ml-2" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Completed</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.completedOrders}</p>
+                </div>
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500 flex-shrink-0 ml-2" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <Clock className="w-8 h-8 text-yellow-500 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
+          {/* Search and Filter */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div className="relative sm:col-span-2 lg:col-span-1">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by title, order number, or supplier..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <Truck className="w-8 h-8 text-orange-500 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Transit</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.inTransitOrders}</p>
+              
+              <div className="relative">
+                <Filter className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+                >
+                  <option value="all">All Statuses</option>
+                  {RESTOCK_ORDER_STATUSES.map(status => (
+                    <option key={status.value} value={status.value}>{status.label}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <Package className="w-8 h-8 text-purple-500 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.deliveredOrders}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <CheckCircle className="w-8 h-8 text-green-500 mr-3" />
-              <div>
-                <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.completedOrders}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by title, order number, or supplier..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div className="relative">
-              <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+              
+              <button
+                onClick={loadRestockOrders}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg transition-colors flex items-center justify-center"
               >
-                <option value="all">All Statuses</option>
-                {RESTOCK_ORDER_STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
-                ))}
-              </select>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
             </div>
-            
-            <button
-              onClick={loadRestockOrders}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </button>
           </div>
-        </div>
 
-        {/* Restock Orders List */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Restock Orders</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Delivery</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Value</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">{order.title}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order?.supplier || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.expectedDeliveryDate && order.expectedDeliveryDate.toDate ? 
-                        order.expectedDeliveryDate.toDate().toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(order?.items || []).length} items
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      UGX {(order?.totalExpectedValue || 0).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getPriorityColor(order.priority)}-100 text-${getPriorityColor(order.priority)}-800`}>
-                        {order?.priority || 'medium'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getStatusColor(order.status)}-100 text-${getStatusColor(order.status)}-800`}>
-                        {getStatusLabel(order?.status || '')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setShowViewModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {order.status === 'draft' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setNewOrder(order);
-                              setEditingOrderId(order.id);
-                              setShowCreateModal(true);
-                            }}
-                            className="text-yellow-600 hover:text-yellow-900"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSubmitOrder(order.id)}
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Restock Orders List */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+              <h3 className="text-base sm:text-lg font-medium text-gray-900">Restock Orders</h3>
+            </div>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Supplier</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Expected Delivery</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Expected Value</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Priority</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-4 sm:px-6 py-3 sm:py-4">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">{order.orderNumber}</div>
+                            <div className="text-xs sm:text-sm text-gray-500 truncate">{order.title}</div>
+                            <div className="text-xs text-gray-500 md:hidden mt-1">{order?.supplier || 'N/A'}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-900 hidden md:table-cell">
+                          {order?.supplier || 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-900 hidden lg:table-cell">
+                          {order.expectedDeliveryDate && order.expectedDeliveryDate.toDate ? 
+                            order.expectedDeliveryDate.toDate().toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-900">
+                          {(order?.items || []).length} items
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-900 hidden sm:table-cell">
+                          UGX {(order?.totalExpectedValue || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getPriorityColor(order.priority)}-100 text-${getPriorityColor(order.priority)}-800`}>
+                            {order?.priority || 'medium'}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${getStatusColor(order.status)}-100 text-${getStatusColor(order.status)}-800`}>
+                            {getStatusLabel(order?.status || '')}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setShowViewModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 p-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            {order.status === 'draft' && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedOrder(order);
+                                    setNewOrder(order);
+                                    setEditingOrderId(order.id);
+                                    setShowCreateModal(true);
+                                  }}
+                                  className="text-yellow-600 hover:text-yellow-900 p-1"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleSubmitOrder(order.id)}
+                                  className="text-green-600 hover:text-green-900 p-1"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
