@@ -196,6 +196,18 @@ interface PurchasingMetrics {
     monthly: number;
     yearly: number;
   };
+  invoicesByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
+  invoiceAmountsByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
   invoiceMetrics: {
     total: number;
     pending: number;
@@ -298,6 +310,8 @@ export default function PurchaseManagerDashboard() {
   // Calculated metrics from real data
   const [metrics, setMetrics] = useState<PurchasingMetrics>({
     totalPurchases: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    invoicesByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    invoiceAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     invoiceMetrics: { total: 0, pending: 0, approved: 0, paid: 0, overdue: 0, totalAmount: 0, paidAmount: 0, pendingAmount: 0 },
     cashFlow: { allocated: 0, used: 0, remaining: 0, utilization: 0 },
     supplierMetrics: { total: 0, active: 0, topSuppliers: [] },
@@ -636,76 +650,177 @@ export default function PurchaseManagerDashboard() {
     setRecentActivities(sortedActivities);
   };
 
+  // Helper function to get current period information
+  const getCurrentPeriodInfo = () => {
+    const now = new Date();
+    
+    // Daily: Current date
+    const currentDate = now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    // Weekly: Current week of the month
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayOfWeek = firstDayOfMonth.getDay();
+    const currentDay = now.getDate();
+    const weekOfMonth = Math.ceil((currentDay + firstDayOfWeek) / 7);
+    
+    // Monthly: Current month
+    const currentMonth = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Yearly: Current year
+    const currentYear = now.getFullYear();
+    
+    return {
+      daily: currentDate,
+      weekly: `Week ${weekOfMonth} of ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+      monthly: currentMonth,
+      yearly: currentYear.toString()
+    };
+  };
+
   const calculatePurchasingMetrics = () => {
     const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-
-    // Calculate purchase totals with date validation
-    // Get start of current day (midnight)
+    
+    // Calculate date boundaries for each period
+    // Daily: Start of current day to end of current day
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
     
-    const todayInvoices = invoices.filter(inv => {
+    // Weekly: Start of current week (Monday) to end of current week (Sunday)
+    const startOfWeek = new Date(now);
+    const dayOfWeek = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust to Monday
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    // Monthly: Start of current month to end of current month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+    
+    // Yearly: Start of current year to end of current year
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    startOfYear.setHours(0, 0, 0, 0);
+    const endOfYear = new Date(now.getFullYear() + 1, 0, 0); // Last day of current year
+    endOfYear.setHours(23, 59, 59, 999);
+
+    // Helper function to parse payment date
+    const getPaymentDate = (payment: any): Date | null => {
       try {
-        if (!inv.createdAt) return false;
-        const createdDate = new Date(inv.createdAt?.toDate?.() || inv.createdAt);
-        return !isNaN(createdDate.getTime()) && createdDate >= startOfToday && createdDate <= now;
-    } catch (error) {
-        return false;
+        if (!payment.paymentDate) return null;
+        const date = payment.paymentDate?.toDate ? payment.paymentDate.toDate() : new Date(payment.paymentDate);
+        return !isNaN(date.getTime()) ? date : null;
+      } catch (error) {
+        return null;
       }
+    };
+
+    // Helper function to get invoice date (for filtering invoices by period)
+    const getInvoiceDate = (invoice: any): Date | null => {
+      try {
+        const invoiceDate = invoice.date || invoice.createdAt;
+        if (!invoiceDate) return null;
+        const date = invoiceDate?.toDate ? invoiceDate.toDate() : 
+                     invoiceDate instanceof Date ? invoiceDate : 
+                     new Date(invoiceDate);
+        return !isNaN(date.getTime()) ? date : null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    // Calculate purchase totals based on payments made to invoices
+    // Daily: Payments made today
+    const dailyPurchases = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfToday && paymentDate <= endOfToday;
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Weekly: Payments made this week
+    const weeklyPurchases = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfWeek && paymentDate <= endOfWeek;
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Monthly: Payments made this month
+    const monthlyPurchases = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth;
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Yearly: Payments made this year
+    const yearlyPurchases = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfYear && paymentDate <= endOfYear;
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Calculate invoices made in each period (using invoice date/createdAt)
+    const dailyInvoices = invoices.filter(invoice => {
+      const invoiceDate = getInvoiceDate(invoice);
+      return invoiceDate && invoiceDate >= startOfToday && invoiceDate <= endOfToday;
     });
 
-    // Debug: Log today's invoices to see what's being counted
-    console.log('=== TODAY\'S PURCHASES DEBUG ===');
-    console.log('Start of today:', startOfToday);
-    console.log('Current time:', now);
-    console.log('Total invoices in database:', invoices.length);
-    console.log('Today\'s invoices found:', todayInvoices.length);
-    console.log('Today\'s invoices:', todayInvoices.map(inv => ({
-      id: inv.id,
-      amount: inv.amount,
-      createdAt: inv.createdAt?.toDate?.() || inv.createdAt,
-      supplierName: inv.supplierName || 'Unknown'
-    })));
+    const weeklyInvoices = invoices.filter(invoice => {
+      const invoiceDate = getInvoiceDate(invoice);
+      return invoiceDate && invoiceDate >= startOfWeek && invoiceDate <= endOfWeek;
+    });
 
-    const dailyPurchases = todayInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const monthlyInvoices = invoices.filter(invoice => {
+      const invoiceDate = getInvoiceDate(invoice);
+      return invoiceDate && invoiceDate >= startOfMonth && invoiceDate <= endOfMonth;
+    });
 
-    const weeklyPurchases = invoices.filter(inv => {
-      try {
-        if (!inv.createdAt) return false;
-        const createdDate = new Date(inv.createdAt?.toDate?.() || inv.createdAt);
-        return !isNaN(createdDate.getTime()) && createdDate >= oneWeekAgo;
-      } catch (error) {
-        return false;
-      }
-    }).reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const yearlyInvoices = invoices.filter(invoice => {
+      const invoiceDate = getInvoiceDate(invoice);
+      return invoiceDate && invoiceDate >= startOfYear && invoiceDate <= endOfYear;
+    });
 
-    const monthlyPurchases = invoices.filter(inv => {
-      try {
-        if (!inv.createdAt) return false;
-        const createdDate = new Date(inv.createdAt?.toDate?.() || inv.createdAt);
-        return !isNaN(createdDate.getTime()) && createdDate >= oneMonthAgo;
-      } catch (error) {
-        return false;
-      }
-    }).reduce((sum, inv) => sum + (inv.amount || 0), 0);
-
-    const yearlyPurchases = invoices.filter(inv => {
-      try {
-        if (!inv.createdAt) return false;
-        const createdDate = new Date(inv.createdAt?.toDate?.() || inv.createdAt);
-        return !isNaN(createdDate.getTime()) && createdDate >= oneYearAgo;
-      } catch (error) {
-        return false;
-      }
-    }).reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    // Calculate invoice amounts for each period
+    const dailyInvoiceAmount = dailyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const weeklyInvoiceAmount = weeklyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const monthlyInvoiceAmount = monthlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const yearlyInvoiceAmount = yearlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
 
     // Calculate invoice metrics
     const totalAmount = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
     const paidAmount = payments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
-    const pendingAmount = totalAmount - paidAmount;
+    
+    // Calculate total outstanding as sum of all supplier outstanding balances
+    // This is the correct way: sum of (invoice.amount - paidAmount) per supplier
+    const supplierOutstandingMap = new Map<string, number>();
+    
+    invoices.forEach(invoice => {
+      const invoiceAmount = Number(invoice.amount || invoice.amountInDigits || 0);
+      const invoicePaidAmount = Number(invoice.paidAmount || 0);
+      const remainingAmount = Math.max(0, invoiceAmount - invoicePaidAmount);
+      
+      if (remainingAmount > 0) {
+        const supplierId = invoice.supplierId || invoice.supplier_id || 'unknown';
+        const currentOutstanding = supplierOutstandingMap.get(supplierId) || 0;
+        supplierOutstandingMap.set(supplierId, currentOutstanding + remainingAmount);
+      }
+    });
+    
+    // Sum all supplier outstanding balances
+    const pendingAmount = Array.from(supplierOutstandingMap.values()).reduce((sum, outstanding) => sum + outstanding, 0);
 
     const invoicesByStatus = {
       pending: invoices.filter(inv => inv.status === 'pending').length,
@@ -758,6 +873,18 @@ export default function PurchaseManagerDashboard() {
         weekly: weeklyPurchases,
         monthly: monthlyPurchases,
         yearly: yearlyPurchases
+      },
+      invoicesByPeriod: {
+        daily: dailyInvoices.length,
+        weekly: weeklyInvoices.length,
+        monthly: monthlyInvoices.length,
+        yearly: yearlyInvoices.length
+      },
+      invoiceAmountsByPeriod: {
+        daily: dailyInvoiceAmount,
+        weekly: weeklyInvoiceAmount,
+        monthly: monthlyInvoiceAmount,
+        yearly: yearlyInvoiceAmount
       },
       invoiceMetrics: {
         total: invoices.length,
@@ -1098,14 +1225,14 @@ export default function PurchaseManagerDashboard() {
 
   // Purchase Period Pie Chart Data
   const purchasePeriodData = {
-    labels: ['Daily Purchases', 'Weekly Purchases', 'Monthly Purchases', 'Yearly Purchases'],
+    labels: ['Daily Invoices', 'Weekly Invoices', 'Monthly Invoices', 'Yearly Invoices'],
     datasets: [
       {
         data: [
-          metrics.totalPurchases.daily,
-          metrics.totalPurchases.weekly,
-          metrics.totalPurchases.monthly,
-          metrics.totalPurchases.yearly
+          metrics.invoiceAmountsByPeriod.daily,
+          metrics.invoiceAmountsByPeriod.weekly,
+          metrics.invoiceAmountsByPeriod.monthly,
+          metrics.invoiceAmountsByPeriod.yearly
         ],
         backgroundColor: [
           '#FF6B6B', // Red for Daily
@@ -1920,52 +2047,88 @@ export default function PurchaseManagerDashboard() {
             
             {/* Summary Stats */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[75px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
                   <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
                   <span className="text-sm font-medium text-red-700 truncate">Daily</span>
                 </div>
+                <p className="text-xs text-red-600 mb-1 truncate" title={getCurrentPeriodInfo().daily}>
+                  {getCurrentPeriodInfo().daily}
+                </p>
                 <p 
-                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.totalPurchases.daily), 'text-base')} font-bold text-red-800 mt-1 truncate`}
-                  title={formatCurrency(metrics.totalPurchases.daily)}
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.daily), 'text-base')} font-bold text-red-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.invoiceAmountsByPeriod.daily)}
                 >
-                  {formatCurrencyForDisplay(metrics.totalPurchases.daily)}
+                  {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.daily)}
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  {metrics.invoicesByPeriod.daily} invoice{metrics.invoicesByPeriod.daily !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-red-600 mt-1 opacity-75">
+                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.daily)}
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3 min-h-[75px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
                   <div className="w-3 h-3 bg-teal-500 rounded-full flex-shrink-0"></div>
                   <span className="text-sm font-medium text-teal-700 truncate">Weekly</span>
                 </div>
+                <p className="text-xs text-teal-600 mb-1 truncate" title={getCurrentPeriodInfo().weekly}>
+                  {getCurrentPeriodInfo().weekly}
+                </p>
                 <p 
-                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.totalPurchases.weekly), 'text-base')} font-bold text-teal-800 mt-1 truncate`}
-                  title={formatCurrency(metrics.totalPurchases.weekly)}
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.weekly), 'text-base')} font-bold text-teal-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.invoiceAmountsByPeriod.weekly)}
                 >
-                  {formatCurrencyForDisplay(metrics.totalPurchases.weekly)}
+                  {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.weekly)}
+                </p>
+                <p className="text-xs text-teal-500 mt-1">
+                  {metrics.invoicesByPeriod.weekly} invoice{metrics.invoicesByPeriod.weekly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-teal-600 mt-1 opacity-75">
+                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.weekly)}
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[75px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
                   <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
                   <span className="text-sm font-medium text-blue-700 truncate">Monthly</span>
                 </div>
+                <p className="text-xs text-blue-600 mb-1 truncate" title={getCurrentPeriodInfo().monthly}>
+                  {getCurrentPeriodInfo().monthly}
+                </p>
                 <p 
-                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.totalPurchases.monthly), 'text-base')} font-bold text-blue-800 mt-1 truncate`}
-                  title={formatCurrency(metrics.totalPurchases.monthly)}
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.monthly), 'text-base')} font-bold text-blue-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.invoiceAmountsByPeriod.monthly)}
                 >
-                  {formatCurrencyForDisplay(metrics.totalPurchases.monthly)}
+                  {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.monthly)}
+                </p>
+                <p className="text-xs text-blue-500 mt-1">
+                  {metrics.invoicesByPeriod.monthly} invoice{metrics.invoicesByPeriod.monthly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-blue-600 mt-1 opacity-75">
+                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.monthly)}
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[75px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
                   <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
                   <span className="text-sm font-medium text-green-700 truncate">Yearly</span>
                 </div>
+                <p className="text-xs text-green-600 mb-1 truncate" title={getCurrentPeriodInfo().yearly}>
+                  {getCurrentPeriodInfo().yearly}
+                </p>
                 <p 
-                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.totalPurchases.yearly), 'text-base')} font-bold text-green-800 mt-1 truncate`}
-                  title={formatCurrency(metrics.totalPurchases.yearly)}
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.yearly), 'text-base')} font-bold text-green-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.invoiceAmountsByPeriod.yearly)}
                 >
-                  {formatCurrencyForDisplay(metrics.totalPurchases.yearly)}
+                  {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.yearly)}
+                </p>
+                <p className="text-xs text-green-500 mt-1">
+                  {metrics.invoicesByPeriod.yearly} invoice{metrics.invoicesByPeriod.yearly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-green-600 mt-1 opacity-75">
+                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.yearly)}
                 </p>
               </div>
                   </div>
@@ -1986,28 +2149,28 @@ export default function PurchaseManagerDashboard() {
               </div>
                 <p className="text-lg font-bold text-purple-800">
                   {(() => {
-                    const purchases = metrics.totalPurchases;
-                    const max = Math.max(purchases.daily, purchases.weekly, purchases.monthly, purchases.yearly);
-                    if (max === purchases.yearly) return 'Yearly';
-                    if (max === purchases.monthly) return 'Monthly';
-                    if (max === purchases.weekly) return 'Weekly';
+                    const invoices = metrics.invoiceAmountsByPeriod;
+                    const max = Math.max(invoices.daily, invoices.weekly, invoices.monthly, invoices.yearly);
+                    if (max === invoices.yearly) return 'Yearly';
+                    if (max === invoices.monthly) return 'Monthly';
+                    if (max === invoices.weekly) return 'Weekly';
                     return 'Daily';
                   })()}
                 </p>
                 <p 
                   className="text-sm text-purple-600 mt-1 truncate"
                   title={formatCurrency(Math.max(
-                    metrics.totalPurchases.daily,
-                    metrics.totalPurchases.weekly,
-                    metrics.totalPurchases.monthly,
-                    metrics.totalPurchases.yearly
+                    metrics.invoiceAmountsByPeriod.daily,
+                    metrics.invoiceAmountsByPeriod.weekly,
+                    metrics.invoiceAmountsByPeriod.monthly,
+                    metrics.invoiceAmountsByPeriod.yearly
                   ))}
                 >
                   {formatCurrencyForDisplay(Math.max(
-                    metrics.totalPurchases.daily,
-                    metrics.totalPurchases.weekly,
-                    metrics.totalPurchases.monthly,
-                    metrics.totalPurchases.yearly
+                    metrics.invoiceAmountsByPeriod.daily,
+                    metrics.invoiceAmountsByPeriod.weekly,
+                    metrics.invoiceAmountsByPeriod.monthly,
+                    metrics.invoiceAmountsByPeriod.yearly
                   ))}
                 </p>
                 </div>
@@ -2019,26 +2182,26 @@ export default function PurchaseManagerDashboard() {
               </div>
                 <p 
                   className={`${getDynamicFontSize(formatCurrencyForDisplay(
-                    metrics.totalPurchases.daily + 
-                    metrics.totalPurchases.weekly + 
-                    metrics.totalPurchases.monthly + 
-                    metrics.totalPurchases.yearly
+                    metrics.invoiceAmountsByPeriod.daily + 
+                    metrics.invoiceAmountsByPeriod.weekly + 
+                    metrics.invoiceAmountsByPeriod.monthly + 
+                    metrics.invoiceAmountsByPeriod.yearly
                   ), 'text-base')} font-bold text-orange-800 truncate`}
                   title={formatCurrency(
-                    metrics.totalPurchases.daily + 
-                    metrics.totalPurchases.weekly + 
-                    metrics.totalPurchases.monthly + 
-                    metrics.totalPurchases.yearly
+                    metrics.invoiceAmountsByPeriod.daily + 
+                    metrics.invoiceAmountsByPeriod.weekly + 
+                    metrics.invoiceAmountsByPeriod.monthly + 
+                    metrics.invoiceAmountsByPeriod.yearly
                   )}
                 >
                   {formatCurrencyForDisplay(
-                    metrics.totalPurchases.daily + 
-                    metrics.totalPurchases.weekly + 
-                    metrics.totalPurchases.monthly + 
-                    metrics.totalPurchases.yearly
+                    metrics.invoiceAmountsByPeriod.daily + 
+                    metrics.invoiceAmountsByPeriod.weekly + 
+                    metrics.invoiceAmountsByPeriod.monthly + 
+                    metrics.invoiceAmountsByPeriod.yearly
                   )}
                 </p>
-                <p className="text-sm text-orange-600 mt-1">Combined periods</p>
+                <p className="text-sm text-orange-600 mt-1">Combined invoice periods</p>
             </div>
 
               <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4">
@@ -2047,12 +2210,12 @@ export default function PurchaseManagerDashboard() {
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
                 </div>
                 <p 
-                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.totalPurchases.yearly / 365), 'text-base')} font-bold text-emerald-800 truncate`}
-                  title={formatCurrency(metrics.totalPurchases.yearly / 365)}
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.yearly / 365), 'text-base')} font-bold text-emerald-800 truncate`}
+                  title={formatCurrency(metrics.invoiceAmountsByPeriod.yearly / 365)}
                 >
-                  {formatCurrencyForDisplay(metrics.totalPurchases.yearly / 365)}
+                  {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.yearly / 365)}
                 </p>
-                <p className="text-sm text-emerald-600 mt-1">Based on yearly data</p>
+                <p className="text-sm text-emerald-600 mt-1">Based on yearly invoice data</p>
               </div>
             </div>
           </div>

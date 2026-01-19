@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Calculator, 
@@ -235,14 +235,16 @@ export default function SupplierTotalsPage() {
     }
   };
 
-  const filteredAndSortedSuppliers = supplierTotals
-    .filter(supplier => {
+  const filteredAndSortedSuppliers = useMemo(() => {
+    const filtered = supplierTotals.filter(supplier => {
       const matchesSearch = supplier.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || supplier.paymentStatus === statusFilter;
       return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      let aValue, bValue;
+    });
+
+    const sorted = filtered.sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
       
       switch (sortBy) {
         case 'name':
@@ -275,6 +277,9 @@ export default function SupplierTotalsPage() {
           : (bValue as number) - (aValue as number);
       }
     });
+    
+    return sorted;
+  }, [supplierTotals, searchTerm, statusFilter, sortBy, sortOrder]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {
@@ -345,75 +350,75 @@ export default function SupplierTotalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <Calculator className="w-6 h-6 text-purple-600" />
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-4 sm:mb-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Supplier Totals</h1>
-              <p className="text-gray-600">Outstanding amounts and payment status by supplier</p>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Supplier Totals</h1>
+              <p className="text-sm sm:text-base text-gray-600">Outstanding amounts and payment status by supplier</p>
             </div>
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Outstanding</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(summaryData.totalOutstanding)}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Outstanding</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{formatCurrency(summaryData.totalOutstanding)}</p>
                 </div>
-                <DollarSign className="w-8 h-8 text-purple-600" />
+                <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 flex-shrink-0 ml-2" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Suppliers</p>
-                  <p className="text-2xl font-bold text-gray-900">{summaryData.totalSuppliers}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Suppliers</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{summaryData.totalSuppliers}</p>
                 </div>
-                <Building2 className="w-8 h-8 text-blue-600" />
+                <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0 ml-2" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Critical Suppliers</p>
-                  <p className="text-2xl font-bold text-red-600">{summaryData.criticalSuppliers}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Critical Suppliers</p>
+                  <p className="text-xl sm:text-2xl font-bold text-red-600">{summaryData.criticalSuppliers}</p>
                 </div>
-                <AlertTriangle className="w-8 h-8 text-red-600" />
+                <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 flex-shrink-0 ml-2" />
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Overdue Invoices</p>
-                  <p className="text-2xl font-bold text-yellow-600">{summaryData.overdueInvoices}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Overdue Invoices</p>
+                  <p className="text-xl sm:text-2xl font-bold text-yellow-600">{summaryData.overdueInvoices}</p>
                 </div>
-                <Clock className="w-8 h-8 text-yellow-600" />
+                <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 flex-shrink-0 ml-2" />
               </div>
             </div>
           </div>
 
           {/* Filters and Search */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
               {/* Search */}
-              <div className="relative">
+              <div className="relative sm:col-span-2 lg:col-span-1 xl:col-span-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Search suppliers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
 
@@ -421,7 +426,7 @@ export default function SupplierTotalsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
                 <option value="critical">Critical</option>
@@ -433,7 +438,7 @@ export default function SupplierTotalsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="amount">Outstanding Amount</option>
                 <option value="name">Supplier Name</option>
@@ -445,7 +450,7 @@ export default function SupplierTotalsPage() {
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as any)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="desc">Descending</option>
                 <option value="asc">Ascending</option>
@@ -454,10 +459,10 @@ export default function SupplierTotalsPage() {
               {/* Refresh */}
               <button
                 onClick={loadSupplierTotals}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg flex items-center justify-center space-x-2 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Refresh</span>
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             </div>
           </div>
@@ -465,130 +470,131 @@ export default function SupplierTotalsPage() {
 
         {/* Suppliers Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left py-4 px-6 font-medium text-gray-900">Supplier</th>
-                  <th className="text-right py-4 px-6 font-medium text-gray-900">Outstanding</th>
-                  <th className="text-center py-4 px-6 font-medium text-gray-900">Invoices</th>
-                  <th className="text-center py-4 px-6 font-medium text-gray-900">Status</th>
-                  <th className="text-center py-4 px-6 font-medium text-gray-900">Oldest Unpaid</th>
-                  <th className="text-center py-4 px-6 font-medium text-gray-900">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredAndSortedSuppliers.map((supplier) => (
-                  <React.Fragment key={supplier.supplierId}>
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-3">
-                          {getStatusIcon(supplier.paymentStatus)}
-                          <div>
-                            <p className="font-medium text-gray-900">{supplier.supplierName}</p>
-                            <p className="text-sm text-gray-500">{supplier.totalInvoicesCount} total invoices</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <p className="font-bold text-gray-900">{formatCurrency(supplier.totalUnpaidAmount)}</p>
-                        <p className="text-sm text-gray-500">Paid: {formatCurrency(supplier.totalPaidAmount)}</p>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <div className="space-y-1">
-                          <p className="text-sm">
-                            <span className="font-medium text-red-600">{supplier.unpaidInvoicesCount}</span> unpaid
-                          </p>
-                          {supplier.partialInvoicesCount > 0 && (
-                            <p className="text-sm">
-                              <span className="font-medium text-yellow-600">{supplier.partialInvoicesCount}</span> partial
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className={getStatusBadge(supplier.paymentStatus)}>
-                          {supplier.paymentStatus.charAt(0).toUpperCase() + supplier.paymentStatus.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center text-sm text-gray-600">
-                        {formatDate(supplier.oldestUnpaidDate)}
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <button
-                          onClick={() => setExpandedSupplier(
-                            expandedSupplier === supplier.supplierId ? null : supplier.supplierId
-                          )}
-                          className="text-purple-600 hover:text-purple-700 p-2 hover:bg-purple-50 rounded-lg transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-
-                    {/* Expanded Invoice Details */}
-                    {expandedSupplier === supplier.supplierId && (
-                      <tr>
-                        <td colSpan={6} className="bg-gray-50 px-6 py-4">
-                          <div className="space-y-4">
-                            <h4 className="font-semibold text-gray-900 flex items-center space-x-2">
-                              <FileText className="w-4 h-4" />
-                              <span>Invoice Details</span>
-                            </h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b border-gray-200">
-                                    <th className="text-left py-2 font-medium text-gray-700">Invoice #</th>
-                                    <th className="text-right py-2 font-medium text-gray-700">Amount</th>
-                                    <th className="text-right py-2 font-medium text-gray-700">Paid</th>
-                                    <th className="text-right py-2 font-medium text-gray-700">Outstanding</th>
-                                    <th className="text-center py-2 font-medium text-gray-700">Status</th>
-                                    <th className="text-center py-2 font-medium text-gray-700">Date</th>
-                                    <th className="text-center py-2 font-medium text-gray-700">Due Date</th>
-                                    <th className="text-center py-2 font-medium text-gray-700">Days Past Due</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {supplier.invoices
-                                    .filter(inv => inv.remainingAmount > 0)
-                                    .map((invoice) => (
-                                    <tr key={invoice.id} className="hover:bg-white transition-colors">
-                                      <td className="py-2 font-medium text-gray-900">{invoice.invoiceNumber}</td>
-                                      <td className="py-2 text-right">{formatCurrency(invoice.amount)}</td>
-                                      <td className="py-2 text-right text-green-600">{formatCurrency(invoice.paidAmount)}</td>
-                                      <td className="py-2 text-right font-medium text-red-600">{formatCurrency(invoice.remainingAmount)}</td>
-                                      <td className="py-2 text-center">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                          invoice.status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                                          invoice.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                                          invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                          'bg-gray-100 text-gray-800'
-                                        }`}>
-                                          {invoice.status}
-                                        </span>
-                                      </td>
-                                      <td className="py-2 text-center text-gray-600">{formatDate(invoice.date)}</td>
-                                      <td className="py-2 text-center text-gray-600">{formatDate(invoice.dueDate)}</td>
-                                      <td className="py-2 text-center">
-                                        {invoice.daysPastDue > 0 ? (
-                                          <span className="text-red-600 font-medium">{invoice.daysPastDue} days</span>
-                                        ) : (
-                                          <span className="text-gray-500">-</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900">Supplier</th>
+                    <th className="text-right py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900">Outstanding</th>
+                    <th className="text-center py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900">Invoices</th>
+                    <th className="text-center py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900">Status</th>
+                    <th className="text-center py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900 hidden lg:table-cell">Oldest Unpaid</th>
+                    <th className="text-center py-3 px-4 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium text-gray-900">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {filteredAndSortedSuppliers.map((supplier) => (
+                    <Fragment key={supplier.supplierId}>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="py-3 px-4 sm:py-4 sm:px-6">
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            {getStatusIcon(supplier.paymentStatus)}
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{supplier.supplierName}</p>
+                              <p className="text-xs sm:text-sm text-gray-500">{supplier.totalInvoicesCount} total invoices</p>
                             </div>
                           </div>
                         </td>
+                        <td className="py-3 px-4 sm:py-4 sm:px-6 text-right">
+                          <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(supplier.totalUnpaidAmount)}</p>
+                          <p className="text-xs sm:text-sm text-gray-500">Paid: {formatCurrency(supplier.totalPaidAmount)}</p>
+                        </td>
+                        <td className="py-3 px-4 sm:py-4 sm:px-6 text-center">
+                          <div className="space-y-1">
+                            <p className="text-xs sm:text-sm">
+                              <span className="font-medium text-red-600">{supplier.unpaidInvoicesCount}</span> unpaid
+                            </p>
+                            {supplier.partialInvoicesCount > 0 && (
+                              <p className="text-xs sm:text-sm">
+                                <span className="font-medium text-yellow-600">{supplier.partialInvoicesCount}</span> partial
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 sm:py-4 sm:px-6 text-center">
+                          <span className={getStatusBadge(supplier.paymentStatus)}>
+                            {supplier.paymentStatus.charAt(0).toUpperCase() + supplier.paymentStatus.slice(1)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 sm:py-4 sm:px-6 text-center text-xs sm:text-sm text-gray-600 hidden lg:table-cell">
+                          {formatDate(supplier.oldestUnpaidDate)}
+                        </td>
+                        <td className="py-3 px-4 sm:py-4 sm:px-6 text-center">
+                          <button
+                            onClick={() => setExpandedSupplier(
+                              expandedSupplier === supplier.supplierId ? null : supplier.supplierId
+                            )}
+                            className="text-purple-600 hover:text-purple-700 p-1.5 sm:p-2 hover:bg-purple-50 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
+                      {expandedSupplier === supplier.supplierId && (
+                        <tr>
+                          <td colSpan={6} className="bg-gray-50 px-4 sm:px-6 py-4">
+                            <div className="space-y-3 sm:space-y-4">
+                              <h4 className="font-semibold text-gray-900 flex items-center space-x-2 text-sm sm:text-base">
+                                <FileText className="w-4 h-4" />
+                                <span>Invoice Details</span>
+                              </h4>
+                              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                                <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                                  <table className="min-w-full text-xs sm:text-sm">
+                                    <thead>
+                                      <tr className="border-b border-gray-200">
+                                        <th className="text-left py-2 px-2 sm:px-3 font-medium text-gray-700">Invoice #</th>
+                                        <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-700">Amount</th>
+                                        <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-700">Paid</th>
+                                        <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-700">Outstanding</th>
+                                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700">Status</th>
+                                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 hidden sm:table-cell">Date</th>
+                                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 hidden md:table-cell">Due Date</th>
+                                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700">Days Past Due</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {supplier.invoices
+                                        .filter(inv => inv.remainingAmount > 0)
+                                        .map((invoice) => (
+                                          <tr key={invoice.id} className="hover:bg-white transition-colors">
+                                            <td className="py-2 px-2 sm:px-3 font-medium text-gray-900">{invoice.invoiceNumber}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-right">{formatCurrency(invoice.amount)}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-right text-green-600">{formatCurrency(invoice.paidAmount)}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-right font-medium text-red-600">{formatCurrency(invoice.remainingAmount)}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-center">
+                                              <span className={`px-1.5 sm:px-2 py-1 rounded-full text-xs ${
+                                                invoice.status === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                                                invoice.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                                invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'
+                                              }`}>
+                                                {invoice.status}
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-2 sm:px-3 text-center text-gray-600 hidden sm:table-cell">{formatDate(invoice.date)}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-center text-gray-600 hidden md:table-cell">{formatDate(invoice.dueDate)}</td>
+                                            <td className="py-2 px-2 sm:px-3 text-center">
+                                              {invoice.daysPastDue > 0 ? (
+                                                <span className="text-red-600 font-medium">{invoice.daysPastDue} days</span>
+                                              ) : (
+                                                <span className="text-gray-500">-</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
             </table>
 
             {filteredAndSortedSuppliers.length === 0 && (

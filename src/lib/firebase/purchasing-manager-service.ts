@@ -417,29 +417,96 @@ export class PurchasingManagerService {
   // ==================== INVOICE MANAGEMENT ====================
   
   /**
-   * Subscribe to real-time invoice updates
+   * Subscribe to real-time invoice updates with optional filters
    */
-  static subscribeToInvoices(callback: (invoices: Invoice[]) => void): () => void {
-    const q = query(
-      collection(db, 'invoices'),
-      orderBy('createdAt', 'desc')
-    );
+  static subscribeToInvoices(
+    callback: (invoices: Invoice[]) => void,
+    filters?: {
+      status?: string;
+      dateRange?: { start: Date; end: Date };
+      year?: number;
+    }
+  ): () => void {
+    // When filtering by status, we can't use orderBy with where clause (requires composite index)
+    // So we'll fetch without orderBy and sort client-side
+    const needsClientSideSort = filters?.status && filters.status !== 'all';
+    
+    let q: any;
+    if (needsClientSideSort) {
+      // Query with status filter only (no orderBy to avoid composite index requirement)
+      q = query(
+        collection(db, 'invoices'),
+        where('status', '==', filters.status)
+      );
+    } else {
+      // Query with orderBy when no status filter (no composite index needed)
+      q = query(
+        collection(db, 'invoices'),
+        orderBy('createdAt', 'desc')
+      );
+    }
+
+    // Note: Date range and year filtering are done client-side
     
     return onSnapshot(q, (snapshot) => {
-      const invoices = snapshot.docs.map(doc => {
+      let invoices = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
           ...data,
+          // Convert all Firestore Timestamps to JavaScript Date objects
+          date: data.date?.toDate ? data.date.toDate() : data.date,
           dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : data.dueDate,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
           approvedAt: data.approvedAt?.toDate ? data.approvedAt.toDate() : data.approvedAt,
           paidAt: data.paidAt?.toDate ? data.paidAt.toDate() : data.paidAt,
+          lastPaymentDate: data.lastPaymentDate?.toDate ? data.lastPaymentDate.toDate() : data.lastPaymentDate,
           rejectedAt: data.rejectedAt?.toDate ? data.rejectedAt.toDate() : data.rejectedAt
         };
       }) as Invoice[];
+
+      // Sort client-side if we didn't use orderBy in the query
+      if (needsClientSideSort) {
+        invoices = invoices.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        });
+      }
+
+      // Client-side date range filtering (if provided)
+      if (filters?.dateRange) {
+        invoices = invoices.filter(invoice => {
+          const invoiceDate = invoice.date || invoice.createdAt;
+          if (!invoiceDate) return false;
+          const date = invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate);
+          return date >= filters.dateRange!.start && date <= filters.dateRange!.end;
+        });
+      }
+
+      // Client-side year filtering (if provided)
+      if (filters?.year) {
+        invoices = invoices.filter(invoice => {
+          const invoiceDate = invoice.date || invoice.createdAt;
+          if (!invoiceDate) return false;
+          const date = invoiceDate instanceof Date ? invoiceDate : new Date(invoiceDate);
+          return date.getFullYear() === filters.year;
+        });
+      }
       
       callback(invoices);
+    }, (error) => {
+      // Error handler for snapshot listener
+      console.error('Error in invoice subscription:', error);
+      
+      // If it's a composite index error, provide helpful message
+      if (error.code === 'failed-precondition') {
+        console.warn('⚠️ Firestore index required. The error message should contain a link to create it.');
+        console.warn('💡 Tip: When filtering by status, the query is optimized to avoid composite indexes.');
+      }
+      
+      // Call callback with empty array on error to prevent UI breaking
+      callback([]);
     });
   }
 

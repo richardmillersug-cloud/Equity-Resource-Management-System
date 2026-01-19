@@ -169,27 +169,27 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="w-full h-full">
+      <div className="w-full space-y-8">
         
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-          <div className="relative p-8 text-white">
-            <div className="flex items-center justify-between">
+          <div className="relative p-6 md:p-8 text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                  <Receipt className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <Receipt className="w-6 h-6 md:w-8 md:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                     Expense Management
                   </h1>
-                  <p className="text-purple-100 text-lg">Review and approve expense claims with modern tools</p>
+                  <p className="text-purple-100 text-sm md:text-lg">Review and approve expense claims with modern tools</p>
                 </div>
               </div>
-              <button className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5">
-                <Plus className="w-5 h-5" />
+              <button className="bg-white text-purple-600 px-4 py-2 md:px-6 md:py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm md:text-base">
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
                 <span>New Expense</span>
               </button>
             </div>

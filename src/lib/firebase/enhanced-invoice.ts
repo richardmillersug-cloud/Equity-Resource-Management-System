@@ -307,9 +307,25 @@ export class EnhancedInvoiceService extends FirestoreService<Invoice> {
     const allInvoices = await this.getAll();
     
     const totalAmount = allInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
-    const pendingAmount = allInvoices
-      .filter(invoice => ['Pending', 'Approved'].includes(invoice.status))
-      .reduce((sum, invoice) => sum + invoice.amount, 0);
+    
+    // Calculate total outstanding as sum of all supplier outstanding balances
+    // This is the correct way: sum of (invoice.amount - paidAmount) per supplier
+    const supplierOutstandingMap = new Map<string, number>();
+    
+    allInvoices.forEach((invoice: any) => {
+      const invoiceAmount = Number(invoice.amount || invoice.amountInDigits || 0);
+      const invoicePaidAmount = Number(invoice.paidAmount || 0);
+      const remainingAmount = Math.max(0, invoiceAmount - invoicePaidAmount);
+      
+      if (remainingAmount > 0) {
+        const supplierId = invoice.supplierId || invoice.supplier_id || 'unknown';
+        const currentOutstanding = supplierOutstandingMap.get(supplierId) || 0;
+        supplierOutstandingMap.set(supplierId, currentOutstanding + remainingAmount);
+      }
+    });
+    
+    // Sum all supplier outstanding balances
+    const pendingAmount = Array.from(supplierOutstandingMap.values()).reduce((sum, outstanding) => sum + outstanding, 0);
     
     return {
       total: allInvoices.length,

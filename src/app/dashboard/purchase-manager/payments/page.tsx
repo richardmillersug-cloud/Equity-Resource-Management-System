@@ -242,25 +242,25 @@ export default function PaymentsPage() {
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-          <div className="relative p-8 text-white">
-          <div className="flex items-center justify-between">
+          <div className="relative p-6 md:p-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
               <div>
-                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                     Payment Records
                   </h1>
-                  <p className="text-purple-100 text-lg">Track all payment transactions and installments with ease</p>
+                  <p className="text-purple-100 text-sm md:text-lg">Track all payment transactions and installments with ease</p>
                 </div>
               </div>
               <button
                 onClick={exportToCSV}
                 disabled={filteredPayments.length === 0}
-                className="bg-white text-purple-600 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
+                className="bg-white text-purple-600 px-4 py-2 md:px-6 md:py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 text-sm md:text-base"
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4 md:w-5 md:h-5" />
                 <span>Export</span>
               </button>
             </div>
