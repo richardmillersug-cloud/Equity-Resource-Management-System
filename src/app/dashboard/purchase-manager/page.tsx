@@ -18,7 +18,10 @@ import {
   TrendingDown,
   Wallet,
   Receipt,
-  Target
+  Target,
+  Activity,
+  CheckCircle,
+  Zap
 } from 'lucide-react';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
