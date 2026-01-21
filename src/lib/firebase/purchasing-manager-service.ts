@@ -427,26 +427,12 @@ export class PurchasingManagerService {
       year?: number;
     }
   ): () => void {
-    // When filtering by status, we can't use orderBy with where clause (requires composite index)
-    // So we'll fetch without orderBy and sort client-side
-    const needsClientSideSort = filters?.status && filters.status !== 'all';
-    
-    let q: any;
-    if (needsClientSideSort) {
-      // Query with status filter only (no orderBy to avoid composite index requirement)
-      q = query(
-        collection(db, 'invoices'),
-        where('status', '==', filters.status)
-      );
-    } else {
-      // Query with orderBy when no status filter (no composite index needed)
-      q = query(
-        collection(db, 'invoices'),
-        orderBy('createdAt', 'desc')
-      );
-    }
-
-    // Note: Date range and year filtering are done client-side
+    // Always fetch all invoices and filter client-side to avoid composite index issues
+    // and to handle case-insensitive status filtering
+    const q = query(
+      collection(db, 'invoices'),
+      orderBy('createdAt', 'desc')
+    );
     
     return onSnapshot(q, (snapshot) => {
       let invoices = snapshot.docs.map(doc => {
@@ -465,12 +451,12 @@ export class PurchasingManagerService {
         };
       }) as Invoice[];
 
-      // Sort client-side if we didn't use orderBy in the query
-      if (needsClientSideSort) {
-        invoices = invoices.sort((a, b) => {
-          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
-          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
-          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      // Client-side status filtering (case-insensitive to handle both 'pending' and 'Pending')
+      if (filters?.status && filters.status !== 'all') {
+        const filterStatusLower = filters.status.toLowerCase();
+        invoices = invoices.filter(invoice => {
+          const invoiceStatusLower = invoice.status?.toLowerCase();
+          return invoiceStatusLower === filterStatusLower;
         });
       }
 
@@ -502,7 +488,7 @@ export class PurchasingManagerService {
       // If it's a composite index error, provide helpful message
       if (error.code === 'failed-precondition') {
         console.warn('⚠️ Firestore index required. The error message should contain a link to create it.');
-        console.warn('💡 Tip: When filtering by status, the query is optimized to avoid composite indexes.');
+        console.warn('💡 Tip: Invoices are fetched and filtered client-side to avoid index requirements.');
       }
       
       // Call callback with empty array on error to prevent UI breaking

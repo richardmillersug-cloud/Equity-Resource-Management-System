@@ -199,7 +199,7 @@ export default function InvoicesPage() {
 
   const handleMakePayment = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    const remainingAmount = invoice.remainingAmount || invoice.amount;
+    const remainingAmount = getOutstanding(invoice);
     setPaymentAmount(remainingAmount.toString());
     
     // Generate initial reference number with default method (cash)
@@ -231,7 +231,7 @@ export default function InvoicesPage() {
     }
 
     const amount = parseFloat(paymentAmount);
-    const remainingAmount = selectedInvoice?.remainingAmount || selectedInvoice?.amount || 0;
+    const remainingAmount = selectedInvoice ? getOutstanding(selectedInvoice) : 0;
 
     if (amount > remainingAmount) {
       return 'Payment amount cannot exceed remaining amount';
@@ -597,8 +597,21 @@ export default function InvoicesPage() {
     }
   };
 
+  // Helper function to check invoice status (case-insensitive)
+  const hasStatus = (invoice: Invoice, status: string) => {
+    return invoice.status?.toLowerCase() === status.toLowerCase();
+  };
+
+  // Helper function to calculate correct remaining amount (outstanding balance)
+  const getOutstanding = (invoice: Invoice): number => {
+    const amount = Number(invoice.amount || 0);
+    const paidAmount = Number(invoice.paidAmount || 0);
+    return Math.max(0, amount - paidAmount);
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'approved': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'paid': return 'bg-green-100 text-green-800 border-green-200';
@@ -609,7 +622,8 @@ export default function InvoicesPage() {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'approved': return <CheckCircle className="w-4 h-4" />;
       case 'paid': return <CheckCircle className="w-4 h-4" />;
@@ -688,7 +702,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-gray-500 text-sm font-medium mb-1">Pending Approval</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">
-                  {(invoices || []).filter(i => i.status === 'pending').length}
+                  {(invoices || []).filter(i => hasStatus(i, 'pending')).length}
                 </p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
@@ -706,7 +720,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-gray-500 text-sm font-medium mb-1">Approved</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {(invoices || []).filter(i => i.status === 'approved').length}
+                  {(invoices || []).filter(i => hasStatus(i, 'approved')).length}
                 </p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
@@ -724,7 +738,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-gray-500 text-sm font-medium mb-1">Partial Payments</p>
                 <p className="text-3xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-                  {(invoices || []).filter(i => i.status === 'partial').length}
+                  {(invoices || []).filter(i => hasStatus(i, 'partial')).length}
                 </p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
@@ -740,19 +754,84 @@ export default function InvoicesPage() {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium mb-1">Total Value</p>
-                <p className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
-                  {formatCurrency((invoices || []).reduce((sum, i) => sum + i.amount, 0))}
+                <p className="text-gray-500 text-sm font-medium mb-1">Fully Paid</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
+                  {(invoices || []).filter(i => hasStatus(i, 'paid')).length}
                 </p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">
-                    Outstanding: {formatCurrency((invoices || []).reduce((sum, i) => sum + (i.remainingAmount || i.amount), 0))}
-                  </span>
+                  <span className="text-xs text-gray-500">Completed payments</span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Financial Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Invoice Value</p>
+                <p className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                  {formatCurrency((invoices || []).reduce((sum, i) => sum + (i.amount || 0), 0))}
+                </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">All invoices</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <DollarSign className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Total Paid</p>
+                <p className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
+                  {formatCurrency((invoices || []).reduce((sum, i) => sum + (i.paidAmount || 0), 0))}
+                </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Amount paid to suppliers</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Outstanding Balance</p>
+                <p className="text-2xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">
+                  {formatCurrency((invoices || [])
+                    .filter(i => !hasStatus(i, 'paid') && !hasStatus(i, 'rejected'))
+                    .reduce((sum, i) => {
+                      const amount = Number(i.amount || 0);
+                      const paid = Number(i.paidAmount || 0);
+                      const remaining = Math.max(0, amount - paid);
+                      return sum + remaining;
+                    }, 0)
+                  )}
+                </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">
+                    Unpaid invoices: {(invoices || []).filter(i => !hasStatus(i, 'paid') && !hasStatus(i, 'rejected')).length}
+                  </span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <AlertCircle className="w-7 h-7 text-white" />
               </div>
             </div>
           </div>
@@ -785,11 +864,11 @@ export default function InvoicesPage() {
                     title={statusFilter !== 'all' ? `Filtering by: ${statusFilter}` : 'Filter by status'}
                   >
                     <option value="all">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Paid">Paid</option>
                     <option value="partial">Partial Payment</option>
-                    <option value="rejected">Rejected</option>
+                    <option value="Rejected">Rejected</option>
                   </select>
                   {statusFilter !== 'all' && (
                     <span className="text-xs text-purple-600 font-medium ml-2">
@@ -994,9 +1073,9 @@ export default function InvoicesPage() {
                               Paid: {formatCurrency(invoice.paidAmount || 0)}
                             </div>
                           )}
-                          {(invoice.remainingAmount || invoice.amount) > 0 && invoice.status !== 'paid' && (
+                          {getOutstanding(invoice) > 0 && !hasStatus(invoice, 'paid') && (
                             <div className="text-xs text-red-600 font-medium">
-                              Due: {formatCurrency(invoice.remainingAmount || invoice.amount)}
+                              Due: {formatCurrency(getOutstanding(invoice))}
                             </div>
                           )}
                           {(invoice.paymentCount || 0) > 0 && (
@@ -1009,21 +1088,21 @@ export default function InvoicesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const paidAmount = invoice.paidAmount || 0;
-                          const remainingAmount = invoice.remainingAmount || invoice.amount;
+                          const outstanding = getOutstanding(invoice);
                           
-                          if (invoice.status === 'paid') {
+                          if (hasStatus(invoice, 'paid')) {
                             return (
                               <div className="flex items-center space-x-1">
                                 <span className="text-sm font-medium text-green-600">Fully Paid</span>
                                 <CheckCircle className="w-4 h-4 text-green-500" />
                               </div>
                             );
-                          } else if (invoice.status === 'partial') {
-                            const paymentPercentage = (paidAmount / invoice.amount) * 100;
+                          } else if (hasStatus(invoice, 'partial')) {
+                            const paymentPercentage = invoice.amount > 0 ? (paidAmount / invoice.amount) * 100 : 0;
                             return (
                               <div>
                                 <div className="text-sm font-medium text-orange-600">
-                                  {formatCurrency(remainingAmount)} remaining
+                                  {formatCurrency(outstanding)} remaining
                                 </div>
                                 <div className="text-xs text-gray-500 mb-1">
                                   {paymentPercentage.toFixed(1)}% paid
@@ -1039,7 +1118,7 @@ export default function InvoicesPage() {
                           } else {
                             return (
                               <div className="text-sm font-medium text-gray-900">
-                                {formatCurrency(invoice.amount)} due
+                                {formatCurrency(outstanding)} due
                               </div>
                             );
                           }
@@ -1096,16 +1175,16 @@ export default function InvoicesPage() {
                           <button 
                             onClick={() => handleMakePayment(invoice)}
                             className={`p-1 rounded ${
-                              invoice.status !== 'paid' 
+                              !hasStatus(invoice, 'paid')
                                 ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
                                 : 'text-gray-400 cursor-not-allowed'
                             }`}
                             title={
-                              invoice.status === 'paid' ? 'Fully Paid' :
-                              invoice.status === 'partial' ? `Pay Remaining ${formatCurrency(invoice.remainingAmount || 0)}` :
+                              hasStatus(invoice, 'paid') ? 'Fully Paid' :
+                              hasStatus(invoice, 'partial') ? `Pay Remaining ${formatCurrency(getOutstanding(invoice))}` :
                               `Make Payment - ${formatCurrency(invoice.amount)}`
                             }
-                            disabled={invoice.status === 'paid'}
+                            disabled={hasStatus(invoice, 'paid')}
                           >
                             <CreditCard className="w-4 h-4" />
                           </button>
@@ -1118,7 +1197,7 @@ export default function InvoicesPage() {
                             <Printer className="w-4 h-4" />
                           </button>
                           
-                          {invoice.status === 'pending' && (
+                          {hasStatus(invoice, 'pending') && (
                             <>
                               <button 
                                 onClick={() => handleApprove(invoice.id)}
@@ -1170,7 +1249,14 @@ export default function InvoicesPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-600">
-                  {formatCurrency(filteredInvoices.reduce((sum, invoice) => sum + (invoice.remainingAmount || invoice.amount), 0))}
+                  {formatCurrency(filteredInvoices
+                    .filter(i => !hasStatus(i, 'paid') && !hasStatus(i, 'rejected'))
+                    .reduce((sum, invoice) => {
+                      const amount = Number(invoice.amount || 0);
+                      const paid = Number(invoice.paidAmount || 0);
+                      return sum + Math.max(0, amount - paid);
+                    }, 0)
+                  )}
                 </div>
                 <div className="text-sm text-gray-600">Outstanding</div>
               </div>
@@ -1182,31 +1268,31 @@ export default function InvoicesPage() {
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="text-center p-3 bg-yellow-50 rounded-lg">
                   <div className="text-xl font-bold text-yellow-600">
-                    {filteredInvoices.filter(i => i.status === 'pending').length}
+                    {filteredInvoices.filter(i => hasStatus(i, 'pending')).length}
                   </div>
                   <div className="text-xs text-yellow-800">Pending</div>
                 </div>
                 <div className="text-center p-3 bg-blue-50 rounded-lg">
                   <div className="text-xl font-bold text-blue-600">
-                    {filteredInvoices.filter(i => i.status === 'approved').length}
+                    {filteredInvoices.filter(i => hasStatus(i, 'approved')).length}
                   </div>
                   <div className="text-xs text-blue-800">Approved</div>
                 </div>
                 <div className="text-center p-3 bg-orange-50 rounded-lg">
                   <div className="text-xl font-bold text-orange-600">
-                    {filteredInvoices.filter(i => i.status === 'partial').length}
+                    {filteredInvoices.filter(i => hasStatus(i, 'partial')).length}
                   </div>
                   <div className="text-xs text-orange-800">Partial</div>
                 </div>
                 <div className="text-center p-3 bg-green-50 rounded-lg">
                   <div className="text-xl font-bold text-green-600">
-                    {filteredInvoices.filter(i => i.status === 'paid').length}
+                    {filteredInvoices.filter(i => hasStatus(i, 'paid')).length}
                   </div>
                   <div className="text-xs text-green-800">Paid</div>
                 </div>
                 <div className="text-center p-3 bg-red-50 rounded-lg">
                   <div className="text-xl font-bold text-red-600">
-                    {filteredInvoices.filter(i => i.status === 'rejected').length}
+                    {filteredInvoices.filter(i => hasStatus(i, 'rejected')).length}
                   </div>
                   <div className="text-xs text-red-800">Rejected</div>
                 </div>
@@ -1247,7 +1333,7 @@ export default function InvoicesPage() {
                         <div className="text-sm text-gray-600">Paid Amount</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</div>
+                        <div className="text-2xl font-bold text-red-600">{formatCurrency(getOutstanding(selectedInvoice))}</div>
                         <div className="text-sm text-gray-600">Remaining</div>
                       </div>
                     </div>
@@ -1394,7 +1480,7 @@ export default function InvoicesPage() {
                             <div className="flex justify-between">
                               <span className="text-gray-600">Remaining:</span>
                               <span className="font-bold text-red-600">
-                                {formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}
+                                {formatCurrency(getOutstanding(selectedInvoice))}
                               </span>
                             </div>
                           </div>
@@ -1413,7 +1499,7 @@ export default function InvoicesPage() {
                   </button>
                   
                   <div className="flex space-x-3">
-                    {selectedInvoice.status === 'pending' && (
+                    {hasStatus(selectedInvoice, 'pending') && (
                       <>
                         <button
                           onClick={() => {
@@ -1438,7 +1524,7 @@ export default function InvoicesPage() {
                       </>
                     )}
                     
-                    {selectedInvoice.status !== 'paid' && (
+                    {!hasStatus(selectedInvoice, 'paid') && (
                       <button
                         onClick={() => {
                           setShowModal(false);
@@ -1449,14 +1535,14 @@ export default function InvoicesPage() {
                         <CreditCard className="w-4 h-4" />
                         <span>
                           {selectedInvoice.status === 'partial' 
-                            ? `Pay ${formatCurrency(selectedInvoice.remainingAmount || 0)}` 
+                            ? `Pay ${formatCurrency(getOutstanding(selectedInvoice))}` 
                             : 'Make Payment'
                           }
                         </span>
                       </button>
                     )}
                     
-                    {selectedInvoice.status === 'paid' && (
+                    {hasStatus(selectedInvoice, 'paid') && (
                       <div className="px-4 py-2 bg-green-100 text-green-800 rounded-lg flex items-center space-x-2">
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Fully Paid</span>
@@ -1519,7 +1605,7 @@ export default function InvoicesPage() {
                     </div>
                     <div>
                       <p className="text-gray-600">Remaining:</p>
-                      <p className="font-bold text-lg text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</p>
+                      <p className="font-bold text-lg text-red-600">{formatCurrency(getOutstanding(selectedInvoice))}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Payments Made:</p>
@@ -1742,14 +1828,14 @@ export default function InvoicesPage() {
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       min="0"
-                      max={selectedInvoice.remainingAmount || selectedInvoice.amount}
+                      max={getOutstanding(selectedInvoice)}
                       step="0.01"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Enter amount"
                     />
                     {paymentAmount && (
                       <div className="text-xs text-gray-500 mt-1">
-                        <p>New remaining: {formatCurrency((selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0'))}</p>
+                        <p>New remaining: {formatCurrency(getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0'))}</p>
                         <p>This will be payment #{(selectedInvoice.paymentCount || 0) + 1}</p>
                       </div>
                     )}
@@ -2075,7 +2161,7 @@ export default function InvoicesPage() {
                         <div className="text-xs text-gray-600">Already Paid</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-red-600">{formatCurrency(selectedInvoice.remainingAmount || selectedInvoice.amount)}</div>
+                        <div className="text-lg font-bold text-red-600">{formatCurrency(getOutstanding(selectedInvoice))}</div>
                         <div className="text-xs text-gray-600">Current Balance</div>
                       </div>
                       <div className="text-center">
@@ -2089,24 +2175,24 @@ export default function InvoicesPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700">Balance After Payment:</span>
                         <span className={`text-lg font-bold ${
-                          (selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') <= 0 
+                          getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0') <= 0 
                             ? 'text-green-600' 
                             : 'text-orange-600'
                         }`}>
-                          {formatCurrency(Math.max(0, (selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0')))}
+                          {formatCurrency(Math.max(0, getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0')))}
                         </span>
                       </div>
-                      {(selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') <= 0 && (
+                      {getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0') <= 0 && (
                         <div className="mt-2 flex items-center space-x-2 text-green-600">
                           <CheckCircle2 className="w-4 h-4" />
                           <span className="text-sm font-medium">This payment will fully settle the invoice</span>
                         </div>
                       )}
-                      {(selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0') > 0 && (
+                      {getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0') > 0 && (
                         <div className="mt-2 flex items-center space-x-2 text-orange-600">
                           <Clock className="w-4 h-4" />
                           <span className="text-sm font-medium">
-                            Partial payment - {formatCurrency((selectedInvoice.remainingAmount || selectedInvoice.amount) - parseFloat(paymentAmount || '0'))} will remain
+                            Partial payment - {formatCurrency(getOutstanding(selectedInvoice) - parseFloat(paymentAmount || '0'))} will remain
                           </span>
                         </div>
                       )}

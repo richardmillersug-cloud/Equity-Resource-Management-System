@@ -25,6 +25,10 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterMethod, setFilterMethod] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>('');
+  const [filterDateFrom, setFilterDateFrom] = useState<string>('');
+  const [filterDateTo, setFilterDateTo] = useState<string>('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [pendingCheques, setPendingCheques] = useState<InvoicePayment[]>([]);
   const [overdueCheques, setOverdueCheques] = useState<InvoicePayment[]>([]);
@@ -82,8 +86,42 @@ export default function PaymentsPage() {
       });
     }
 
+    // Filter by year
+    if (filterYear) {
+      const year = parseInt(filterYear);
+      filtered = filtered.filter(payment => {
+        const paymentDate = payment.paymentDate instanceof Date 
+          ? payment.paymentDate 
+          : new Date(payment.paymentDate);
+        return paymentDate.getFullYear() === year;
+      });
+    }
+
+    // Filter by date range
+    if (filterDateFrom) {
+      const fromDate = new Date(filterDateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(payment => {
+        const paymentDate = payment.paymentDate instanceof Date 
+          ? payment.paymentDate 
+          : new Date(payment.paymentDate);
+        return paymentDate >= fromDate;
+      });
+    }
+
+    if (filterDateTo) {
+      const toDate = new Date(filterDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(payment => {
+        const paymentDate = payment.paymentDate instanceof Date 
+          ? payment.paymentDate 
+          : new Date(payment.paymentDate);
+        return paymentDate <= toDate;
+      });
+    }
+
     setFilteredPayments(filtered);
-  }, [payments, searchTerm, filterMethod, filterStatus]);
+  }, [payments, searchTerm, filterMethod, filterStatus, filterYear, filterDateFrom, filterDateTo]);
 
   const getPaymentMethodColor = (method: string) => {
     const colors = {
@@ -209,13 +247,13 @@ export default function PaymentsPage() {
     a.click();
   };
 
-  // Calculate statistics
-  const totalPayments = payments.length;
-  const totalAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const cashPayments = payments.filter(p => p.paymentMethod.type === 'cash').length;
-  const bankTransfers = payments.filter(p => p.paymentMethod.type === 'bank_deposit').length;
-  const mobilePayments = payments.filter(p => ['mobile_money', 'momo', 'airtel_pay'].includes(p.paymentMethod.type)).length;
-  const chequePayments = payments.filter(p => p.paymentMethod.type === 'cheque').length;
+  // Calculate statistics based on filtered payments
+  const totalPayments = filteredPayments.length;
+  const totalAmount = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const cashPayments = filteredPayments.filter(p => p.paymentMethod.type === 'cash').length;
+  const bankTransfers = filteredPayments.filter(p => p.paymentMethod.type === 'bank_deposit').length;
+  const mobilePayments = filteredPayments.filter(p => ['mobile_money', 'momo', 'airtel_pay'].includes(p.paymentMethod.type)).length;
+  const chequePayments = filteredPayments.filter(p => p.paymentMethod.type === 'cheque').length;
 
   if (loading) {
     return (
@@ -243,26 +281,16 @@ export default function PaymentsPage() {
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
           <div className="relative p-6 md:p-8 text-white">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-white" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
               <div>
-                  <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
-                    Payment Records
-                  </h1>
-                  <p className="text-purple-100 text-sm md:text-lg">Track all payment transactions and installments with ease</p>
-                </div>
+                <h1 className="text-2xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  Payment Records
+                </h1>
+                <p className="text-purple-100 text-sm md:text-lg">Track all payment transactions and installments with ease</p>
               </div>
-              <button
-                onClick={exportToCSV}
-                disabled={filteredPayments.length === 0}
-                className="bg-white text-purple-600 px-4 py-2 md:px-6 md:py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-purple-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 text-sm md:text-base"
-              >
-                <Download className="w-4 h-4 md:w-5 md:h-5" />
-                <span>Export</span>
-              </button>
             </div>
           </div>
         </div>
@@ -391,6 +419,7 @@ export default function PaymentsPage() {
         {/* Advanced Search & Filters */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            {/* Search Bar */}
             <div className="flex-1 max-w-2xl">
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-purple-500 transition-colors" />
@@ -404,13 +433,16 @@ export default function PaymentsPage() {
               </div>
             </div>
 
+            {/* Filter Controls */}
             <div className="flex items-center gap-4">
+              {/* Payment Method Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="w-5 h-5 text-gray-500" />
                 <select
                   value={filterMethod}
                   onChange={(e) => setFilterMethod(e.target.value)}
-                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 min-w-[160px]"
+                  title={filterMethod !== 'all' ? `Filtering by: ${filterMethod}` : 'Filter by payment method'}
                 >
                   <option value="all">All Methods</option>
                   <option value="cash">Cash</option>
@@ -420,24 +452,161 @@ export default function PaymentsPage() {
                   <option value="momo">MTN MoMo</option>
                   <option value="airtel_pay">Airtel Money</option>
                 </select>
+                {filterMethod !== 'all' && (
+                  <span className="text-xs text-purple-600 font-medium ml-2">
+                    ({filteredPayments.length} {filteredPayments.length === 1 ? 'payment' : 'payments'})
+                  </span>
+                )}
               </div>
-              
+
+              {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="w-5 h-5 text-gray-500" />
-            <select
+                <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
-            >
-              <option value="all">All Status</option>
+                  className="border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900 min-w-[160px]"
+                  title={filterStatus !== 'all' ? `Filtering by: ${filterStatus}` : 'Filter by status'}
+                >
+                  <option value="all">All Status</option>
                   <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-                <option value="failed">Failed/Bounced</option>
-            </select>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed/Bounced</option>
+                </select>
+                {filterStatus !== 'all' && (
+                  <span className="text-xs text-purple-600 font-medium ml-2">
+                    ({filteredPayments.length} {filteredPayments.length === 1 ? 'payment' : 'payments'})
+                  </span>
+                )}
+              </div>
+
+              {/* More Filters Button */}
+              <button 
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`px-4 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 font-medium relative ${
+                  showAdvancedFilters 
+                    ? 'bg-purple-500 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                <span>More Filters</span>
+                {(filterDateFrom || filterDateTo || filterYear) && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+
+              {/* Export Button */}
+              <button
+                onClick={exportToCSV}
+                disabled={filteredPayments.length === 0}
+                className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </button>
             </div>
           </div>
+
+          {/* Advanced Filters Section */}
+          {showAdvancedFilters && (
+            <div className="border-t border-gray-200 pt-6 mt-4">
+              {/* Active Filters Summary */}
+              {(filterDateFrom || filterDateTo || filterYear) && (
+                <div className="mb-4 p-3 bg-purple-50 rounded-xl border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-900">Active Filters:</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFilterDateFrom('');
+                        setFilterDateTo('');
+                        setFilterYear('');
+                      }}
+                      className="text-xs text-purple-600 hover:text-purple-800 underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {filterYear && (
+                      <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-lg text-xs font-medium">
+                        Year: {filterYear}
+                      </span>
+                    )}
+                    {(filterDateFrom || filterDateTo) && (
+                      <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-lg text-xs font-medium">
+                        Date: {filterDateFrom || 'Start'} - {filterDateTo || 'End'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Filter Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Year Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Year
+                  </label>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                  >
+                    <option value="">All Years</option>
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                  </select>
+                </div>
+
+                {/* Date Range Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-gray-50 hover:bg-white text-gray-900"
+                  />
+                </div>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => {
+                    setFilterDateFrom('');
+                    setFilterDateTo('');
+                    setFilterYear('');
+                  }}
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Clear Advanced Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-          </div>
           
       {/* Payments Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">

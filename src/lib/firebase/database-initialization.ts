@@ -390,6 +390,17 @@ export class DatabaseInitialization {
       return;
     }
 
+    const now = new Date();
+    const today = new Date(now);
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(now);
+    lastWeek.setDate(lastWeek.getDate() - 5);
+    const lastMonth = new Date(now);
+    lastMonth.setDate(lastMonth.getDate() - 20);
+    const twoMonthsAgo = new Date(now);
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+
     const paymentsData = [
       {
         reference: 'PAY-2024-001',
@@ -401,6 +412,7 @@ export class DatabaseInitialization {
         description: 'Payment for fresh vegetables and fruits supply',
         processedBy: 'pm_001',
         processedAt: serverTimestamp(),
+        paymentDate: today,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       },
@@ -414,6 +426,7 @@ export class DatabaseInitialization {
         description: 'Mobile money payment for dairy products',
         processedBy: 'pm_001',
         processedAt: serverTimestamp(),
+        paymentDate: yesterday,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       },
@@ -434,8 +447,11 @@ export class DatabaseInitialization {
         amount: 650000,
         method: 'Bank Transfer',
         type: 'outgoing',
-        status: 'processing',
+        status: 'completed',
         description: 'Payment for cooking oil and soap supplies',
+        processedBy: 'pm_001',
+        processedAt: serverTimestamp(),
+        paymentDate: lastWeek,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       },
@@ -449,6 +465,7 @@ export class DatabaseInitialization {
         description: 'Refund received from customer return',
         processedBy: 'pm_001',
         processedAt: serverTimestamp(),
+        paymentDate: lastMonth,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       },
@@ -465,13 +482,41 @@ export class DatabaseInitialization {
         cancellationReason: 'Insufficient account balance',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
+      },
+      {
+        reference: 'PAY-2024-006',
+        supplierName: 'Kampala Fresh Foods Ltd',
+        amount: 1250000,
+        method: 'Bank Transfer',
+        type: 'outgoing',
+        status: 'completed',
+        description: 'Weekly payment for fresh produce supply',
+        processedBy: 'pm_001',
+        processedAt: serverTimestamp(),
+        paymentDate: lastWeek,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      },
+      {
+        reference: 'PAY-2024-007',
+        supplierName: 'Uganda Dairy Cooperative',
+        amount: 780000,
+        method: 'Mobile Money',
+        type: 'outgoing',
+        status: 'completed',
+        description: 'Monthly dairy products payment',
+        processedBy: 'pm_001',
+        processedAt: serverTimestamp(),
+        paymentDate: twoMonthsAgo,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       }
     ];
 
     for (const data of paymentsData) {
       await addDoc(collectionRef, data);
     }
-    console.log('✅ payments collection initialized with 6 records');
+    console.log('✅ payments collection initialized with 8 records');
   }
 
   static async initializeChequeTrackerCollection(): Promise<void> {

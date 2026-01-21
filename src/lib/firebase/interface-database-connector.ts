@@ -306,7 +306,8 @@ export class InterfaceDatabaseConnector {
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate?.() || new Date(),
           processedAt: doc.data().processedAt?.toDate?.() || null,
-          cancelledAt: doc.data().cancelledAt?.toDate?.() || null
+          cancelledAt: doc.data().cancelledAt?.toDate?.() || null,
+          paymentDate: doc.data().paymentDate?.toDate?.() || doc.data().createdAt?.toDate?.() || new Date()
         }));
         callback(data);
       },

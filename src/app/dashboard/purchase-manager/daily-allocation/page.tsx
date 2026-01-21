@@ -51,6 +51,15 @@ interface CashAllocation {
   monthlyExpenseFund: number;
   profitDeduction: number;
   totalDeductions: number;
+  // Action timestamps
+  actionDate?: any;
+  actionBy?: string;
+  acceptedAt?: any;
+  acceptedBy?: string;
+  acceptedByName?: string;
+  rejectedAt?: any;
+  rejectedBy?: string;
+  rejectedByName?: string;
   cashCloseData?: {
     variance: number;
     note: string;
@@ -217,11 +226,27 @@ export default function PurchaseManagerDailyAllocationPage() {
 
     try {
       const allocationRef = doc(db, 'cashAllocations', allocationId);
-      await updateDoc(allocationRef, {
+      const currentUser = authService.getCurrentUser();
+      
+      // Prepare update data with specific timestamps
+      const updateData: any = {
         status: action,
         actionDate: serverTimestamp(),
-        actionBy: authService.getCurrentUser()?.uid
-      });
+        actionBy: currentUser?.uid
+      };
+
+      // Add specific timestamp based on action
+      if (action === 'accepted') {
+        updateData.acceptedAt = serverTimestamp();
+        updateData.acceptedBy = currentUser?.uid;
+        updateData.acceptedByName = currentUser?.displayName || currentUser?.email || 'Unknown';
+      } else if (action === 'rejected') {
+        updateData.rejectedAt = serverTimestamp();
+        updateData.rejectedBy = currentUser?.uid;
+        updateData.rejectedByName = currentUser?.displayName || currentUser?.email || 'Unknown';
+      }
+
+      await updateDoc(allocationRef, updateData);
 
       // Update local state
       setAllocations(prev =>
@@ -232,7 +257,7 @@ export default function PurchaseManagerDailyAllocationPage() {
         )
       );
 
-      console.log(`✅ Allocation ${allocationId} ${action}`);
+      console.log(`✅ Allocation ${allocationId} ${action} at ${new Date().toISOString()}`);
 
     } catch (error: any) {
       console.error(`❌ Error ${action} allocation:`, error);

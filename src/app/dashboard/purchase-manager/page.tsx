@@ -1,12 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, 
   TrendingUp, 
   AlertTriangle, 
-  CheckCircle, 
-  Clock, 
   CreditCard,
   Building2,
   FileText,
@@ -17,26 +15,16 @@ import {
   PieChart,
   BarChart3,
   ArrowUpRight,
-  ArrowDownRight,
-  Zap,
-  Star,
-  Bell,
-  Settings,
-  Filter,
-  Plus,
-  Eye,
   TrendingDown,
-  Activity,
   Wallet,
   Receipt,
   Target
 } from 'lucide-react';
-import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
 import { useRouter } from 'next/navigation';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
-import { CashTrackingInterface } from '../../../components/purchase-manager/CashTrackingInterface';
+import { subscribeToInvoicePayments } from '@/lib/firebase/purchasing-manager-service';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -196,6 +184,12 @@ interface PurchasingMetrics {
     monthly: number;
     yearly: number;
   };
+  paymentsMade: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
   invoicesByPeriod: {
     daily: number;
     weekly: number;
@@ -203,6 +197,30 @@ interface PurchasingMetrics {
     yearly: number;
   };
   invoiceAmountsByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
+  allocationsByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
+  allocationAmountsByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
+  paymentsByPeriod: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    yearly: number;
+  };
+  paymentAmountsByPeriod: {
     daily: number;
     weekly: number;
     monthly: number;
@@ -223,6 +241,7 @@ interface PurchasingMetrics {
     used: number;
     remaining: number;
     utilization: number; // percentage
+    todayAllocated: number; // allocation for today
   };
   supplierMetrics: {
     total: number;
@@ -244,6 +263,18 @@ interface PurchasingMetrics {
       count: number;
     }>;
   };
+  invoiceTrends: Array<{
+    month: string;
+    amount: number;
+    count: number;
+    fullDate: string;
+  }>;
+  paymentTrends: Array<{
+    month: string;
+    amount: number;
+    count: number;
+    fullDate: string;
+  }>;
   cashCloseMetrics: {
     totalDayCash: number;
     totalNightCash: number;
@@ -310,12 +341,19 @@ export default function PurchaseManagerDashboard() {
   // Calculated metrics from real data
   const [metrics, setMetrics] = useState<PurchasingMetrics>({
     totalPurchases: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    paymentsMade: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     invoicesByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     invoiceAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    allocationsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    allocationAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    paymentsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
+    paymentAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     invoiceMetrics: { total: 0, pending: 0, approved: 0, paid: 0, overdue: 0, totalAmount: 0, paidAmount: 0, pendingAmount: 0 },
-    cashFlow: { allocated: 0, used: 0, remaining: 0, utilization: 0 },
+    cashFlow: { allocated: 0, used: 0, remaining: 0, utilization: 0, todayAllocated: 0 },
     supplierMetrics: { total: 0, active: 0, topSuppliers: [] },
     paymentAnalytics: { totalPayments: 0, averagePayment: 0, paymentMethods: {}, monthlyTrends: [] },
+    invoiceTrends: [],
+    paymentTrends: [],
     cashCloseMetrics: { 
       totalDayCash: 0, totalNightCash: 0, totalNetworkMoney: 0, totalShortage: 0, totalExcess: 0,
       averageDayClose: 0, averageNightClose: 0, profitMargin: 0, estimatedProfit: 0,
@@ -354,17 +392,12 @@ export default function PurchaseManagerDashboard() {
       );
       subscriptions.push(unsubscribeInvoices);
 
-      // Subscribe to payments data
-      const unsubscribePayments = InterfaceDatabaseConnector.subscribeToPaymentsData(
-        (data) => {
-          console.log('Payments data received:', data);
-          setPayments(data);
-        },
-        (error) => {
-          console.error('Payments subscription error:', error);
-          setError('Failed to load payments data. Please refresh the page.');
-        }
-      );
+      // Subscribe to invoice payments data from invoicePayments collection
+      const unsubscribePayments = subscribeToInvoicePayments((paymentsData) => {
+        console.log('💳 Invoice Payments data received from invoicePayments collection:', paymentsData.length, 'payments');
+        console.log('Sample payment:', paymentsData.length > 0 ? paymentsData[0] : 'No payments');
+        setPayments(paymentsData);
+      });
       subscriptions.push(unsubscribePayments);
 
       // Subscribe to suppliers data
@@ -398,9 +431,9 @@ export default function PurchaseManagerDashboard() {
         (data) => {
           console.log('💰 FORCE DATA CHECK - Cash Allocations received:', {
             totalRecords: data.length,
-            allocatedStatus: data.filter(a => a.status === 'allocated').length,
+            pendingStatus: data.filter(a => a.status === 'pending').length,
             acceptedStatus: data.filter(a => a.status === 'accepted').length,
-            moneyReceivedStatus: data.filter(a => a.status === 'money_received').length,
+            rejectedStatus: data.filter(a => a.status === 'rejected').length,
             rawData: data.slice(0, 3) // Show first 3 for debugging
           });
           
@@ -456,13 +489,13 @@ export default function PurchaseManagerDashboard() {
       
       let allAllocationsData: any[] = [];
       
-      // Query 1: cash_allocations collection (primary)
+      // Query 1: cashAllocations collection (primary) - matches daily-allocation page
       const { collection, getDocs, query, where } = await import('firebase/firestore');
-      const allocationsSnapshot = await getDocs(collection(db, 'cash_allocations'));
+      const allocationsSnapshot = await getDocs(collection(db, 'cashAllocations'));
       
       const cashAllocationsData = allocationsSnapshot.docs.map(doc => ({
         id: doc.id,
-        source: 'cash_allocations',
+        source: 'cashAllocations',
         ...doc.data()
       }));
       allAllocationsData.push(...cashAllocationsData);
@@ -480,9 +513,9 @@ export default function PurchaseManagerDashboard() {
       console.log('💪 COMPREHENSIVE FORCE LOAD COMPLETE:', {
         cashAllocations: cashAllocationsData.length,
         totalUnique: uniqueAllocations.length,
-        pendingAcceptance: uniqueAllocations.filter(a => a.status === 'allocated').length,
+        pending: uniqueAllocations.filter(a => a.status === 'pending').length,
         accepted: uniqueAllocations.filter(a => a.status === 'accepted').length,
-        moneyReceived: uniqueAllocations.filter(a => a.status === 'money_received').length
+        rejected: uniqueAllocations.filter(a => a.status === 'rejected').length
       });
       
       setCashAllocations(uniqueAllocations);
@@ -497,9 +530,9 @@ export default function PurchaseManagerDashboard() {
     }
   };
 
-  // ✅ ENHANCED: Multiple force refresh mechanisms to ensure data visibility
+  // ✅ ENHANCED: Force refresh only when needed (not periodic to avoid flickering)
   useEffect(() => {
-    // Initial force refresh after 2 seconds to ensure data is loaded
+    // Initial force refresh after 2 seconds ONLY if no data is loaded
     const initialTimer = setTimeout(() => {
       if (cashAllocations.length === 0) {
         console.log('🔄 AUTO FORCE REFRESH: No allocations detected, forcing refresh...');
@@ -507,17 +540,18 @@ export default function PurchaseManagerDashboard() {
       }
     }, 2000);
     
-    // Periodic refresh every 30 seconds to ensure data stays current
-    const periodicTimer = setInterval(() => {
-      console.log('🔄 PERIODIC REFRESH: Ensuring data is current...');
-      forceRefreshAllocations();
-    }, 30000);
+    // NOTE: Removed periodic 30-second refresh to prevent graph flickering
+    // Real-time Firebase subscriptions handle automatic updates
 
-    // Refresh when page becomes visible again
+    // Refresh when page becomes visible again (only if hidden for a while)
+    let wasHidden = false;
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('🔄 VISIBILITY REFRESH: Page became visible, refreshing data...');
+      if (document.hidden) {
+        wasHidden = true;
+      } else if (wasHidden) {
+        console.log('🔄 VISIBILITY REFRESH: Page became visible after being hidden, refreshing data...');
         forceRefreshAllocations();
+        wasHidden = false;
       }
     };
     
@@ -525,7 +559,6 @@ export default function PurchaseManagerDashboard() {
     
     return () => {
       clearTimeout(initialTimer);
-      clearInterval(periodicTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [cashAllocations.length]);
@@ -714,15 +747,29 @@ export default function PurchaseManagerDashboard() {
     const endOfYear = new Date(now.getFullYear() + 1, 0, 0); // Last day of current year
     endOfYear.setHours(23, 59, 59, 999);
 
-    // Helper function to parse payment date
+    // Get payment date
     const getPaymentDate = (payment: any): Date | null => {
-      try {
-        if (!payment.paymentDate) return null;
-        const date = payment.paymentDate?.toDate ? payment.paymentDate.toDate() : new Date(payment.paymentDate);
-        return !isNaN(date.getTime()) ? date : null;
-      } catch (error) {
-        return null;
+      if (!payment) return null;
+      
+      // Try paymentDate first
+      if (payment.paymentDate) {
+        const date = payment.paymentDate?.toDate?.() || payment.paymentDate;
+        if (date instanceof Date && !isNaN(date.getTime())) return date;
       }
+      
+      // Fallback to processedAt for completed payments
+      if (payment.status === 'completed' && payment.processedAt) {
+        const date = payment.processedAt?.toDate?.() || payment.processedAt;
+        if (date instanceof Date && !isNaN(date.getTime())) return date;
+      }
+      
+      // Fallback to createdAt as last resort
+      if (payment.createdAt) {
+        const date = payment.createdAt?.toDate?.() || payment.createdAt;
+        if (date instanceof Date && !isNaN(date.getTime())) return date;
+      }
+      
+      return null;
     };
 
     // Helper function to get invoice date (for filtering invoices by period)
@@ -739,40 +786,7 @@ export default function PurchaseManagerDashboard() {
       }
     };
 
-    // Calculate purchase totals based on payments made to invoices
-    // Daily: Payments made today
-    const dailyPurchases = payments
-      .filter(payment => {
-        const paymentDate = getPaymentDate(payment);
-        return paymentDate && paymentDate >= startOfToday && paymentDate <= endOfToday;
-      })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-
-    // Weekly: Payments made this week
-    const weeklyPurchases = payments
-      .filter(payment => {
-        const paymentDate = getPaymentDate(payment);
-        return paymentDate && paymentDate >= startOfWeek && paymentDate <= endOfWeek;
-      })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-
-    // Monthly: Payments made this month
-    const monthlyPurchases = payments
-      .filter(payment => {
-        const paymentDate = getPaymentDate(payment);
-        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth;
-      })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-
-    // Yearly: Payments made this year
-    const yearlyPurchases = payments
-      .filter(payment => {
-        const paymentDate = getPaymentDate(payment);
-        return paymentDate && paymentDate >= startOfYear && paymentDate <= endOfYear;
-      })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-
-    // Calculate invoices made in each period (using invoice date/createdAt)
+    // Calculate invoices made in each period FIRST (using invoice date/createdAt)
     const dailyInvoices = invoices.filter(invoice => {
       const invoiceDate = getInvoiceDate(invoice);
       return invoiceDate && invoiceDate >= startOfToday && invoiceDate <= endOfToday;
@@ -793,7 +807,128 @@ export default function PurchaseManagerDashboard() {
       return invoiceDate && invoiceDate >= startOfYear && invoiceDate <= endOfYear;
     });
 
-    // Calculate invoice amounts for each period
+    // Calculate purchase totals based on INVOICES created (not payments)
+    // Daily: Sum of invoices created today
+    const dailyPurchases = dailyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    
+    // Weekly: Sum of invoices created this week
+    const weeklyPurchases = weeklyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    
+    // Monthly: Sum of invoices created this month
+    const monthlyPurchases = monthlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    
+    // Yearly: Sum of invoices created this year
+    const yearlyPurchases = yearlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+
+    // Helper function to check if payment should be counted (only completed payments)
+    const isValidPayment = (payment: any): boolean => {
+      // Include only completed payments (exclude pending cheques and failed payments)
+      // If no paymentStatus field, assume it's completed (backward compatibility)
+      const status = payment.paymentStatus || 'completed';
+      return status === 'completed';
+    };
+
+    // Calculate PAYMENTS made up to today (include all completed payments with valid dates up to end of today)
+    const endOfTodayTime = new Date(endOfToday); // Use end of today instead of current moment
+    const allPaymentsTotal = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        // Include all completed payments up to end of today (includes payments made earlier today)
+        return paymentDate && paymentDate <= endOfTodayTime && isValidPayment(payment);
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Daily: All payments made today (completed only)
+    const dailyPaymentsMade = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfToday && paymentDate <= endOfToday && isValidPayment(payment);
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Weekly: All payments made this week (completed only)
+    const weeklyPaymentsMade = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfWeek && paymentDate <= endOfWeek && isValidPayment(payment);
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Monthly: All payments made this month (completed only)
+    const monthlyPaymentsMade = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPayment(payment);
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+
+    // Yearly: All payments made this year (completed only)
+    const yearlyPaymentsMade = payments
+      .filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        return paymentDate && paymentDate >= startOfYear && paymentDate <= endOfYear && isValidPayment(payment);
+      })
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+    
+    // Calculate payment counts by period (completed payments only)
+    const dailyPayments = payments.filter(payment => {
+      const paymentDate = getPaymentDate(payment);
+      return paymentDate && paymentDate >= startOfToday && paymentDate <= endOfToday && isValidPayment(payment);
+    });
+
+    const weeklyPayments = payments.filter(payment => {
+      const paymentDate = getPaymentDate(payment);
+      return paymentDate && paymentDate >= startOfWeek && paymentDate <= endOfWeek && isValidPayment(payment);
+    });
+
+    const monthlyPayments = payments.filter(payment => {
+      const paymentDate = getPaymentDate(payment);
+      return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPayment(payment);
+    });
+
+    const yearlyPayments = payments.filter(payment => {
+      const paymentDate = getPaymentDate(payment);
+      return paymentDate && paymentDate >= startOfYear && paymentDate <= endOfYear && isValidPayment(payment);
+    });
+    
+    // Debug - check what we have
+    console.log('💳 PAYMENT ANALYSIS DEBUG (from invoicePayments collection):', {
+      totalPaymentsReceived: payments.length,
+      completedPayments: payments.filter(isValidPayment).length,
+      pendingPayments: payments.filter(p => (p.paymentStatus || 'completed') === 'pending').length,
+      failedPayments: payments.filter(p => (p.paymentStatus || 'completed') === 'failed').length,
+      dailyPaymentsCount: dailyPayments.length,
+      weeklyPaymentsCount: weeklyPayments.length,
+      monthlyPaymentsCount: monthlyPayments.length,
+      yearlyPaymentsCount: yearlyPayments.length,
+      dailyPaymentAmount: dailyPaymentsMade,
+      weeklyPaymentAmount: weeklyPaymentsMade,
+      monthlyPaymentAmount: monthlyPaymentsMade,
+      yearlyPaymentAmount: yearlyPaymentsMade,
+      dataSource: 'invoicePayments collection'
+    });
+    
+    if (payments.length > 0) {
+      console.log('💳 First payment sample:', payments[0]);
+      console.log('💳 Payment dates check:');
+      payments.slice(0, 5).forEach(p => {
+        const date = getPaymentDate(p);
+        console.log('  Payment:', p.paymentReference || p.id, '| Date:', date ? date.toLocaleString() : 'NO DATE', '| Amount:', p.amount);
+      });
+    }
+    
+    // Count payments up to today
+    const paymentsUpToToday = payments.filter(p => {
+      const d = getPaymentDate(p);
+      return d && d <= endOfTodayTime;
+    });
+    
+    console.log('💰 Payment Summary:', {
+      paymentsToday: paymentsUpToToday.length,
+      totalAmount: allPaymentsTotal.toLocaleString()
+    });
+
+    // Calculate invoice amounts for each period (invoices already filtered above)
     const dailyInvoiceAmount = dailyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
     const weeklyInvoiceAmount = weeklyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
     const monthlyInvoiceAmount = monthlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
@@ -837,8 +972,125 @@ export default function PurchaseManagerDashboard() {
       }).length
     };
 
-    // Calculate cash flow
-    const totalAllocated = cashAllocations.reduce((sum, alloc) => sum + (alloc.amount || 0), 0);
+    // Helper function to get allocation date
+    // Priority for ACCEPTED allocations: acceptedAt (when PM accepted) > actionDate > allocationDate
+    // This ensures we track when money was actually accepted, not just allocated
+    const getAllocationDate = (allocation: any): Date | null => {
+      try {
+        // Priority 1: acceptedAt - when PM accepted the allocation (for accepted status only)
+        if (allocation.status === 'accepted' && allocation.acceptedAt) {
+          const date = allocation.acceptedAt?.toDate ? allocation.acceptedAt.toDate() : 
+                       allocation.acceptedAt instanceof Date ? allocation.acceptedAt : 
+                       typeof allocation.acceptedAt === 'string' ? new Date(allocation.acceptedAt) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 2: actionDate - generic action timestamp (fallback for accepted/rejected)
+        if (allocation.status === 'accepted' && allocation.actionDate) {
+          const date = allocation.actionDate?.toDate ? allocation.actionDate.toDate() : 
+                       allocation.actionDate instanceof Date ? allocation.actionDate : 
+                       typeof allocation.actionDate === 'string' ? new Date(allocation.actionDate) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 3: allocationDate - when accountant allocated the funds (Firebase Timestamp)
+        if (allocation.allocationDate) {
+          const date = allocation.allocationDate?.toDate ? allocation.allocationDate.toDate() : 
+                       allocation.allocationDate instanceof Date ? allocation.allocationDate : 
+                       typeof allocation.allocationDate === 'string' ? new Date(allocation.allocationDate) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 4: createdAt - when record was created (Firebase Timestamp)
+        if (allocation.createdAt) {
+          const date = allocation.createdAt?.toDate ? allocation.createdAt.toDate() : 
+                       allocation.createdAt instanceof Date ? allocation.createdAt : 
+                       typeof allocation.createdAt === 'string' ? new Date(allocation.createdAt) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 5: businessDate - the cash close date (usually string format YYYY-MM-DD)
+        if (allocation.businessDate) {
+          const date = typeof allocation.businessDate === 'string' ? new Date(allocation.businessDate) : 
+                       allocation.businessDate?.toDate ? allocation.businessDate.toDate() : 
+                       allocation.businessDate instanceof Date ? allocation.businessDate : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('Error parsing allocation date:', error, allocation);
+        return null;
+      }
+    };
+
+    // Calculate allocations by period - ONLY count accepted allocations
+    const dailyAllocations = cashAllocations.filter(alloc => {
+      // Only include accepted allocations
+      if (alloc.status !== 'accepted') return false;
+      
+      const allocDate = getAllocationDate(alloc);
+      return allocDate && allocDate >= startOfToday && allocDate <= endOfToday;
+    });
+    
+    // Log allocation date sources for debugging (only when allocations exist)
+    if (cashAllocations.length > 0 && dailyAllocations.length > 0) {
+      console.log('📅 Daily Allocations Date Sources (Accepted only):', {
+        total: dailyAllocations.length,
+        totalAllocations: cashAllocations.length,
+        acceptedCount: cashAllocations.filter(a => a.status === 'accepted').length,
+        sample: dailyAllocations.slice(0, 2).map(a => ({
+          id: a.id,
+          status: a.status,
+          hasAcceptedAt: !!a.acceptedAt,
+          hasActionDate: !!a.actionDate,
+          hasAllocationDate: !!a.allocationDate,
+          hasCreatedAt: !!a.createdAt,
+          hasBusinessDate: !!a.businessDate,
+          parsedDate: getAllocationDate(a)?.toISOString(),
+          usingTimestamp: a.acceptedAt ? 'acceptedAt' : a.actionDate ? 'actionDate' : a.allocationDate ? 'allocationDate' : a.createdAt ? 'createdAt' : 'businessDate'
+        }))
+      });
+    }
+
+    const weeklyAllocations = cashAllocations.filter(alloc => {
+      // Only include accepted allocations
+      if (alloc.status !== 'accepted') return false;
+      
+      const allocDate = getAllocationDate(alloc);
+      return allocDate && allocDate >= startOfWeek && allocDate <= endOfWeek;
+    });
+
+    const monthlyAllocations = cashAllocations.filter(alloc => {
+      // Only include accepted allocations
+      if (alloc.status !== 'accepted') return false;
+      
+      const allocDate = getAllocationDate(alloc);
+      return allocDate && allocDate >= startOfMonth && allocDate <= endOfMonth;
+    });
+
+    const yearlyAllocations = cashAllocations.filter(alloc => {
+      // Only include accepted allocations
+      if (alloc.status !== 'accepted') return false;
+      
+      const allocDate = getAllocationDate(alloc);
+      return allocDate && allocDate >= startOfYear && allocDate <= endOfYear;
+    });
+
+    // Calculate allocation amounts for each period
+    const dailyAllocationAmount = dailyAllocations.reduce((sum, alloc) => sum + (Number(alloc.amount) || 0), 0);
+    const weeklyAllocationAmount = weeklyAllocations.reduce((sum, alloc) => sum + (Number(alloc.amount) || 0), 0);
+    const monthlyAllocationAmount = monthlyAllocations.reduce((sum, alloc) => sum + (Number(alloc.amount) || 0), 0);
+    const yearlyAllocationAmount = yearlyAllocations.reduce((sum, alloc) => sum + (Number(alloc.amount) || 0), 0);
+
+    // Calculate cash flow - only count accepted allocations
+    const totalAllocated = cashAllocations
+      .filter(alloc => alloc.status === 'accepted')
+      .reduce((sum, alloc) => sum + (alloc.amount || 0), 0);
+    
+    // Calculate today's allocation
+    const todayAllocated = dailyAllocationAmount;
+    
     const totalUsed = paidAmount;
     const remaining = totalAllocated - totalUsed;
     const utilization = totalAllocated > 0 ? (totalUsed / totalAllocated) * 100 : 0;
@@ -862,7 +1114,19 @@ export default function PurchaseManagerDashboard() {
       return acc;
     }, {} as Record<string, number>);
 
-    const monthlyTrends = generateMonthlyTrends(payments);
+    const monthlyTrends = generateMonthlyPaymentTrends(payments, getPaymentDate, isValidPayment); // Keep for backward compatibility
+    
+    // Generate separate trends for Purchase Trends Analysis chart
+    const invoiceTrends = generateMonthlyInvoiceTrends(invoices);
+    const paymentTrends = generateMonthlyPaymentTrends(payments, getPaymentDate, isValidPayment);
+    
+    // ✅ VERIFICATION: Ensure current month count matches between Payment Analysis Period and Purchase Trends
+    console.log('✅ PAYMENT COUNT VERIFICATION:', {
+      monthlyPaymentCardCount: monthlyPayments.length,
+      purchaseTrendsCurrentMonthCount: paymentTrends[paymentTrends.length - 1]?.count,
+      match: monthlyPayments.length === paymentTrends[paymentTrends.length - 1]?.count ? '✅ MATCH' : '❌ MISMATCH',
+      currentMonthLabel: paymentTrends[paymentTrends.length - 1]?.month
+    });
 
     // Calculate cash close metrics
     const cashCloseMetrics = calculateCashCloseMetrics(cashCloses, cashCloseShiftFilter, cashClosesRowCount, cashCloseFromDate, cashCloseToDate);
@@ -873,6 +1137,12 @@ export default function PurchaseManagerDashboard() {
         weekly: weeklyPurchases,
         monthly: monthlyPurchases,
         yearly: yearlyPurchases
+      },
+      paymentsMade: {
+        daily: allPaymentsTotal, // Show total of all payments
+        weekly: weeklyPaymentsMade,
+        monthly: monthlyPaymentsMade,
+        yearly: yearlyPaymentsMade
       },
       invoicesByPeriod: {
         daily: dailyInvoices.length,
@@ -885,6 +1155,30 @@ export default function PurchaseManagerDashboard() {
         weekly: weeklyInvoiceAmount,
         monthly: monthlyInvoiceAmount,
         yearly: yearlyInvoiceAmount
+      },
+      allocationsByPeriod: {
+        daily: dailyAllocations.length,
+        weekly: weeklyAllocations.length,
+        monthly: monthlyAllocations.length,
+        yearly: yearlyAllocations.length
+      },
+      allocationAmountsByPeriod: {
+        daily: dailyAllocationAmount,
+        weekly: weeklyAllocationAmount,
+        monthly: monthlyAllocationAmount,
+        yearly: yearlyAllocationAmount
+      },
+      paymentsByPeriod: {
+        daily: dailyPayments.length,
+        weekly: weeklyPayments.length,
+        monthly: monthlyPayments.length,
+        yearly: yearlyPayments.length
+      },
+      paymentAmountsByPeriod: {
+        daily: dailyPaymentsMade,
+        weekly: weeklyPaymentsMade,
+        monthly: monthlyPaymentsMade,
+        yearly: yearlyPaymentsMade
       },
       invoiceMetrics: {
         total: invoices.length,
@@ -900,7 +1194,8 @@ export default function PurchaseManagerDashboard() {
         allocated: totalAllocated,
         used: totalUsed,
         remaining,
-        utilization
+        utilization,
+        todayAllocated
       },
       supplierMetrics: {
         total: suppliers.length,
@@ -913,39 +1208,94 @@ export default function PurchaseManagerDashboard() {
         paymentMethods,
         monthlyTrends
       },
+      invoiceTrends,
+      paymentTrends,
       cashCloseMetrics
     });
   };
 
-  const generateMonthlyTrends = (paymentsData: any[]) => {
+  // Generate monthly invoice trends (Purchase Amount from invoices)
+  const generateMonthlyInvoiceTrends = (invoicesData: any[]) => {
     const months = [];
     for (let i = 11; i >= 0; i--) {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
       const monthKey = date.toISOString().slice(0, 7); // YYYY-MM format
       
-      const monthPayments = paymentsData.filter(payment => {
+      // Filter invoices created in this month
+      const monthInvoices = invoicesData.filter(invoice => {
         try {
-          if (!payment.paymentDate) return false;
+          const invoiceDate = invoice.date || invoice.createdAt;
+          if (!invoiceDate) return false;
           
-          const paymentDate = new Date(payment.paymentDate?.toDate?.() || payment.paymentDate);
+          const dateObj = invoiceDate?.toDate ? invoiceDate.toDate() : 
+                         invoiceDate instanceof Date ? invoiceDate : 
+                         new Date(invoiceDate);
           
-          // Check if the date is valid
-          if (isNaN(paymentDate.getTime())) return false;
+          if (isNaN(dateObj.getTime())) return false;
           
-          return paymentDate.toISOString().slice(0, 7) === monthKey;
-    } catch (error) {
-          console.warn('Invalid payment date:', payment.paymentDate, error);
+          return dateObj.toISOString().slice(0, 7) === monthKey;
+        } catch (error) {
+          console.warn('Invalid invoice date:', invoice, error);
           return false;
         }
       });
       
+      // Format month with year indicator for clarity (e.g., "Jan '26")
+      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' }) + " '" + date.getFullYear().toString().slice(-2);
+      
       months.push({
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        amount: monthPayments.reduce((sum, p) => sum + (p.amount || 0), 0),
-        count: monthPayments.length
+        month: monthLabel,
+        amount: monthInvoices.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0),
+        count: monthInvoices.length,
+        fullDate: monthKey
       });
     }
+    
+    console.log('📊 Purchase Amount Trends (Invoice Amounts by Month):', months);
+    return months;
+  };
+
+  // Generate monthly payment trends (Payment Count from completed payments)
+  // Uses EXACT SAME LOGIC as Payment Analysis Period Monthly card
+  const generateMonthlyPaymentTrends = (paymentsData: any[], getPaymentDateFunc: (payment: any) => Date | null, isValidPaymentFunc: (payment: any) => boolean) => {
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      
+      // Calculate month boundaries (same as Payment Analysis Period)
+      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      
+      // Filter using EXACT SAME LOGIC as Payment Analysis Period Monthly card
+      const monthPayments = paymentsData.filter(payment => {
+        const paymentDate = getPaymentDateFunc(payment);
+        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPaymentFunc(payment);
+      });
+      
+      // Format month with year indicator for clarity (e.g., "Jan '26")
+      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' }) + " '" + date.getFullYear().toString().slice(-2);
+      const monthKey = date.toISOString().slice(0, 7); // YYYY-MM format
+      
+      months.push({
+        month: monthLabel,
+        amount: monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+        count: monthPayments.length,
+        fullDate: monthKey // Keep full date for debugging (YYYY-MM)
+      });
+    }
+    
+    console.log('📊 Payment Count Trends (Using Payment Analysis Period Logic):', months);
+    console.log('📊 Current month (Jan \'26) data:', {
+      month: months[months.length - 1]?.month,
+      amount: months[months.length - 1]?.amount,
+      count: months[months.length - 1]?.count,
+      formattedAmount: 'UGX ' + (months[months.length - 1]?.amount || 0).toLocaleString()
+    });
+    
     return months;
   };
 
@@ -1109,13 +1459,15 @@ export default function PurchaseManagerDashboard() {
     return 'bg-red-500';
   };
 
-  // Chart configurations
+  // Chart configurations - Purchase & Payment Trends Analysis
+  // Purple line: Payment amounts (from Payment Analysis Period)
+  // Pink line: Purchase amounts (from Purchase Period - invoices)
   const purchaseTrendsData = {
-    labels: metrics.paymentAnalytics.monthlyTrends.map(d => d.month),
+    labels: metrics.paymentTrends.map((d: any) => d.month),
     datasets: [
       {
-        label: 'Purchase Amount',
-        data: metrics.paymentAnalytics.monthlyTrends.map(d => d.amount),
+        label: 'Payment Amount (Completed)',
+        data: metrics.paymentTrends.map((d: any) => d.amount),
         backgroundColor: 'rgba(139, 92, 246, 0.3)',
         borderColor: 'rgba(139, 92, 246, 1)',
         borderWidth: 3,
@@ -1128,8 +1480,8 @@ export default function PurchaseManagerDashboard() {
         pointHoverRadius: 8,
       },
       {
-        label: 'Payment Count',
-        data: metrics.paymentAnalytics.monthlyTrends.map(d => d.count * 50000), // Scale for visibility
+        label: 'Purchase Amount (Invoices)',
+        data: metrics.invoiceTrends.map((d: any) => d.amount),
         backgroundColor: 'rgba(236, 72, 153, 0.3)',
         borderColor: 'rgba(236, 72, 153, 1)',
         borderWidth: 3,
@@ -1337,6 +1689,234 @@ export default function PurchaseManagerDashboard() {
     }
   };
 
+  // Payment Period Pie Chart Data
+  const paymentPeriodData = {
+    labels: ['Daily Payments', 'Weekly Payments', 'Monthly Payments', 'Yearly Payments'],
+    datasets: [
+      {
+        data: [
+          metrics.paymentAmountsByPeriod.daily,
+          metrics.paymentAmountsByPeriod.weekly,
+          metrics.paymentAmountsByPeriod.monthly,
+          metrics.paymentAmountsByPeriod.yearly
+        ],
+        backgroundColor: [
+          '#FF6B6B', // Red for Daily
+          '#4ECDC4', // Teal for Weekly  
+          '#45B7D1', // Blue for Monthly
+          '#96CEB4'  // Green for Yearly
+        ],
+        borderColor: '#fff',
+        borderWidth: 3,
+        hoverBorderWidth: 5,
+        hoverOffset: 15,
+        hoverBackgroundColor: [
+          '#FF5252',
+          '#26C6DA', 
+          '#2196F3',
+          '#66BB6A'
+        ]
+      }
+    ]
+  };
+
+  // Custom options for Payment Period Pie Chart
+  const paymentPeriodChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+          font: {
+            size: 12,
+            weight: '600'
+          },
+          generateLabels: function(chart: any) {
+            const data = chart.data;
+            if (data.labels.length && data.datasets.length) {
+              return data.labels.map((label: string, i: number) => {
+                const value = data.datasets[0].data[i];
+                const total = data.datasets[0].data.reduce((a: number, b: number) => a + b, 0);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                return {
+                  text: `${label}: ${percentage}%`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  strokeStyle: data.datasets[0].borderColor,
+                  lineWidth: data.datasets[0].borderWidth,
+                  pointStyle: 'circle',
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+            return [];
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: 'rgba(139, 92, 246, 0.8)',
+        borderWidth: 2,
+        cornerRadius: 12,
+        displayColors: true,
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 13,
+          weight: '500'
+        },
+        padding: 12,
+        callbacks: {
+          title: function(context: any) {
+            return context[0].label;
+          },
+          label: function(context: any) {
+            const value = context.parsed;
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+            return [
+              `Amount: ${formatCurrency(value)}`,
+              `Percentage: ${percentage}%`
+            ];
+          }
+        }
+      }
+    },
+    elements: {
+      arc: {
+        borderWidth: 3,
+        hoverBorderWidth: 5
+      }
+    },
+    animation: {
+      animateRotate: true,
+      animateScale: true,
+      duration: 1000,
+      easing: 'easeOutQuart'
+    }
+  };
+
+  // Allocation Period Pie Chart Data
+  const allocationPeriodData = {
+    labels: ['Daily Allocations', 'Weekly Allocations', 'Monthly Allocations', 'Yearly Allocations'],
+    datasets: [
+      {
+        data: [
+          metrics.allocationAmountsByPeriod.daily,
+          metrics.allocationAmountsByPeriod.weekly,
+          metrics.allocationAmountsByPeriod.monthly,
+          metrics.allocationAmountsByPeriod.yearly
+        ],
+        backgroundColor: [
+          '#FF6B6B', // Red for Daily
+          '#4ECDC4', // Teal for Weekly  
+          '#45B7D1', // Blue for Monthly
+          '#96CEB4'  // Green for Yearly
+        ],
+        borderColor: '#fff',
+        borderWidth: 3,
+        hoverBorderWidth: 5,
+        hoverOffset: 15,
+        hoverBackgroundColor: [
+          '#FF5252',
+          '#26C6DA', 
+          '#2196F3',
+          '#66BB6A'
+        ]
+      }
+    ]
+  };
+
+  // Custom options for Allocation Period Pie Chart
+  const allocationPeriodChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right' as const,
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+          font: {
+            size: 12,
+            weight: '600'
+          },
+          generateLabels: function(chart: any) {
+            const data = chart.data;
+            if (data.labels.length && data.datasets.length) {
+              return data.labels.map((label: string, i: number) => {
+                const value = data.datasets[0].data[i];
+                const total = data.datasets[0].data.reduce((a: number, b: number) => a + b, 0);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                return {
+                  text: `${label}: ${percentage}%`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  strokeStyle: data.datasets[0].borderColor,
+                  lineWidth: data.datasets[0].borderWidth,
+                  pointStyle: 'circle',
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+            return [];
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: 'rgba(139, 92, 246, 0.8)',
+        borderWidth: 2,
+        cornerRadius: 12,
+        displayColors: true,
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 13,
+          weight: '500'
+        },
+        padding: 12,
+        callbacks: {
+          title: function(context: any) {
+            return context[0].label;
+          },
+          label: function(context: any) {
+            const value = context.parsed;
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+            return [
+              `Amount: ${formatCurrency(value)}`,
+              `Percentage: ${percentage}%`
+            ];
+          }
+        }
+      }
+    },
+    elements: {
+      arc: {
+        borderWidth: 3,
+        hoverBorderWidth: 5
+      }
+    },
+    animation: {
+      animateRotate: true,
+      animateScale: true,
+      duration: 1000,
+      easing: 'easeOutQuart'
+    }
+  };
+
   const pieChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1390,37 +1970,160 @@ export default function PurchaseManagerDashboard() {
     }
   };
 
-  // Generate daily cash flow data for the last 7 days
-  const generateDailyCashFlow = () => {
+  // Generate daily cash flow data for the last 7 days using REAL allocation data
+  // Memoize the cash flow calculation to prevent unnecessary recalculations
+  const dailyCashFlow = useMemo(() => {
     const days = [];
     const allocatedData = [];
     const usedData = [];
     const remainingData = [];
     
+    // Helper function to get allocation date for 7-day cash flow chart
+    // Priority for ACCEPTED allocations: acceptedAt (when PM accepted) > actionDate > allocationDate
+    const getAllocationDate = (allocation: any): Date | null => {
+      try {
+        // Priority 1: acceptedAt - when PM accepted the allocation (for accepted status only)
+        if (allocation.status === 'accepted' && allocation.acceptedAt) {
+          const date = allocation.acceptedAt?.toDate ? allocation.acceptedAt.toDate() : 
+                       allocation.acceptedAt instanceof Date ? allocation.acceptedAt : 
+                       typeof allocation.acceptedAt === 'string' ? new Date(allocation.acceptedAt) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 2: actionDate - generic action timestamp (fallback for accepted/rejected)
+        if (allocation.status === 'accepted' && allocation.actionDate) {
+          const date = allocation.actionDate?.toDate ? allocation.actionDate.toDate() : 
+                       allocation.actionDate instanceof Date ? allocation.actionDate : 
+                       typeof allocation.actionDate === 'string' ? new Date(allocation.actionDate) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 3: allocationDate - when accountant allocated the funds
+        if (allocation.allocationDate) {
+          const date = allocation.allocationDate?.toDate ? allocation.allocationDate.toDate() : 
+                       allocation.allocationDate instanceof Date ? allocation.allocationDate : 
+                       typeof allocation.allocationDate === 'string' ? new Date(allocation.allocationDate) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 4: createdAt - when record was created
+        if (allocation.createdAt) {
+          const date = allocation.createdAt?.toDate ? allocation.createdAt.toDate() : 
+                       allocation.createdAt instanceof Date ? allocation.createdAt : 
+                       typeof allocation.createdAt === 'string' ? new Date(allocation.createdAt) : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        // Priority 5: businessDate - the cash close date
+        if (allocation.businessDate) {
+          const date = typeof allocation.businessDate === 'string' ? new Date(allocation.businessDate) : 
+                       allocation.businessDate?.toDate ? allocation.businessDate.toDate() : 
+                       allocation.businessDate instanceof Date ? allocation.businessDate : null;
+          if (date && !isNaN(date.getTime())) return date;
+        }
+        
+        return null;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    // Helper function to get payment date from invoices or payments
+    const getPaymentDate = (item: any): Date | null => {
+      try {
+        // For invoices with paid status
+        if (item.status === 'paid' || item.status === 'Paid') {
+          const dateField = item.paidDate || item.paidAt || item.paymentDate || item.updatedAt;
+          if (dateField) {
+            const date = dateField?.toDate ? dateField.toDate() : 
+                         dateField instanceof Date ? dateField : 
+                         typeof dateField === 'string' ? new Date(dateField) : null;
+            return date && !isNaN(date.getTime()) ? date : null;
+          }
+        }
+        
+        // For payment records
+        if (item.paymentDate) {
+          const date = item.paymentDate?.toDate ? item.paymentDate.toDate() : 
+                       item.paymentDate instanceof Date ? item.paymentDate : 
+                       typeof item.paymentDate === 'string' ? new Date(item.paymentDate) : null;
+          return date && !isNaN(date.getTime()) ? date : null;
+        }
+        
+        return null;
+      } catch (error) {
+        return null;
+      }
+    };
+    
+    // Get current date once to ensure consistency
+    const now = new Date();
+    
+    // Generate data for last 7 days
     for (let i = 6; i >= 0; i--) {
-      const date = new Date();
+      const date = new Date(now);
       date.setDate(date.getDate() - i);
-      days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      date.setHours(0, 0, 0, 0);
       
-      // Generate realistic daily variation based on actual metrics
-      const baseAllocated = metrics.cashFlow.allocated / 7;
-      const baseUsed = metrics.cashFlow.used / 7;
+      const nextDay = new Date(date);
+      nextDay.setDate(date.getDate() + 1);
       
-      const dailyAllocated = baseAllocated * (0.8 + Math.random() * 0.4);
-      const dailyUsed = baseUsed * (0.7 + Math.random() * 0.6);
+      // Format day label
+      days.push(date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      }));
+      
+      // Get allocations for this day (only accepted ones count)
+      const dayAllocations = cashAllocations.filter(allocation => {
+        if (allocation.status !== 'accepted') return false;
+        const allocDate = getAllocationDate(allocation);
+        if (!allocDate) return false;
+        return allocDate >= date && allocDate < nextDay;
+      });
+      
+      const dailyAllocated = dayAllocations.reduce((sum, alloc) => {
+        return sum + (Number(alloc.amount) || 0);
+      }, 0);
+      
+      // Get payments made on this day from both invoices and payment records
+      const dayInvoicePayments = invoices.filter(invoice => {
+        const paymentDate = getPaymentDate(invoice);
+        if (!paymentDate) return false;
+        return paymentDate >= date && paymentDate < nextDay;
+      });
+      
+      const dayPaymentRecords = payments.filter(payment => {
+        const paymentDate = getPaymentDate(payment);
+        if (!paymentDate) return false;
+        return paymentDate >= date && paymentDate < nextDay;
+      });
+      
+      // Calculate daily used from invoices
+      const dailyUsedFromInvoices = dayInvoicePayments.reduce((sum, invoice) => {
+        return sum + (Number(invoice.paidAmount) || Number(invoice.amount) || 0);
+      }, 0);
+      
+      // Calculate daily used from payment records (if they exist separately)
+      const dailyUsedFromPayments = dayPaymentRecords.reduce((sum, payment) => {
+        return sum + (Number(payment.amount) || 0);
+      }, 0);
+      
+      // Use the higher value to avoid double counting
+      const dailyUsed = Math.max(dailyUsedFromInvoices, dailyUsedFromPayments);
+      
       const dailyRemaining = dailyAllocated - dailyUsed;
       
-      allocatedData.push(Math.max(0, dailyAllocated));
-      usedData.push(Math.max(0, dailyUsed));
+      allocatedData.push(dailyAllocated);
+      usedData.push(dailyUsed);
       remainingData.push(Math.max(0, dailyRemaining));
     }
     
     return { days, allocatedData, usedData, remainingData };
-  };
+  }, [cashAllocations, invoices, payments]);
 
-  const dailyCashFlow = generateDailyCashFlow();
-
-  const cashFlowData = {
+  // Memoize the chart data to prevent re-renders
+  const cashFlowData = useMemo(() => ({
     labels: dailyCashFlow.days,
     datasets: [
       {
@@ -1445,11 +2148,13 @@ export default function PurchaseManagerDashboard() {
         borderWidth: 2
       }
     ]
-  };
+  }), [dailyCashFlow]);
 
-  const trendChartOptions = {
+  // Memoize chart options to prevent recreation
+  const trendChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
+    animation: false, // Disable animations to prevent flickering
     plugins: {
       legend: {
         position: 'top' as const,
@@ -1502,7 +2207,7 @@ export default function PurchaseManagerDashboard() {
         }
       }
     }
-  };
+  }), []);
 
   // Cash Close Pie Chart Data
   const cashClosePieData = {
@@ -1680,8 +2385,8 @@ export default function PurchaseManagerDashboard() {
         {/* ✅ NEW: Professional Header with Force Refresh */}
 
         {/* Purchasing Analytics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Daily Purchases */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Daily Purchases - Invoices Created Today */}
           <div className="group bg-gradient-to-r from-blue-500 to-blue-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
             <div className="flex items-center justify-between">
               <div>
@@ -1692,7 +2397,7 @@ export default function PurchaseManagerDashboard() {
                   >
                     {formatCurrencyForDisplay(metrics.totalPurchases.daily)}
                   </p>
-                <p className="text-blue-100 text-xs">Today</p>
+                <p className="text-blue-100 text-xs">{metrics.invoicesByPeriod.daily} invoice{metrics.invoicesByPeriod.daily !== 1 ? 's' : ''} created today</p>
                 </div>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
                 <Calendar className="w-5 h-5" />
@@ -1700,21 +2405,41 @@ export default function PurchaseManagerDashboard() {
             </div>
           </div>
 
-          {/* Pending Invoices */}
+          {/* Daily Payment */}
           <div className="group bg-gradient-to-r from-orange-500 to-orange-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium mb-1">Pending Invoices</p>
-                <p className="text-2xl font-bold">{metrics.invoiceMetrics.pending}</p>
+                <p className="text-orange-100 text-sm font-medium mb-1">Daily Payment</p>
                 <p 
-                  className="text-orange-100 text-xs truncate"
-                  title={formatCurrency(metrics.invoiceMetrics.pendingAmount)}
+                  className={`${getDynamicFontSize(metrics.paymentAmountsByPeriod.daily)} font-bold truncate`}
+                  title={formatCurrency(metrics.paymentAmountsByPeriod.daily)}
                 >
-                  {formatCurrencyForDisplay(metrics.invoiceMetrics.pendingAmount)}
+                  {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.daily)}
                 </p>
+                <p className="text-orange-100 text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {metrics.paymentsByPeriod.daily} payment{metrics.paymentsByPeriod.daily !== 1 ? 's' : ''}</p>
               </div>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
-                <AlertTriangle className="w-5 h-5" />
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Today's Allocation */}
+          <div className="group bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-3xl p-6 text-white transform hover:scale-105 transition-all duration-300 hover:shadow-xl cursor-pointer"
+               onClick={() => router.push('/dashboard/purchase-manager/daily-allocation')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-emerald-100 text-sm font-medium mb-1">Today's Allocation</p>
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashFlow.todayAllocated, 'text-2xl')} font-bold truncate`}
+                  title={formatCurrency(metrics.cashFlow.todayAllocated)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashFlow.todayAllocated)}
+                </p>
+                <p className="text-emerald-100 text-xs">Allocated today</p>
+              </div>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3 group-hover:bg-white/30 transition-all duration-300">
+                <DollarSign className="w-5 h-5" />
               </div>
             </div>
           </div>
@@ -1741,20 +2466,26 @@ export default function PurchaseManagerDashboard() {
           </div>
 
 
-        {/* Main Analytics Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Purchase Trends Line Chart */}
-          <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
+        {/* Purchase & Payment Trends with Admin Panel */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Purchase & Payment Trends Line Chart */}
+          <div className="md:col-span-2 lg:col-span-3 bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Purchase Trends Analysis</h3>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Purchase & Payment Trends</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  <span className="font-semibold text-pink-600">Purchases: {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.monthly)}</span> | 
+                  <span className="font-semibold text-purple-600 ml-2">Payments: {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.monthly)}</span>
+                </p>
+              </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Amount</span>
+                  <span className="text-sm text-gray-600">Payments</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-pink-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Count</span>
+                  <span className="text-sm text-gray-600">Purchases</span>
                 </div>
         </div>
       </div>
@@ -1765,14 +2496,32 @@ export default function PurchaseManagerDashboard() {
 
             {/* Cash Flow Analysis */}
             <div className="border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-bold text-gray-900 mb-4">Cash Flow Analysis</h4>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-lg font-bold text-gray-900">Cash Flow Analysis - Last 7 Days</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {dailyCashFlow.allocatedData.some((val: number) => val > 0) || dailyCashFlow.usedData.some((val: number) => val > 0)
+                      ? '✓ Showing real allocation and spending data'
+                      : '⚠️ No allocation data for the last 7 days'}
+                  </p>
+                </div>
+              </div>
               <div className="h-72">
-                <Bar data={cashFlowData} options={trendChartOptions} />
+                <Bar 
+                  data={cashFlowData} 
+                  options={trendChartOptions}
+                  redraw={false}
+                />
               </div>
               
               {/* Daily Analysis Summary */}
               <div className="mt-6 bg-gray-50 rounded-xl p-4">
-                <h5 className="text-sm font-semibold text-gray-700 mb-3">7-Day Cash Flow Summary</h5>
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-sm font-semibold text-gray-700">7-Day Cash Flow Summary</h5>
+                  <span className="text-xs text-gray-600">
+                    {dailyCashFlow.allocatedData.filter((val: number) => val > 0).length} days with allocations
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-4 h-4 bg-green-500 rounded-sm flex-shrink-0"></div>
@@ -1818,6 +2567,12 @@ export default function PurchaseManagerDashboard() {
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div className="flex justify-between">
+                      <span className="text-gray-600 font-medium">Today's Allocation:</span>
+                      <span className="font-bold text-emerald-700">
+                        {formatCurrencyForDisplay(metrics.cashFlow.todayAllocated)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600 font-medium">Daily Avg Allocation:</span>
                       <span className="font-bold text-gray-800">
                         {formatCurrencyForDisplay(dailyCashFlow.allocatedData.reduce((a, b) => a + b, 0) / 7)}
@@ -1830,210 +2585,180 @@ export default function PurchaseManagerDashboard() {
                           ((dailyCashFlow.usedData.reduce((a, b) => a + b, 0) / dailyCashFlow.allocatedData.reduce((a, b) => a + b, 0)) * 100).toFixed(1) : 0}%
                       </span>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-        </div>
-
-          {/* Cash Close Analysis Pie Chart */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-bold text-gray-900">Cash Close Analysis</h3>
-                <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${
-                  (cashCloseFromDate || cashCloseToDate) ? 'bg-orange-50' : 'bg-blue-50'
-                }`}>
-                  <PieChart className={`w-4 h-4 ${
-                    (cashCloseFromDate || cashCloseToDate) ? 'text-orange-600' : 'text-blue-600'
-                  }`} />
-                  <span className={`text-sm font-medium ${
-                    (cashCloseFromDate || cashCloseToDate) ? 'text-orange-600' : 'text-blue-600'
-                  }`}>
-                    {(cashCloseFromDate || cashCloseToDate) ? 'Filtered Data' : 'Live Data'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 flex-wrap">
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600 whitespace-nowrap">From:</span>
-                  <input
-                    type="date"
-                    value={cashCloseFromDate}
-                    onChange={(e) => setCashCloseFromDate(e.target.value)}
-                    className="px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-blue-400 transition-colors w-24"
-                    style={{ fontSize: '10px' }}
-                  />
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs text-gray-600 whitespace-nowrap">To:</span>
-                  <input
-                    type="date"
-                    value={cashCloseToDate}
-                    onChange={(e) => setCashCloseToDate(e.target.value)}
-                    className="px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-blue-400 transition-colors w-24"
-                    style={{ fontSize: '10px' }}
-                  />
-                </div>
-                {(cashCloseFromDate || cashCloseToDate) && (
-                  <button
-                    onClick={() => {
-                      setCashCloseFromDate('');
-                      setCashCloseToDate('');
-                    }}
-                    className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors whitespace-nowrap"
-                    title="Clear date filters"
-                    style={{ fontSize: '10px' }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2 mb-1">
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
-                  <span className="text-xs font-medium text-blue-700 truncate">Day Shift</span>
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalDayCash)} font-bold text-blue-800 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalDayCash)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalDayCash)}
-                </p>
-                </div>
-                <p className="text-xs text-blue-600 truncate">{metrics.cashCloseMetrics.dayCloseCount} closes</p>
-              </div>
-              
-              <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2 mb-1">
-                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0"></div>
-                  <span className="text-xs font-medium text-indigo-700 truncate">Night Shift</span>
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalNightCash)} font-bold text-indigo-800 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalNightCash)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNightCash)}
-                </p>
-                </div>
-                <p className="text-xs text-indigo-600 truncate">{metrics.cashCloseMetrics.nightCloseCount} closes</p>
-              </div>
-              
-              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2 mb-1">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></div>
-                  <span className="text-xs font-medium text-green-700 truncate">Network Money</span>
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalNetworkMoney)} font-bold text-green-800 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalNetworkMoney)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNetworkMoney)}
-                </p>
-                </div>
-                <p className="text-xs text-green-600 truncate">Digital payments</p>
-              </div>
-              
-              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2 mb-1">
-                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0"></div>
-                  <span className="text-xs font-medium text-red-700 truncate">Shortage</span>
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalShortage)} font-bold text-red-800 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalShortage)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalShortage)}
-                  </p>
-                </div>
-                <p className="text-xs text-red-600 truncate">Cash shortfall</p>
-              </div>
-              
-              <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
-                <div className="flex items-center space-x-2 mb-1">
-                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0"></div>
-                  <span className="text-xs font-medium text-amber-700 truncate">Excess</span>
-                </div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalExcess)} font-bold text-amber-800 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalExcess)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalExcess)}
-                </p>
-                </div>
-                <p className="text-xs text-amber-600 truncate">Cash surplus</p>
-              </div>
-            </div>
-            
-            {/* Pie Chart */}
-            <div className="h-80">
-              <Pie data={cashClosePieData} options={cashCloseChartOptions} />
-            </div>
-            
-            {/* Cash Analysis Insights */}
-            <div className="mt-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4">
-              <h4 className="font-bold text-gray-800 mb-3 flex items-center">
-                <DollarSign className="w-4 h-4 mr-2 text-gray-600 flex-shrink-0" />
-                <span className="truncate">Cash Analysis Insights</span>
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  <p className="text-gray-600 text-xs font-medium">• <strong>Total Cash Handled:</strong></p>
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash)}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-gray-600 text-xs font-medium">• <strong>Average Day Close:</strong></p>
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.averageDayClose, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.averageDayClose)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.averageDayClose)}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-gray-600 text-xs font-medium">• <strong>Average Night Close:</strong></p>
-                  <p 
-                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.averageNightClose, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
-                    title={formatCurrency(metrics.cashCloseMetrics.averageNightClose)}
-                  >
-                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.averageNightClose)}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-gray-600 text-xs font-medium">• <strong>Net Variance:</strong></p>
-                  <div className="ml-2">
-                    <p 
-                      className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage, 'text-sm')} font-semibold truncate ${metrics.cashCloseMetrics.totalExcess > metrics.cashCloseMetrics.totalShortage ? 'text-green-600' : 'text-red-600'}`}
-                      title={formatCurrency(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage)}
-                    >
-                      {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage)}
-                    </p>
-                    <span className="text-xs text-gray-500 truncate">
-                      {metrics.cashCloseMetrics.totalExcess > metrics.cashCloseMetrics.totalShortage ? '(Surplus)' : '(Deficit)'}
-                    </span>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 font-medium">Total Allocated:</span>
+                      <span className="font-bold text-gray-800">
+                        {formatCurrencyForDisplay(metrics.cashFlow.allocated)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Admin Panel */}
+          <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">Admin Panel</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-2xl hover:bg-purple-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/invoices')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Manage Invoices</p>
+                    <p className="text-xs text-gray-500">Review and approve</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-purple-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/suppliers')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Users className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Supplier Management</p>
+                    <p className="text-xs text-gray-500">Add & manage suppliers</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-blue-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-2xl hover:bg-green-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/payments')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Payment Reports</p>
+                    <p className="text-xs text-gray-500">View analytics</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-green-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-2xl hover:bg-indigo-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/allocation-tracking')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <Target className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Allocation Tracking</p>
+                    <p className="text-xs text-gray-500">Sent & accepted amounts</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-indigo-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-2xl hover:bg-orange-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/cash-tracking')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Cash Tracking</p>
+                    <p className="text-xs text-gray-500">Monitor cash flow</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-orange-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-2xl hover:bg-emerald-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/daily-allocation')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Daily Allocation</p>
+                    <p className="text-xs text-gray-500">Today's cash allocation</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-pink-50 rounded-2xl hover:bg-pink-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/expenses')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-pink-100 rounded-xl flex items-center justify-center">
+                    <Receipt className="w-4 h-4 text-pink-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Expenses</p>
+                    <p className="text-xs text-gray-500">Track expenses</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-pink-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-cyan-50 rounded-2xl hover:bg-cyan-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/restock-orders')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-cyan-100 rounded-xl flex items-center justify-center">
+                    <ShoppingCart className="w-4 h-4 text-cyan-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Restock Orders</p>
+                    <p className="text-xs text-gray-500">Inventory restocking</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-cyan-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-2xl hover:bg-amber-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/return-notes')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <TrendingDown className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Return Notes</p>
+                    <p className="text-xs text-gray-500">Product returns</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-amber-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-violet-50 rounded-2xl hover:bg-violet-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/supplier-totals')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-violet-100 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-4 h-4 text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Supplier Totals</p>
+                    <p className="text-xs text-gray-500">Supplier summaries</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-violet-600" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-teal-50 rounded-2xl hover:bg-teal-100 transition-colors cursor-pointer"
+                   onClick={() => router.push('/dashboard/purchase-manager/till-cash-closes')}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <Wallet className="w-4 h-4 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Till Cash Closes</p>
+                    <p className="text-xs text-gray-500">Daily till closing</p>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-teal-600" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Purchase Period Analysis */}
+        {/* Purchase Period Analysis and Allocation Period Analysis */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Purchase Period Pie Chart */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
@@ -2065,7 +2790,7 @@ export default function PurchaseManagerDashboard() {
                   {metrics.invoicesByPeriod.daily} invoice{metrics.invoicesByPeriod.daily !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-red-600 mt-1 opacity-75">
-                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.daily)}
+                  Invoices Created: {formatCurrencyForDisplay(metrics.totalPurchases.daily)}
                 </p>
               </div>
               <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
@@ -2086,7 +2811,7 @@ export default function PurchaseManagerDashboard() {
                   {metrics.invoicesByPeriod.weekly} invoice{metrics.invoicesByPeriod.weekly !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-teal-600 mt-1 opacity-75">
-                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.weekly)}
+                  Invoices Created: {formatCurrencyForDisplay(metrics.totalPurchases.weekly)}
                 </p>
               </div>
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
@@ -2107,7 +2832,7 @@ export default function PurchaseManagerDashboard() {
                   {metrics.invoicesByPeriod.monthly} invoice{metrics.invoicesByPeriod.monthly !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-blue-600 mt-1 opacity-75">
-                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.monthly)}
+                  Invoices Created: {formatCurrencyForDisplay(metrics.totalPurchases.monthly)}
                 </p>
               </div>
               <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
@@ -2128,7 +2853,7 @@ export default function PurchaseManagerDashboard() {
                   {metrics.invoicesByPeriod.yearly} invoice{metrics.invoicesByPeriod.yearly !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-green-600 mt-1 opacity-75">
-                  Payments: {formatCurrencyForDisplay(metrics.totalPurchases.yearly)}
+                  Invoices Created: {formatCurrencyForDisplay(metrics.totalPurchases.yearly)}
                 </p>
               </div>
                   </div>
@@ -2216,6 +2941,429 @@ export default function PurchaseManagerDashboard() {
                   {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.yearly / 365)}
                 </p>
                 <p className="text-sm text-emerald-600 mt-1">Based on yearly invoice data</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Analysis Period - Using invoicePayments Collection */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Payment Period Pie Chart */}
+          <div className="bg-white rounded-3xl p-6 shadow-lg border border-orange-50">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Payment Analysis Period</h3>
+              <div className="flex items-center space-x-2 bg-orange-50 rounded-full px-3 py-1">
+                <PieChart className="w-4 h-4 text-orange-600" />
+                <span className="text-sm text-orange-600 font-medium">Period Breakdown</span>
+              </div>
+            </div>
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-red-700 truncate">Daily</span>
+                </div>
+                <p className="text-xs text-red-600 mb-1 truncate" title={getCurrentPeriodInfo().daily}>
+                  {getCurrentPeriodInfo().daily}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.daily), 'text-base')} font-bold text-red-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.paymentAmountsByPeriod.daily)}
+                >
+                  {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.daily)}
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  {metrics.paymentsByPeriod.daily} payment{metrics.paymentsByPeriod.daily !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-red-600 mt-1 opacity-75">
+                  Avg per payment: {metrics.paymentsByPeriod.daily > 0 ? formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.daily / metrics.paymentsByPeriod.daily) : 'UGX 0'}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-teal-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-teal-700 truncate">Weekly</span>
+                </div>
+                <p className="text-xs text-teal-600 mb-1 truncate" title={getCurrentPeriodInfo().weekly}>
+                  {getCurrentPeriodInfo().weekly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.weekly), 'text-base')} font-bold text-teal-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.paymentAmountsByPeriod.weekly)}
+                >
+                  {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.weekly)}
+                </p>
+                <p className="text-xs text-teal-500 mt-1">
+                  {metrics.paymentsByPeriod.weekly} payment{metrics.paymentsByPeriod.weekly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-teal-600 mt-1 opacity-75">
+                  Avg per payment: {metrics.paymentsByPeriod.weekly > 0 ? formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.weekly / metrics.paymentsByPeriod.weekly) : 'UGX 0'}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-blue-700 truncate">Monthly</span>
+                </div>
+                <p className="text-xs text-blue-600 mb-1 truncate" title={getCurrentPeriodInfo().monthly}>
+                  {getCurrentPeriodInfo().monthly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.monthly), 'text-base')} font-bold text-blue-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.paymentAmountsByPeriod.monthly)}
+                >
+                  {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.monthly)}
+                </p>
+                <p className="text-xs text-blue-500 mt-1">
+                  {metrics.paymentsByPeriod.monthly} payment{metrics.paymentsByPeriod.monthly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-blue-600 mt-1 opacity-75">
+                  Avg per payment: {metrics.paymentsByPeriod.monthly > 0 ? formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.monthly / metrics.paymentsByPeriod.monthly) : 'UGX 0'}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-green-700 truncate">Yearly</span>
+                </div>
+                <p className="text-xs text-green-600 mb-1 truncate" title={getCurrentPeriodInfo().yearly}>
+                  {getCurrentPeriodInfo().yearly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.yearly), 'text-base')} font-bold text-green-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.paymentAmountsByPeriod.yearly)}
+                >
+                  {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.yearly)}
+                </p>
+                <p className="text-xs text-green-500 mt-1">
+                  {metrics.paymentsByPeriod.yearly} payment{metrics.paymentsByPeriod.yearly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-green-600 mt-1 opacity-75">
+                  Avg per payment: {metrics.paymentsByPeriod.yearly > 0 ? formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.yearly / metrics.paymentsByPeriod.yearly) : 'UGX 0'}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-80">
+              {(metrics.paymentAmountsByPeriod.daily + metrics.paymentAmountsByPeriod.weekly + metrics.paymentAmountsByPeriod.monthly + metrics.paymentAmountsByPeriod.yearly) > 0 ? (
+                <Pie data={paymentPeriodData} options={paymentPeriodChartOptions} />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-gray-400">
+                    <PieChart className="w-16 h-16 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm font-medium">No payment data available</p>
+                    <p className="text-xs mt-1">Payments will appear here once recorded</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Insights */}
+          <div className="bg-white rounded-3xl p-6 shadow-lg border border-orange-50">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">Payment Insights</h3>
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-orange-700">Highest Period</span>
+                  <Activity className="w-4 h-4 text-orange-600" />
+              </div>
+                <p className="text-lg font-bold text-orange-800">
+                  {(() => {
+                    const payments = metrics.paymentAmountsByPeriod;
+                    const max = Math.max(payments.daily, payments.weekly, payments.monthly, payments.yearly);
+                    if (max === payments.yearly) return 'Yearly';
+                    if (max === payments.monthly) return 'Monthly';
+                    if (max === payments.weekly) return 'Weekly';
+                    return 'Daily';
+                  })()}
+                </p>
+                <p 
+                  className="text-sm text-orange-600 mt-1 truncate"
+                  title={formatCurrency(Math.max(
+                    metrics.paymentAmountsByPeriod.daily,
+                    metrics.paymentAmountsByPeriod.weekly,
+                    metrics.paymentAmountsByPeriod.monthly,
+                    metrics.paymentAmountsByPeriod.yearly
+                  ))}
+                >
+                  {formatCurrencyForDisplay(Math.max(
+                    metrics.paymentAmountsByPeriod.daily,
+                    metrics.paymentAmountsByPeriod.weekly,
+                    metrics.paymentAmountsByPeriod.monthly,
+                    metrics.paymentAmountsByPeriod.yearly
+                  ))}
+                </p>
+                </div>
+              
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-amber-700">Total Volume</span>
+                  <BarChart3 className="w-4 h-4 text-amber-600" />
+              </div>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(
+                    metrics.paymentAmountsByPeriod.daily + 
+                    metrics.paymentAmountsByPeriod.weekly + 
+                    metrics.paymentAmountsByPeriod.monthly + 
+                    metrics.paymentAmountsByPeriod.yearly
+                  ), 'text-base')} font-bold text-amber-800 truncate`}
+                  title={formatCurrency(
+                    metrics.paymentAmountsByPeriod.daily + 
+                    metrics.paymentAmountsByPeriod.weekly + 
+                    metrics.paymentAmountsByPeriod.monthly + 
+                    metrics.paymentAmountsByPeriod.yearly
+                  )}
+                >
+                  {formatCurrencyForDisplay(
+                    metrics.paymentAmountsByPeriod.daily + 
+                    metrics.paymentAmountsByPeriod.weekly + 
+                    metrics.paymentAmountsByPeriod.monthly + 
+                    metrics.paymentAmountsByPeriod.yearly
+                  )}
+                </p>
+                <p className="text-sm text-amber-600 mt-1">Combined payment periods</p>
+            </div>
+
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-emerald-700">Average Payment</span>
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                </div>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(
+                    metrics.paymentsByPeriod.yearly > 0 
+                      ? metrics.paymentAmountsByPeriod.yearly / metrics.paymentsByPeriod.yearly 
+                      : 0
+                  ), 'text-base')} font-bold text-emerald-800 truncate`}
+                  title={formatCurrency(
+                    metrics.paymentsByPeriod.yearly > 0 
+                      ? metrics.paymentAmountsByPeriod.yearly / metrics.paymentsByPeriod.yearly 
+                      : 0
+                  )}
+                >
+                  {formatCurrencyForDisplay(
+                    metrics.paymentsByPeriod.yearly > 0 
+                      ? metrics.paymentAmountsByPeriod.yearly / metrics.paymentsByPeriod.yearly 
+                      : 0
+                  )}
+                </p>
+                <p className="text-sm text-emerald-600 mt-1">Average payment size this year</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-700">Total Payments</span>
+                  <CheckCircle className="w-4 h-4 text-blue-600" />
+                </div>
+                <p className="text-2xl font-bold text-blue-800">
+                  {metrics.paymentsByPeriod.yearly}
+                </p>
+                <p className="text-sm text-blue-600 mt-1">Completed this year</p>
+              </div>
+
+              <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-violet-700">Payment Rate</span>
+                  <Zap className="w-4 h-4 text-violet-600" />
+                </div>
+                <p className="text-2xl font-bold text-violet-800">
+                  {metrics.paymentsByPeriod.monthly > 0 
+                    ? (metrics.paymentsByPeriod.monthly / (new Date().getDate())).toFixed(1)
+                    : '0.0'
+                  }
+                </p>
+                <p className="text-sm text-violet-600 mt-1">Payments per day this month</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Allocation Period Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Allocation Period Pie Chart */}
+          <div className="bg-white rounded-3xl p-6 shadow-lg border border-blue-50">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Allocation Period Analysis</h3>
+              <div className="flex items-center space-x-2 bg-blue-50 rounded-full px-3 py-1">
+                <PieChart className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-blue-600 font-medium">Period Breakdown</span>
+              </div>
+            </div>
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-red-700 truncate">Daily</span>
+                </div>
+                <p className="text-xs text-red-600 mb-1 truncate" title={getCurrentPeriodInfo().daily}>
+                  {getCurrentPeriodInfo().daily}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.daily), 'text-base')} font-bold text-red-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.allocationAmountsByPeriod.daily)}
+                >
+                  {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.daily)}
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  {metrics.allocationsByPeriod.daily} allocation{metrics.allocationsByPeriod.daily !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-red-600 mt-1 opacity-75">
+                  Total: {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.daily)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-teal-50 to-teal-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-teal-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-teal-700 truncate">Weekly</span>
+                </div>
+                <p className="text-xs text-teal-600 mb-1 truncate" title={getCurrentPeriodInfo().weekly}>
+                  {getCurrentPeriodInfo().weekly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.weekly), 'text-base')} font-bold text-teal-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.allocationAmountsByPeriod.weekly)}
+                >
+                  {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.weekly)}
+                </p>
+                <p className="text-xs text-teal-500 mt-1">
+                  {metrics.allocationsByPeriod.weekly} allocation{metrics.allocationsByPeriod.weekly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-teal-600 mt-1 opacity-75">
+                  Total: {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.weekly)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-blue-700 truncate">Monthly</span>
+                </div>
+                <p className="text-xs text-blue-600 mb-1 truncate" title={getCurrentPeriodInfo().monthly}>
+                  {getCurrentPeriodInfo().monthly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.monthly), 'text-base')} font-bold text-blue-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.allocationAmountsByPeriod.monthly)}
+                >
+                  {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.monthly)}
+                </p>
+                <p className="text-xs text-blue-500 mt-1">
+                  {metrics.allocationsByPeriod.monthly} allocation{metrics.allocationsByPeriod.monthly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-blue-600 mt-1 opacity-75">
+                  Total: {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.monthly)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[130px] flex flex-col justify-between">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-sm font-medium text-green-700 truncate">Yearly</span>
+                </div>
+                <p className="text-xs text-green-600 mb-1 truncate" title={getCurrentPeriodInfo().yearly}>
+                  {getCurrentPeriodInfo().yearly}
+                </p>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.yearly), 'text-base')} font-bold text-green-800 mt-1 truncate`}
+                  title={formatCurrency(metrics.allocationAmountsByPeriod.yearly)}
+                >
+                  {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.yearly)}
+                </p>
+                <p className="text-xs text-green-500 mt-1">
+                  {metrics.allocationsByPeriod.yearly} allocation{metrics.allocationsByPeriod.yearly !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-green-600 mt-1 opacity-75">
+                  Total: {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.yearly)}
+                </p>
+              </div>
+                  </div>
+
+            <div className="h-80">
+              <Pie data={allocationPeriodData} options={allocationPeriodChartOptions} />
+                  </div>
+                </div>
+
+          {/* Allocation Insights */}
+          <div className="bg-white rounded-3xl p-6 shadow-lg border border-blue-50">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">Allocation Insights</h3>
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-700">Highest Period</span>
+                  <Activity className="w-4 h-4 text-blue-600" />
+              </div>
+                <p className="text-lg font-bold text-blue-800">
+                  {(() => {
+                    const allocations = metrics.allocationAmountsByPeriod;
+                    const max = Math.max(allocations.daily, allocations.weekly, allocations.monthly, allocations.yearly);
+                    if (max === allocations.yearly) return 'Yearly';
+                    if (max === allocations.monthly) return 'Monthly';
+                    if (max === allocations.weekly) return 'Weekly';
+                    return 'Daily';
+                  })()}
+                </p>
+                <p 
+                  className="text-sm text-blue-600 mt-1 truncate"
+                  title={formatCurrency(Math.max(
+                    metrics.allocationAmountsByPeriod.daily,
+                    metrics.allocationAmountsByPeriod.weekly,
+                    metrics.allocationAmountsByPeriod.monthly,
+                    metrics.allocationAmountsByPeriod.yearly
+                  ))}
+                >
+                  {formatCurrencyForDisplay(Math.max(
+                    metrics.allocationAmountsByPeriod.daily,
+                    metrics.allocationAmountsByPeriod.weekly,
+                    metrics.allocationAmountsByPeriod.monthly,
+                    metrics.allocationAmountsByPeriod.yearly
+                  ))}
+                </p>
+                </div>
+              
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-orange-700">Total Volume</span>
+                  <BarChart3 className="w-4 h-4 text-orange-600" />
+              </div>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(
+                    metrics.allocationAmountsByPeriod.daily + 
+                    metrics.allocationAmountsByPeriod.weekly + 
+                    metrics.allocationAmountsByPeriod.monthly + 
+                    metrics.allocationAmountsByPeriod.yearly
+                  ), 'text-base')} font-bold text-orange-800 truncate`}
+                  title={formatCurrency(
+                    metrics.allocationAmountsByPeriod.daily + 
+                    metrics.allocationAmountsByPeriod.weekly + 
+                    metrics.allocationAmountsByPeriod.monthly + 
+                    metrics.allocationAmountsByPeriod.yearly
+                  )}
+                >
+                  {formatCurrencyForDisplay(
+                    metrics.allocationAmountsByPeriod.daily + 
+                    metrics.allocationAmountsByPeriod.weekly + 
+                    metrics.allocationAmountsByPeriod.monthly + 
+                    metrics.allocationAmountsByPeriod.yearly
+                  )}
+                </p>
+                <p className="text-sm text-orange-600 mt-1">Combined allocation periods</p>
+            </div>
+
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-emerald-700">Average Daily</span>
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                </div>
+                <p 
+                  className={`${getDynamicFontSize(formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.yearly / 365), 'text-base')} font-bold text-emerald-800 truncate`}
+                  title={formatCurrency(metrics.allocationAmountsByPeriod.yearly / 365)}
+                >
+                  {formatCurrencyForDisplay(metrics.allocationAmountsByPeriod.yearly / 365)}
+                </p>
+                <p className="text-sm text-emerald-600 mt-1">Based on yearly allocation data</p>
               </div>
             </div>
           </div>
@@ -2402,221 +3550,208 @@ export default function PurchaseManagerDashboard() {
           </div>
         </div>
 
-        {/* Cash Close Tracking Section */}
+        {/* Cash Close Analysis & Recent Closes Section */}
         <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
           <div className="flex items-center justify-between mb-6">
             <div>
-            <h3 className="text-xl font-bold text-gray-900">Recent Cash Closes</h3>
+              <h3 className="text-xl font-bold text-gray-900">Cash Close Analysis & Recent Closes</h3>
               <p className="text-sm text-gray-500">Showing {metrics.cashCloseMetrics.recentCloses.length} of latest cash closes</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Shift:</span>
-                  <select
-                    value={cashCloseShiftFilter}
-                    onChange={(e) => setCashCloseShiftFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white hover:border-purple-400 transition-colors"
-                  >
-                    <option value="all">All Shifts</option>
-                    <option value="day">☀️ Day Shift</option>
-                    <option value="night">🌙 Night Shift</option>
-                  </select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Show:</span>
-                  <select
-                    value={cashClosesRowCount}
-                    onChange={(e) => setCashClosesRowCount(Number(e.target.value))}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white hover:border-purple-400 transition-colors"
-                  >
-                    <option value={5}>5 rows</option>
-                    <option value={10}>10 rows</option>
-                    <option value={15}>15 rows</option>
-                    <option value={20}>20 rows</option>
-                    <option value={25}>25 rows</option>
-                    <option value={50}>50 rows</option>
-                  </select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">From:</span>
-                  <input
-                    type="date"
-                    value={cashCloseFromDate}
-                    onChange={(e) => setCashCloseFromDate(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white hover:border-purple-400 transition-colors"
-                    placeholder="From date"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">To:</span>
-                  <input
-                    type="date"
-                    value={cashCloseToDate}
-                    onChange={(e) => setCashCloseToDate(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white hover:border-purple-400 transition-colors"
-                    placeholder="To date"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 bg-blue-50 rounded-full px-3 py-1">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-600 font-medium">Real-time</span>
-              </div>
-              </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Shift</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Amount</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Variance</th>
-                      </tr>
-                    </thead>
-              <tbody>
-                {metrics.cashCloseMetrics.recentCloses.map((close, index) => (
-                  <tr key={close.id} className="border-b border-gray-100 hover:bg-purple-50 transition-colors">
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {formatDate(close.date)}
-                          </td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        close.shift === 'day' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-indigo-100 text-indigo-800'
-                      }`}>
-                        {close.shift === 'day' ? '☀️ Day' : '🌙 Night'}
-                            </span>
-                          </td>
-                    <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                      {formatCurrency(close.amount)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {close.shortage > 0 ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          ⚠️ Shortage
-                        </span>
-                      ) : close.excess > 0 ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          📈 Excess
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ✅ Balanced
-                        </span>
-                      )}
-                          </td>
-                    <td className="py-3 px-4 text-sm">
-                      {close.shortage > 0 && (
-                        <span className="text-red-600 font-medium">
-                          -{formatCurrency(close.shortage)}
-                            </span>
-                      )}
-                      {close.excess > 0 && (
-                        <span className="text-green-600 font-medium">
-                          +{formatCurrency(close.excess)}
-                        </span>
-                      )}
-                      {close.shortage === 0 && close.excess === 0 && (
-                        <span className="text-gray-500">—</span>
-                      )}
-                          </td>
-                        </tr>
-                      ))}
-                {metrics.cashCloseMetrics.recentCloses.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
-                      No cash closes found. Data will appear here once cash closes are recorded.
-                    </td>
-                  </tr>
-                )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-        {/* Additional Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Quick Actions */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Admin Panel</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-2xl hover:bg-purple-100 transition-colors cursor-pointer"
-                   onClick={() => router.push('/dashboard/purchase-manager/invoices')}>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Manage Invoices</p>
-                    <p className="text-xs text-gray-500">Review and approve</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-purple-600" />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors cursor-pointer"
-                   onClick={() => router.push('/dashboard/purchase-manager/suppliers')}>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Users className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Supplier Management</p>
-                    <p className="text-xs text-gray-500">Add & manage suppliers</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-blue-600" />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-2xl hover:bg-green-100 transition-colors cursor-pointer"
-                   onClick={() => router.push('/dashboard/purchase-manager/payments')}>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center">
-                    <BarChart3 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Payment Reports</p>
-                    <p className="text-xs text-gray-500">View analytics</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-green-600" />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-2xl hover:bg-indigo-100 transition-colors cursor-pointer"
-                   onClick={() => router.push('/dashboard/purchase-manager/allocation-tracking')}>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center">
-                    <Target className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Allocation Tracking</p>
-                    <p className="text-xs text-gray-500">Sent & accepted amounts</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-indigo-600" />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-2xl hover:bg-orange-100 transition-colors cursor-pointer"
-                   onClick={() => router.push('/dashboard/purchase-manager/cash-tracking')}>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-4 h-4 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Cash Tracking</p>
-                    <p className="text-xs text-gray-500">Monitor cash flow</p>
-                  </div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-orange-600" />
+            <div className="flex items-center space-x-2">
+              <div className={`flex items-center space-x-2 rounded-full px-3 py-1 ${
+                (cashCloseFromDate || cashCloseToDate) ? 'bg-orange-50' : 'bg-blue-50'
+              }`}>
+                <PieChart className={`w-4 h-4 ${
+                  (cashCloseFromDate || cashCloseToDate) ? 'text-orange-600' : 'text-blue-600'
+                }`} />
+                <span className={`text-sm font-medium ${
+                  (cashCloseFromDate || cashCloseToDate) ? 'text-orange-600' : 'text-blue-600'
+                }`}>
+                  {(cashCloseFromDate || cashCloseToDate) ? 'Filtered Data' : 'Live Data'}
+                </span>
               </div>
             </div>
           </div>
 
+          {/* Date Filters */}
+          <div className="flex items-center space-x-2 flex-wrap mb-6">
+            <div className="flex items-center space-x-1">
+              <span className="text-xs text-gray-600 whitespace-nowrap">From:</span>
+              <input
+                type="date"
+                value={cashCloseFromDate}
+                onChange={(e) => setCashCloseFromDate(e.target.value)}
+                className="px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-blue-400 transition-colors w-24"
+                style={{ fontSize: '10px' }}
+              />
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="text-xs text-gray-600 whitespace-nowrap">To:</span>
+              <input
+                type="date"
+                value={cashCloseToDate}
+                onChange={(e) => setCashCloseToDate(e.target.value)}
+                className="px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-blue-400 transition-colors w-24"
+                style={{ fontSize: '10px' }}
+              />
+            </div>
+            {(cashCloseFromDate || cashCloseToDate) && (
+              <button
+                onClick={() => {
+                  setCashCloseFromDate('');
+                  setCashCloseToDate('');
+                }}
+                className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors whitespace-nowrap"
+                title="Clear date filters"
+                style={{ fontSize: '10px' }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs font-medium text-blue-700 truncate">Day Shift</span>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalDayCash)} font-bold text-blue-800 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalDayCash)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalDayCash)}
+                </p>
+              </div>
+              <p className="text-xs text-blue-600 truncate">{metrics.cashCloseMetrics.dayCloseCount} closes</p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs font-medium text-indigo-700 truncate">Night Shift</span>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalNightCash)} font-bold text-indigo-800 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalNightCash)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNightCash)}
+                </p>
+              </div>
+              <p className="text-xs text-indigo-600 truncate">{metrics.cashCloseMetrics.nightCloseCount} closes</p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs font-medium text-green-700 truncate">Network Money</span>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalNetworkMoney)} font-bold text-green-800 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalNetworkMoney)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalNetworkMoney)}
+                </p>
+              </div>
+              <p className="text-xs text-green-600 truncate">Digital payments</p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs font-medium text-red-700 truncate">Shortage</span>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalShortage)} font-bold text-red-800 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalShortage)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalShortage)}
+                </p>
+              </div>
+              <p className="text-xs text-red-600 truncate">Cash shortfall</p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-xl p-3 min-h-[80px] flex flex-col justify-between">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs font-medium text-amber-700 truncate">Excess</span>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalExcess)} font-bold text-amber-800 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalExcess)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalExcess)}
+                </p>
+              </div>
+              <p className="text-xs text-amber-600 truncate">Cash surplus</p>
+            </div>
+          </div>
+
+          {/* Pie Chart */}
+          <div className="h-80 mb-6">
+            <Pie data={cashClosePieData} options={cashCloseChartOptions} />
+          </div>
+
+          {/* Cash Analysis Insights */}
+          <div className="mb-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4">
+            <h4 className="font-bold text-gray-800 mb-3 flex items-center">
+              <DollarSign className="w-4 h-4 mr-2 text-gray-600 flex-shrink-0" />
+              <span className="truncate">Cash Analysis Insights</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <p className="text-gray-600 text-xs font-medium">• <strong>Total Cash Handled:</strong></p>
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalDayCash + metrics.cashCloseMetrics.totalNightCash)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-gray-600 text-xs font-medium">• <strong>Average Day Close:</strong></p>
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.averageDayClose, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.averageDayClose)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.averageDayClose)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-gray-600 text-xs font-medium">• <strong>Average Night Close:</strong></p>
+                <p 
+                  className={`${getDynamicFontSize(metrics.cashCloseMetrics.averageNightClose, 'text-sm')} text-gray-800 font-semibold ml-2 truncate`}
+                  title={formatCurrency(metrics.cashCloseMetrics.averageNightClose)}
+                >
+                  {formatCurrencyForDisplay(metrics.cashCloseMetrics.averageNightClose)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-gray-600 text-xs font-medium">• <strong>Net Variance:</strong></p>
+                <div className="ml-2">
+                  <p 
+                    className={`${getDynamicFontSize(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage, 'text-sm')} font-semibold truncate ${metrics.cashCloseMetrics.totalExcess > metrics.cashCloseMetrics.totalShortage ? 'text-green-600' : 'text-red-600'}`}
+                    title={formatCurrency(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage)}
+                  >
+                    {formatCurrencyForDisplay(metrics.cashCloseMetrics.totalExcess - metrics.cashCloseMetrics.totalShortage)}
+                  </p>
+                  <span className="text-xs text-gray-500 truncate">
+                    {metrics.cashCloseMetrics.totalExcess > metrics.cashCloseMetrics.totalShortage ? '(Surplus)' : '(Deficit)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activities Section */}
+        <div className="grid grid-cols-1 gap-6">
           {/* Recent Activities */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-purple-50">
             <div className="flex items-center justify-between mb-6">

@@ -217,10 +217,17 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'pm-allocations', 
-    icon: <Wallet className="w-5 h-5" />, 
-    label: 'My Allocations', 
-    path: '/dashboard/purchase-manager/allocations',
+    id: 'restock-orders', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Restock Orders', 
+    path: '/dashboard/purchase-manager/restock-orders',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'daily-allocation', 
+    icon: <Calendar className="w-5 h-5" />, 
+    label: 'Daily Fund Allocation', 
+    path: '/dashboard/purchase-manager/daily-allocation',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -231,17 +238,17 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'pm-expenses', 
-    icon: <Receipt className="w-5 h-5" />, 
-    label: 'PM Expenses', 
-    path: '/dashboard/purchase-manager/expenses',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
     id: 'payments', 
     icon: <CreditCard className="w-5 h-5" />, 
     label: 'Payments', 
     path: '/dashboard/purchase-manager/payments',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'supplier-totals', 
+    icon: <Calculator className="w-5 h-5" />, 
+    label: 'Supplier Totals', 
+    path: '/dashboard/purchase-manager/supplier-totals',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -252,30 +259,24 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'cash-tracking', 
-    icon: <Smartphone className="w-5 h-5" />, 
-    label: 'Cash Tracking', 
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin'],
-    submenu: [
-      {
-        id: 'daily-allocation-pm',
-        icon: <Wallet className="w-5 h-5" />,
-        label: 'Daily Allocation',
-        path: '/dashboard/purchase-manager/daily-allocation'
-      },
-      {
-        id: 'till-cash-closes',
-        icon: <Receipt className="w-5 h-5" />,
-        label: 'Till Cash Closes', 
-        path: '/dashboard/purchase-manager/till-cash-closes'
-      }
-    ]
+    id: 'pm-allocations', 
+    icon: <Send className="w-5 h-5" />, 
+    label: 'Detailed Cash by Accountant', 
+    path: '/dashboard/purchase-manager/allocations',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'supplier-totals', 
-    icon: <Calculator className="w-5 h-5" />, 
-    label: 'Supplier Totals', 
-    path: '/dashboard/purchase-manager/supplier-totals',
+    id: 'till-cash-closes', 
+    icon: <Wallet className="w-5 h-5" />, 
+    label: 'Till Cash Closes', 
+    path: '/dashboard/purchase-manager/till-cash-closes',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'pm-expenses', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'PM Expenses', 
+    path: '/dashboard/purchase-manager/expenses',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -283,20 +284,6 @@ const navigationItems: NavigationItem[] = [
     icon: <RefreshCw className="w-5 h-5" />, 
     label: 'Return Notes & Restocking', 
     path: '/dashboard/purchase-manager/return-notes',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'restock-orders', 
-    icon: <Package className="w-5 h-5" />, 
-    label: 'Restock Orders', 
-    path: '/dashboard/purchase-manager/restock-orders',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'daily-allocation', 
-    icon: <Wallet className="w-5 h-5" />, 
-    label: 'Daily Fund Allocation', 
-    path: '/dashboard/purchase-manager/daily-allocation',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
 

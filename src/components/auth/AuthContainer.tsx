@@ -15,8 +15,16 @@ export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: 
   const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // Mark component as mounted to prevent hydration mismatch
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
     // Check if user is already authenticated
     const checkAuthState = () => {
       const user = authService.getCurrentUser();
@@ -41,7 +49,7 @@ export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: 
     checkAuthState();
 
     return unsubscribe;
-  }, [onAuthSuccess]);
+  }, [onAuthSuccess, isMounted]);
 
   const handleAuthSuccess = () => {
     const user = authService.getCurrentUser();
@@ -57,6 +65,17 @@ export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: 
   const handleSwitchToLogin = () => {
     setMode('login');
   };
+
+  // Don't render loading state during SSR to prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading spinner while checking auth state
   if (isCheckingAuth) {
