@@ -16,7 +16,9 @@ import {
   ArrowLeft,
   Plus,
   Search,
-  Filter
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface DailySupplier {
@@ -38,14 +40,22 @@ interface DailySupplier {
 interface RestockItem {
   id: string;
   itemName: string;
+  itemDescription?: string;
   currentStock: number;
   restockThreshold: number;
   suggestedQuantity: number;
+  unit?: string;
   supplier: string;
-  priority: 'urgent' | 'high' | 'medium' | 'low';
+  priority: 'high' | 'medium' | 'low';
   category: string;
   lastRestocked: string;
   averageUsage: number;
+  expectedDate?: string;
+  status?: 'pending' | 'partial' | 'overdue' | 'received';
+  notes?: string;
+  receivedQuantity?: number;
+  createdDate?: string;
+  daysUntilDelivery?: number;
 }
 
 export default function DeliveriesPage() {
@@ -59,6 +69,8 @@ export default function DeliveriesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Real-time subscriptions
   useEffect(() => {
@@ -211,12 +223,35 @@ export default function DeliveriesPage() {
     return matchesSearch && matchesPriority;
   });
 
+  // Pagination for suppliers
+  const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSuppliers = filteredSuppliers.slice(startIndex, endIndex);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterPriority]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -225,14 +260,14 @@ export default function DeliveriesPage() {
               >
                 <ArrowLeft className="h-5 w-5 text-white" />
               </button>
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <Truck className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Truck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Daily Deliveries
                 </h1>
-                <p className="text-purple-100 text-lg">
+                <p className="text-purple-100 text-base">
                   {getCurrentDayLabel()} • Last updated: {formatTime(lastUpdated.toLocaleTimeString())}
                 </p>
               </div>
@@ -390,7 +425,10 @@ export default function DeliveriesPage() {
               Today's Expected Suppliers
             </h2>
             <span className="text-sm text-gray-500 bg-purple-50 px-3 py-1 rounded-full">
-              {filteredSuppliers.length} supplier{filteredSuppliers.length !== 1 ? 's' : ''} expected
+              {filteredSuppliers.length > 0 
+                ? `Page ${currentPage} of ${totalPages} (${filteredSuppliers.length} total)` 
+                : 'No suppliers expected'
+              }
             </span>
           </div>
 
@@ -431,8 +469,9 @@ export default function DeliveriesPage() {
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredSuppliers.map((supplier) => (
+            <>
+              <div className="space-y-4">
+                {paginatedSuppliers.map((supplier) => (
                 <div key={supplier.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -488,8 +527,46 @@ export default function DeliveriesPage() {
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls - Always visible when there are suppliers */}
+              {filteredSuppliers.length > 0 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={currentPage === 1}
+                    className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
+                      currentPage === 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md'
+                    }`}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600 font-medium">
+                      {totalPages > 1 ? `Page ${currentPage} of ${totalPages}` : `${filteredSuppliers.length} supplier${filteredSuppliers.length !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages || totalPages === 1}
+                    className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
+                      currentPage === totalPages || totalPages === 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md'
+                    }`}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -506,30 +583,60 @@ export default function DeliveriesPage() {
           </div>
 
           {loading && restockItems.length === 0 ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-gray-200 rounded"></div>
-                      <div>
-                        <div className="h-4 bg-gray-200 rounded w-40 mb-2"></div>
-                        <div className="h-3 bg-gray-200 rounded w-32"></div>
-                      </div>
-                    </div>
-                    <div className="w-16 h-6 bg-gray-200 rounded"></div>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Qty</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {[1, 2, 3, 4].map((i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-32"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-20"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-24"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-20"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : filteredRestockItems.length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">All Items Well Stocked</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Items Expected Today</h3>
               <p className="text-gray-500">
                 {error 
-                  ? 'Unable to load inventory data. Please check your connection.'
-                  : 'No items currently need restocking.'
+                  ? 'Unable to load restock data. Please check your connection.'
+                  : 'No restocking items are expected for delivery today.'
                 }
               </p>
               {error && (
@@ -542,77 +649,81 @@ export default function DeliveriesPage() {
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredRestockItems.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className={`p-2 rounded-lg ${getPriorityColor(item.priority)}`}>
-                        <Package className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">{item.itemName}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span>Current: {item.currentStock}</span>
-                          <span>Threshold: {item.restockThreshold}</span>
-                          <span>Suggested: {item.suggestedQuantity}</span>
-                          <span>Supplier: {item.supplier}</span>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Qty</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRestockItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`p-2 rounded-lg ${getPriorityColor(item.priority)} mr-3`}>
+                            <Package className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
+                            {item.itemDescription && (
+                              <div className="text-xs text-gray-500">{item.itemDescription}</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(item.priority)}`}>
-                        {item.priority.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Stock Level Progress Bar */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                      <span>Stock Level</span>
-                      <span>{Math.round((item.currentStock / item.restockThreshold) * 100)}% of threshold</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          item.currentStock <= item.restockThreshold * 0.2 ? 'bg-red-500' :
-                          item.currentStock <= item.restockThreshold * 0.5 ? 'bg-orange-500' :
-                          item.currentStock <= item.restockThreshold * 0.8 ? 'bg-yellow-500' :
-                          'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min((item.currentStock / item.restockThreshold) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Additional Details */}
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-500">Category:</span>
-                        <span className="ml-2 font-medium">{item.category}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Last Restocked:</span>
-                        <span className="ml-2 font-medium">{item.lastRestocked}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Avg Usage:</span>
-                        <span className="ml-2 font-medium">{item.averageUsage}/day</span>
-                      </div>
-                      {item.daysUntilEmpty && (
-                        <div>
-                          <span className="text-gray-500">Days Until Empty:</span>
-                          <span className={`ml-2 font-medium ${item.daysUntilEmpty <= 7 ? 'text-red-600' : item.daysUntilEmpty <= 14 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {item.daysUntilEmpty}
-                          </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.category}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.currentStock || 0}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm font-semibold text-gray-900">{item.suggestedQuantity}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">{item.unit || 'pcs'}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.supplier}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                          {item.expectedDate}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          item.priority === 'high' ? 'bg-red-100 text-red-800' :
+                          item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          item.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                          item.status === 'partial' ? 'bg-orange-100 text-orange-800' :
+                          item.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.status?.charAt(0).toUpperCase() + item.status?.slice(1)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

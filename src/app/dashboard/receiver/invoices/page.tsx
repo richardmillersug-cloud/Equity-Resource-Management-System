@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 import { QRCodeService } from '../../../../lib/utils/qr-code';
+import { Timestamp } from 'firebase/firestore';
 import {
   FileText,
   Plus,
@@ -475,17 +476,17 @@ export default function InvoicesPage() {
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-8">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-          <div className="relative p-8 text-white">
+          <div className="relative p-5 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                  <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                     Invoices Management
                   </h1>
-                  <p className="text-purple-100 text-lg">Manage and track all invoices from suppliers</p>
+                  <p className="text-purple-100 text-base">Manage and track all invoices from suppliers</p>
                 </div>
               </div>
               <button
@@ -714,121 +715,208 @@ export default function InvoicesPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoice Details
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//   Supplier
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount & Details
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//   Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//   Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//   Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {filteredInvoices.map((invoice, index) => (
-                    <tr key={invoice.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {invoice.invoiceNumber}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            FDN: {invoice.fdn || 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {invoice.description}
-                          </div>
+            <>
+              {/* Mobile Card View - visible on small screens */}
+              <div className="block md:hidden space-y-4">
+                {filteredInvoices.map((invoice) => (
+                  <div 
+                    key={invoice.id} 
+                    className="bg-white rounded-xl shadow-md border border-gray-200 p-4 hover:shadow-lg transition-all duration-300"
+                  >
+                    {/* Header with Invoice Number and Status */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="text-base font-semibold text-gray-900 mb-1">
+                          {invoice.invoiceNumber}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 text-gray-400 mr-2" />
-                          <div className="text-sm text-gray-900">{invoice.supplierName}</div>
+                        <div className="text-xs text-gray-500 mb-2">
+                          FDN: {invoice.fdn || 'N/A'}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatAmount(invoice.amount)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Qty: {invoice.quantity || 'N/A'}
-                          </div>
-                          {invoice.description && (
-                            <div className="text-xs text-blue-600 truncate max-w-xs">
+                      </div>
+                      <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(invoice.status)}`}>
+                        {getStatusIcon(invoice.status)}
+                        <span className="hidden sm:inline">{invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}</span>
+                      </span>
+                    </div>
+
+                    {/* Supplier */}
+                    <div className="flex items-center mb-3">
+                      <User className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                      <div className="text-sm text-gray-900 truncate">{invoice.supplierName}</div>
+                    </div>
+
+                    {/* Amount and Quantity */}
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+                      <div>
+                        <div className="text-lg font-bold text-purple-600">
+                          {formatAmount(invoice.amount)}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Qty: {invoice.quantity || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {formatDate(invoice.date)}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {invoice.description && (
+                      <div className="mb-3">
+                        <div className="text-xs text-gray-500 line-clamp-2">
+                          {invoice.description}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                      <button 
+                        onClick={() => setSelectedInvoiceForDetails(invoice)}
+                        className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setSelectedInvoiceForPrint(invoice)}
+                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                        title="Print"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleGenerateQR(invoice)}
+                        className="p-2 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="QR Code"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedInvoiceForEdit(invoice)}
+                        className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View - visible on medium screens and above */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-100">
+                  <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
+                    <tr>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Invoice Details
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Supplier
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount & Details
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                        Date
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {filteredInvoices.map((invoice, index) => (
+                      <tr key={invoice.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
+                        <td className="px-4 lg:px-6 py-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {invoice.invoiceNumber}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              FDN: {invoice.fdn || 'N/A'}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate max-w-xs mt-1">
                               {invoice.description}
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(invoice.status)}`}>
-                          {getStatusIcon(invoice.status)}
-                          <span>{invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                          <div className="text-sm text-gray-900">
-                            {formatDate(invoice.date)}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-1">
-                          <button 
-                            onClick={() => setSelectedInvoiceForDetails(invoice)}
-                            className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
-                            title="View Invoice Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          
-                          <button 
-                            onClick={() => setSelectedInvoiceForPrint(invoice)}
-                            className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded"
-                            title="Print Invoice"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          
-                          <button
-                            onClick={() => handleGenerateQR(invoice)}
-                            className="p-1 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded"
-                            title="Generate QR Code"
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </button>
-                          
-                          <button
-                            onClick={() => setSelectedInvoiceForEdit(invoice)}
-                            className="p-1 text-green-600 hover:text-green-900 hover:bg-green-50 rounded"
-                            title="Edit Invoice"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                            <div className="text-sm text-gray-900 truncate max-w-[150px]">{invoice.supplierName}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatAmount(invoice.amount)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Qty: {invoice.quantity || 'N/A'}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <span className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(invoice.status)}`}>
+                            {getStatusIcon(invoice.status)}
+                            <span>{invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}</span>
+                          </span>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 hidden lg:table-cell">
+                          <div className="flex items-center">
+                            <Calendar className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                            <div className="text-sm text-gray-900">
+                              {formatDate(invoice.date)}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4 text-sm font-medium">
+                          <div className="flex flex-wrap gap-1">
+                            <button 
+                              onClick={() => setSelectedInvoiceForDetails(invoice)}
+                              className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded transition-colors"
+                              title="View Invoice Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => setSelectedInvoiceForPrint(invoice)}
+                              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors"
+                              title="Print Invoice"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+                            
+                            <button
+                              onClick={() => handleGenerateQR(invoice)}
+                              className="p-1.5 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded transition-colors"
+                              title="Generate QR Code"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                            
+                            <button
+                              onClick={() => setSelectedInvoiceForEdit(invoice)}
+                              className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded transition-colors"
+                              title="Edit Invoice"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
 

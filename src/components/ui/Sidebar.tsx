@@ -388,7 +388,7 @@ const navigationItems: NavigationItem[] = [
     roles: ['Stock Manager', 'Admin']
   },
 
-  // Receiver specific
+  // Receiver specific - arranged in order
   { 
     id: 'receiver-dashboard', 
     icon: <LayoutDashboard className="w-5 h-5" />, 
@@ -397,87 +397,53 @@ const navigationItems: NavigationItem[] = [
     roles: ['Receiver', 'Admin']
   },
   { 
-    id: 'damage-reports', 
-    icon: <AlertTriangle className="w-5 h-5" />, 
-    label: 'Damage Reports', 
-    path: '/dashboard/receiver/damages',
-    roles: ['Stock Manager', 'Manager', 'Admin']
+    id: 'restocking', 
+    icon: <Package className="w-5 h-5" />, 
+    label: 'Restocking', 
+    path: '/dashboard/receiver/restocking',
+    roles: ['Receiver', 'Admin']
   },
-  
-  // Receiver specific
+  {
+    id: 'restock-verification',
+    icon: <Package className="w-5 h-5" />,
+    label: 'Stock Received',
+    path: '/dashboard/receiver/restock-verification',
+    roles: ['Receiver', 'Admin']
+  },
   { 
     id: 'deliveries', 
     icon: <Truck className="w-5 h-5" />, 
-    label: 'Deliveries', 
+    label: 'Suppliers Expected', 
     path: '/dashboard/receiver/deliveries',
     roles: ['Receiver', 'Admin']
   },
   { 
-    id: 'return-notes', 
-    icon: <FileText className="w-5 h-5" />, 
-    label: 'Return Notes', 
-    roles: ['Receiver', 'Admin'],
-    submenu: [
-      {
-        id: 'return-notes-management',
-        icon: <ClipboardList className="w-4 h-4" />,
-        label: 'Return Notes Management',
-        path: '/dashboard/receiver/returns'
-      },
-              {
-          id: 'return-notes-tracking',
-          icon: <RefreshCw className="w-4 h-4" />,
-          label: 'Return Notes Tracking',
-          path: '/dashboard/receiver/returns/tracking'
-        }
-      ]
-    },
-    {
-      id: 'restock-verification',
-      icon: <Package className="w-5 h-5" />,
-      label: 'Restock Verification',
-      path: '/dashboard/receiver/restock-verification',
-      roles: ['Receiver', 'Admin']
-    },
-  { 
     id: 'suppliers', 
     icon: <Factory className="w-5 h-5" />, 
     label: 'Suppliers', 
-    roles: ['Receiver', 'Admin'],
-    submenu: [
-      {
-        id: 'add-supplier',
-        icon: <Plus className="w-4 h-4" />,
-        label: 'Add Supplier',
-        path: '/dashboard/receiver/suppliers/add'
-      },
-      {
-        id: 'view-suppliers',
-        icon: <Eye className="w-4 h-4" />,
-        label: 'View Suppliers',
-        path: '/dashboard/receiver/suppliers'
-      }
-    ]
+    path: '/dashboard/receiver/suppliers',
+    roles: ['Receiver', 'Admin']
   },
   { 
     id: 'invoices', 
     icon: <Receipt className="w-5 h-5" />, 
-    label: 'Invoices', 
-    roles: ['Receiver', 'Admin'],
-    submenu: [
-      {
-        id: 'add-invoice',
-        icon: <Plus className="w-4 h-4" />,
-        label: 'Add Invoice',
-        path: '/dashboard/receiver/invoices/add'
-      },
-      {
-        id: 'view-invoices',
-        icon: <Eye className="w-4 h-4" />,
-        label: 'View Invoices',
-        path: '/dashboard/receiver/invoices'
-      }
-    ]
+    label: 'Invoice', 
+    path: '/dashboard/receiver/invoices',
+    roles: ['Receiver', 'Admin']
+  },
+  { 
+    id: 'return-notes-management', 
+    icon: <ClipboardList className="w-5 h-5" />, 
+    label: 'Return Notes Management', 
+    path: '/dashboard/receiver/returns',
+    roles: ['Receiver', 'Admin']
+  },
+  { 
+    id: 'return-notes-tracking', 
+    icon: <RefreshCw className="w-5 h-5" />, 
+    label: 'Return Notes Tracking', 
+    path: '/dashboard/receiver/returns/tracking',
+    roles: ['Receiver', 'Admin']
   },
   { 
     id: 'damages', 
@@ -494,11 +460,11 @@ const navigationItems: NavigationItem[] = [
     roles: ['Receiver', 'Admin']
   },
   { 
-    id: 'restocking', 
-    icon: <Package className="w-5 h-5" />, 
-    label: 'Restocking', 
-    path: '/dashboard/receiver/restocking',
-    roles: ['Receiver', 'Admin']
+    id: 'damage-reports', 
+    icon: <AlertTriangle className="w-5 h-5" />, 
+    label: 'Damage Reports', 
+    path: '/dashboard/receiver/damages',
+    roles: ['Stock Manager', 'Manager', 'Admin']
   },
   
   // Auditor specific
@@ -844,28 +810,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   };
 
   const handleItemClick = (item: NavigationItem) => {
-    // Special handling for deliveries item for receivers
-    if (item.id === 'deliveries' && getUserRole() === 'Receiver') {
-      // Toggle dropdown for expected suppliers
-      const newOpenDropdowns = new Set(openDropdowns);
-      if (newOpenDropdowns.has(item.id)) {
-        newOpenDropdowns.delete(item.id);
-      } else {
-        newOpenDropdowns.add(item.id);
-      }
-      setOpenDropdowns(newOpenDropdowns);
-      // Still navigate to the main deliveries page
-      if (item.path) {
-        if (onItemClick) {
-          onItemClick(item.id);
-        } else {
-          router.push(item.path);
-        }
-      }
-    }
-    
     // Special handling for hr-dashboard item for HR
-    else if (item.id === 'hr-dashboard' && getUserRole() === 'HR') {
+    if (item.id === 'hr-dashboard' && getUserRole() === 'HR') {
       // Toggle dropdown for HR quick actions
       const newOpenDropdowns = new Set(openDropdowns);
       if (newOpenDropdowns.has(item.id)) {
@@ -1001,9 +947,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
               </span>
             )}
 
-              {/* Dropdown arrow - only show when expanded and has submenu OR is deliveries for receiver OR is pm-dashboard for PM */}
+              {/* Dropdown arrow - only show when expanded and has submenu OR is pm-dashboard for PM */}
               {isExpanded && (item.submenu || 
-                (item.id === 'deliveries' && getUserRole() === 'Receiver') ||
                 (item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager'))
               ) && (
                 <ChevronDown 
@@ -1011,13 +956,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                     openDropdowns.has(item.id) ? 'rotate-180' : ''
                   }`} 
                 />
-              )}
-
-              {/* Expected suppliers count badge for deliveries - only when collapsed */}
-              {!isExpanded && item.id === 'deliveries' && getUserRole() === 'Receiver' && expectedSuppliers.length > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {expectedSuppliers.length}
-                </div>
               )}
 
               {/* PM quick actions count badge for pm-dashboard - only when collapsed */}
@@ -1056,85 +994,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                     </span>
                   </button>
                 ))}
-              </div>
-            )}
-
-            {/* Expected Suppliers List - Special for deliveries when receiver */}
-            {isExpanded && item.id === 'deliveries' && getUserRole() === 'Receiver' && openDropdowns.has(item.id) && (
-              <div className="ml-6 mt-2 space-y-2">
-                {/* Header */}
-                <div className="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center space-x-2">
-                    <Truck className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-semibold text-blue-900">Today's Expected</span>
-                  </div>
-                  <span className="text-xs text-blue-600 font-medium">{getCurrentTime()}</span>
-                </div>
-
-                {/* Loading State */}
-                {loadingSuppliers && (
-                  <div className="px-3 py-4 text-center">
-                    <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                    <span className="text-xs text-gray-500">Loading suppliers...</span>
-                  </div>
-                )}
-
-                {/* Suppliers List */}
-                {!loadingSuppliers && expectedSuppliers.length > 0 && (
-                  <div className="max-h-64 overflow-y-auto space-y-1">
-                    {expectedSuppliers.map((supplier) => (
-                      <div
-                        key={supplier.id}
-                        className="px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
-                        onClick={() => router.push('/dashboard/receiver/deliveries')}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center space-x-1">
-                            <span className="text-xs">{getPriorityIcon(supplier.priority)}</span>
-                            <span className="text-xs font-medium text-gray-900 truncate" title={supplier.name}>
-                              {supplier.name.length > 12 ? supplier.name.substring(0, 12) + '...' : supplier.name}
-                            </span>
-                          </div>
-                          <span className="text-xs text-gray-500">{supplier.expectedTime}</span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600">{supplier.items} items</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusColor(supplier.status)}`}>
-                            {supplier.status === 'on-time' ? 'On Time' : 
-                             supplier.status === 'delayed' ? 'Delayed' : 'Early'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* No Suppliers */}
-                {!loadingSuppliers && expectedSuppliers.length === 0 && (
-                  <div className="px-3 py-4 text-center">
-                    <div className="text-gray-400 mb-2">📦</div>
-                    <span className="text-xs text-gray-500">No deliveries expected today</span>
-                  </div>
-                )}
-
-                {/* Quick Actions */}
-                <div className="border-t border-gray-200 pt-2 space-y-1">
-                  <button
-                    onClick={() => router.push('/dashboard/receiver/deliveries')}
-                    className="w-full h-8 rounded-lg flex items-center px-3 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                  >
-                    <Plus className="w-3 h-3 text-emerald-600 mr-2" />
-                    <span className="text-xs font-medium text-emerald-700">View Deliveries</span>
-                  </button>
-                  <button
-                    onClick={() => loadExpectedSuppliers()}
-                    className="w-full h-8 rounded-lg flex items-center px-3 bg-blue-50 hover:bg-blue-100 transition-colors"
-                  >
-                    <RefreshCw className="w-3 h-3 text-blue-600 mr-2" />
-                    <span className="text-xs font-medium text-blue-700">Refresh</span>
-                  </button>
-                </div>
               </div>
             )}
 

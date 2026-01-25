@@ -454,119 +454,80 @@ export class ReceiverQueries {
     }
 
     try {
-      // Get today's date range
+      // Get today's day of the week (e.g., "Monday")
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const todayDayName = daysOfWeek[today.getDay()];
+      
+      console.log('📅 Today is:', todayDayName);
 
-      // Simplified query - only use receiverId and scheduledDate to reduce index complexity
-      const deliveriesQuery = query(
-        collection(db, 'deliveries'),
-        where('receiverId', '==', userId),
-        where('scheduledDate', '>=', Timestamp.fromDate(today)),
-        where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
-        orderBy('scheduledDate'),
-        limit(50) // Limit results to prevent large queries
+      // Query suppliers where routeDays array contains today's day
+      const suppliersQuery = query(
+        collection(db, 'suppliers'),
+        where('routeDays', 'array-contains', todayDayName),
+        limit(100) // Limit results to prevent large queries
       );
 
-      const deliveriesSnapshot = await getDocs(deliveriesQuery);
-      const todaysDeliveries = deliveriesSnapshot.docs.map(doc => ({ 
+      const suppliersSnapshot = await getDocs(suppliersQuery);
+      const todaysSuppliers = suppliersSnapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data() 
-      } as Delivery & { id: string }));
+      } as Supplier & { id: string }));
 
-      // Sort by scheduled time on client-side to avoid complex index
-      todaysDeliveries.sort((a, b) => {
-        // First sort by date, then by time
-        const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
-        if (dateCompare !== 0) return dateCompare;
+      console.log(`📦 Found ${todaysSuppliers.length} suppliers expected on ${todayDayName}`);
+
+      // Process suppliers for display
+      const suppliersWithDetails = todaysSuppliers.map((supplier) => {
+        // Get typical delivery time (default to 09:00 AM)
+        const expectedTime = '09:00';
         
-        // Then sort by time
-        const timeA = a.scheduledTime || '00:00';
-        const timeB = b.scheduledTime || '00:00';
-        return timeA.localeCompare(timeB);
-      });
+        // Determine priority - default to medium for all suppliers
+        let priority: 'high' | 'medium' | 'low' = 'medium';
 
-      // Get supplier details for each delivery (batch processing)
-      const supplierIds = [...new Set(todaysDeliveries.map(d => d.supplierId))];
-      const supplierPromises = supplierIds.map(async (supplierId) => {
-        try {
-          const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId));
-        return {
-            id: supplierId, 
-            data: supplierDoc.exists() ? supplierDoc.data() as Supplier : null 
-          };
-        } catch (error) {
-          console.warn(`Failed to fetch supplier ${supplierId}:`, error);
-          return { id: supplierId, data: null };
-        }
-      });
-
-      const suppliers = await Promise.all(supplierPromises);
-      const supplierMap = suppliers.reduce((acc, supplier) => {
-        if (supplier.data) {
-          acc[supplier.id] = supplier.data;
-        }
-        return acc;
-      }, {} as Record<string, Supplier>);
-
-      // Process deliveries with supplier data
-      const suppliersWithDeliveries = todaysDeliveries.map((delivery) => {
-        const supplierData = supplierMap[delivery.supplierId];
-        
-        if (!supplierData) {
-          return {
-            id: delivery.id,
-            name: 'Unknown Supplier',
-            expectedTime: delivery.scheduledTime || '00:00',
-            status: 'unknown',
-            priority: 'medium',
-            items: delivery.itemCount || 0,
-            contactPerson: 'N/A',
-            phone: 'N/A',
-            deliveryItems: delivery.deliveryItems || []
-          };
-        }
-
-        // Calculate delivery status
+        // Calculate status based on current time (simplified logic)
         const now = new Date();
-        const scheduledDateTime = delivery.scheduledDate.toDate();
-        const [hours, minutes] = (delivery.scheduledTime || '00:00').split(':').map(Number);
-        scheduledDateTime.setHours(hours, minutes, 0, 0);
-
-        const timeDiff = scheduledDateTime.getTime() - now.getTime();
-        const minutesDiff = Math.floor(timeDiff / (1000 * 60));
-
+        const currentHour = now.getHours();
         let status: 'on-time' | 'delayed' | 'early' = 'on-time';
-        if (delivery.status === 'delayed') {
+        
+        const [expectedHour] = expectedTime.split(':').map(Number);
+        if (currentHour > expectedHour + 2) {
           status = 'delayed';
-        } else if (minutesDiff < -30) {
-          status = 'delayed';
-        } else if (minutesDiff > 60) {
+        } else if (currentHour < expectedHour - 1) {
           status = 'early';
         }
 
         return {
-          id: delivery.id,
-          name: supplierData.supplierName || 'Unknown Supplier',
-          expectedTime: delivery.scheduledTime || '00:00',
+          id: supplier.id,
+          name: supplier.supplierName || 'Unknown Supplier',
+          expectedTime: expectedTime,
           status,
-          priority: delivery.priority || 'medium',
-          items: delivery.itemCount || delivery.deliveryItems?.length || 0,
-          contactPerson: delivery.contactPerson || 'N/A',
-          phone: delivery.contactPhone || supplierData.phoneNumber || 'N/A',
-          deliveryItems: delivery.deliveryItems || [],
-          totalValue: delivery.totalValue || 0,
-          trackingNumber: delivery.trackingNumber,
-          notes: delivery.notes
+          priority,
+          items: 0, // Can be populated from pending orders if available
+          contactPerson: (supplier as any).contactPerson || 'N/A',
+          phone: supplier.phoneNumber || 'N/A',
+          deliveryItems: [], // Can be populated from pending orders
+          email: supplier.emailAddress,
+          address: supplier.address,
+          routeDays: (supplier as any).routeDays
         };
-      }).filter(supplier => supplier !== null);
+      });
 
-      return suppliersWithDeliveries;
+      // Sort by expected time and priority
+      suppliersWithDetails.sort((a, b) => {
+        // First sort by priority
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        const priorityCompare = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityCompare !== 0) return priorityCompare;
+        
+        // Then sort by expected time
+        return a.expectedTime.localeCompare(b.expectedTime);
+      });
+
+      return suppliersWithDetails;
 
     } catch (error) {
       logger.error('Error fetching today\'s expected suppliers', error as Error, { userId });
+      console.error('❌ Error fetching suppliers:', error);
       return []; // Return empty array instead of throwing
     }
   }
@@ -576,6 +537,97 @@ export class ReceiverQueries {
     const userId = getCurrentUserId();
     if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
       console.warn('Unauthorized access to getTodaysRestockItems, returning empty array');
+      return [];
+    }
+
+    try {
+      // Get today's date range
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      console.log('📦 Fetching restock items for today:', today.toDateString());
+
+      // Query restockingItems collection for items expected today
+      const restockQuery = query(
+        collection(db, 'restockingItems'),
+        where('receiverId', '==', userId),
+        where('expectedDate', '>=', Timestamp.fromDate(today)),
+        where('expectedDate', '<', Timestamp.fromDate(tomorrow)),
+        orderBy('expectedDate'),
+        limit(100) // Limit to prevent large queries
+      );
+
+      const restockSnapshot = await getDocs(restockQuery);
+      const todaysItems = restockSnapshot.docs.map(doc => ({ 
+        id: doc.id,
+        ...doc.data() 
+      } as any));
+
+      console.log(`📋 Found ${todaysItems.length} restock items for today`);
+
+      // Process and format items for display
+      const itemsNeedingRestock = todaysItems
+        .filter(item => item.status === 'pending' || item.status === 'overdue' || item.status === 'partial')
+        .map(item => {
+          // Convert Firestore Timestamp to readable date
+          const expectedDate = item.expectedDate?.toDate?.() || new Date();
+          const createdDate = item.createdAt?.toDate?.() || new Date();
+          
+          // Calculate days until expected delivery
+          const daysUntilDelivery = Math.ceil((expectedDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+          return {
+            id: item.id,
+            itemName: item.itemName,
+            category: item.category || 'General',
+            currentStock: item.currentStock ?? 0,
+            restockThreshold: item.expectedQuantity || 0,
+            suggestedQuantity: item.expectedQuantity || 0,
+            priority: item.priority || 'medium',
+            supplier: item.supplierName || 'N/A',
+            status: item.status,
+            expectedDate: expectedDate.toLocaleDateString(),
+            createdDate: createdDate.toLocaleDateString(),
+            daysUntilDelivery,
+            unit: item.unit || 'pcs',
+            notes: item.notes || '',
+            receivedQuantity: item.receivedQuantity || 0,
+            itemDescription: item.itemDescription || '',
+            lastRestocked: createdDate.toLocaleDateString(),
+            averageUsage: 0 // Not applicable for restock requests
+          };
+        });
+
+      // Sort by priority and expected date
+      itemsNeedingRestock.sort((a, b) => {
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
+        
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+        return a.daysUntilDelivery - b.daysUntilDelivery;
+      });
+
+      console.log(`✅ Processed ${itemsNeedingRestock.length} items needing attention`);
+
+      return itemsNeedingRestock;
+
+    } catch (error) {
+      logger.error('Error fetching today\'s restock items', error as Error, { userId });
+      console.error('❌ Error fetching restock items:', error);
+      return []; // Return empty array instead of throwing
+    }
+  }
+
+  // Legacy method kept for backwards compatibility
+  static async getInventoryRestockItems() {
+    const userId = getCurrentUserId();
+    if (!userId || !hasPermission('MANAGE_DELIVERIES')) {
+      console.warn('Unauthorized access to getInventoryRestockItems, returning empty array');
       return [];
     }
 
@@ -817,127 +869,84 @@ export class ReceiverQueries {
       return () => {}; // Return empty unsubscribe function
     }
 
-    // Get today's date range
+    // Get today's day of the week
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayDayName = daysOfWeek[today.getDay()];
+    
+    console.log('📅 Subscribing to suppliers for:', todayDayName);
 
-    // Simplified query - avoid complex composite index
-    const deliveriesQuery = query(
-      collection(db, 'deliveries'),
-      where('receiverId', '==', userId),
-      where('scheduledDate', '>=', Timestamp.fromDate(today)),
-      where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
-      orderBy('scheduledDate'),
-      limit(50)
+    // Query suppliers where routeDays array contains today's day
+    const suppliersQuery = query(
+      collection(db, 'suppliers'),
+      where('routeDays', 'array-contains', todayDayName),
+      limit(100)
     );
 
-    return onSnapshot(deliveriesQuery, async (snapshot) => {
+    return onSnapshot(suppliersQuery, async (snapshot) => {
       try {
-        const todaysDeliveries = snapshot.docs.map(doc => ({ 
+        const todaysSuppliers = snapshot.docs.map(doc => ({ 
           id: doc.id, 
           ...doc.data() 
-        } as Delivery & { id: string }));
+        } as Supplier & { id: string }));
 
-        // Sort by scheduled time on client-side
-        todaysDeliveries.sort((a, b) => {
-          const dateCompare = a.scheduledDate.toDate().getTime() - b.scheduledDate.toDate().getTime();
-          if (dateCompare !== 0) return dateCompare;
+        console.log(`📦 Real-time update: ${todaysSuppliers.length} suppliers expected on ${todayDayName}`);
+
+        // Process suppliers for display
+        const suppliersWithDetails = todaysSuppliers.map((supplier) => {
+          // Get typical delivery time (default to 09:00 AM)
+          const expectedTime = '09:00';
           
-          const timeA = a.scheduledTime || '00:00';
-          const timeB = b.scheduledTime || '00:00';
-          return timeA.localeCompare(timeB);
-        });
+          // Determine priority - default to medium for all suppliers
+          let priority: 'high' | 'medium' | 'low' = 'medium';
 
-        // Get supplier details (batch processing)
-        const supplierIds = [...new Set(todaysDeliveries.map(d => d.supplierId))];
-        
-        if (supplierIds.length === 0) {
-          callback([]);
-          return;
-        }
-
-        const supplierPromises = supplierIds.map(async (supplierId) => {
-          try {
-            const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId));
-            return { 
-              id: supplierId, 
-              data: supplierDoc.exists() ? supplierDoc.data() as Supplier : null 
-            };
-          } catch (error) {
-            return { id: supplierId, data: null };
-          }
-        });
-
-        const suppliers = await Promise.all(supplierPromises);
-        const supplierMap = suppliers.reduce((acc, supplier) => {
-          if (supplier.data) {
-            acc[supplier.id] = supplier.data;
-          }
-          return acc;
-        }, {} as Record<string, Supplier>);
-
-        // Process deliveries with supplier data
-        const suppliersWithDeliveries = todaysDeliveries.map((delivery) => {
-          const supplierData = supplierMap[delivery.supplierId];
-          
-          if (!supplierData) {
-            return {
-              id: delivery.id,
-              name: 'Unknown Supplier',
-              expectedTime: delivery.scheduledTime || '00:00',
-              status: 'unknown',
-              priority: 'medium',
-              items: delivery.itemCount || 0,
-              contactPerson: 'N/A',
-              phone: 'N/A',
-              deliveryItems: delivery.deliveryItems || []
-            };
-          }
-
-          // Calculate delivery status
+          // Calculate status based on current time
           const now = new Date();
-          const scheduledDateTime = delivery.scheduledDate.toDate();
-          const [hours, minutes] = (delivery.scheduledTime || '00:00').split(':').map(Number);
-          scheduledDateTime.setHours(hours, minutes, 0, 0);
-
-          const timeDiff = scheduledDateTime.getTime() - now.getTime();
-          const minutesDiff = Math.floor(timeDiff / (1000 * 60));
-
+          const currentHour = now.getHours();
           let status: 'on-time' | 'delayed' | 'early' = 'on-time';
-          if (delivery.status === 'delayed') {
+          
+          const [expectedHour] = expectedTime.split(':').map(Number);
+          if (currentHour > expectedHour + 2) {
             status = 'delayed';
-          } else if (minutesDiff < -30) {
-            status = 'delayed';
-          } else if (minutesDiff > 60) {
+          } else if (currentHour < expectedHour - 1) {
             status = 'early';
           }
 
           return {
-            id: delivery.id,
-            name: supplierData.supplierName || 'Unknown Supplier',
-            expectedTime: delivery.scheduledTime || '00:00',
+            id: supplier.id,
+            name: supplier.supplierName || 'Unknown Supplier',
+            expectedTime: expectedTime,
             status,
-            priority: delivery.priority || 'medium',
-            items: delivery.itemCount || delivery.deliveryItems?.length || 0,
-            contactPerson: delivery.contactPerson || 'N/A',
-            phone: delivery.contactPhone || supplierData.phoneNumber || 'N/A',
-            deliveryItems: delivery.deliveryItems || [],
-            totalValue: delivery.totalValue || 0,
-            trackingNumber: delivery.trackingNumber,
-            notes: delivery.notes
+            priority,
+            items: 0,
+            contactPerson: (supplier as any).contactPerson || 'N/A',
+            phone: supplier.phoneNumber || 'N/A',
+            deliveryItems: [],
+            email: supplier.emailAddress,
+            address: supplier.address,
+            routeDays: (supplier as any).routeDays
           };
-        }).filter(supplier => supplier !== null);
+        });
 
-        callback(suppliersWithDeliveries);
+        // Sort by priority and expected time
+        suppliersWithDetails.sort((a, b) => {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          const priorityCompare = priorityOrder[a.priority] - priorityOrder[b.priority];
+          if (priorityCompare !== 0) return priorityCompare;
+          
+          return a.expectedTime.localeCompare(b.expectedTime);
+        });
+
+        callback(suppliersWithDetails);
 
       } catch (error) {
         logger.error('Error in suppliers subscription', error as Error, { userId });
+        console.error('❌ Subscription error:', error);
         callback([]); // Return empty array on error
       }
     }, (error) => {
       logger.error('Firestore subscription error', error as Error, { userId });
+      console.error('❌ Firestore subscription error:', error);
       callback([]); // Return empty array on subscription error
     });
   }
@@ -949,121 +958,89 @@ export class ReceiverQueries {
       throw new Error('Unauthorized access');
     }
 
-    // First get user's branch
-    getDoc(doc(db, 'employees', userId)).then((userDoc) => {
-      const userData = userDoc.data() as Employee;
-      
-      if (!userData?.branchId) {
-        console.error('User branch not found');
-        callback([]);
-        return;
-      }
+    // Get today's date range for filtering
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Optimized subscription query
-      const inventoryQuery = query(
-        collection(db, 'inventory'),
-        where('branchId', '==', userData.branchId),
-        where('status', '==', 'active'),
-        limit(100) // Prevent large real-time updates
-      );
+    console.log('📦 Setting up real-time subscription for restock items expected today');
 
-      return onSnapshot(inventoryQuery, async (snapshot) => {
-        try {
-          const allItems = snapshot.docs.map(doc => ({ 
-            id: doc.id, 
-            ...doc.data() 
-          } as InventoryItem & { id: string }));
+    // Subscribe to restockingItems collection for items expected today
+    const restockQuery = query(
+      collection(db, 'restockingItems'),
+      where('receiverId', '==', userId),
+      where('expectedDate', '>=', Timestamp.fromDate(today)),
+      where('expectedDate', '<', Timestamp.fromDate(tomorrow)),
+      orderBy('expectedDate'),
+      limit(100) // Prevent large real-time updates
+    );
 
-          // Process items (same logic as getTodaysRestockItems)
-          const itemsNeedingRestock = allItems
-            .filter(item => item.currentStock <= item.restockThreshold)
-            .map(item => {
-              const stockRatio = item.currentStock / item.restockThreshold;
-              const priority = stockRatio <= 0.2 ? 'urgent' : 
-                              stockRatio <= 0.5 ? 'high' : 
-                              stockRatio <= 0.8 ? 'medium' : 'low';
-              
-              const maxTarget = item.maxStock || (item.restockThreshold * 2);
-              const suggestedQuantity = Math.max(0, maxTarget - item.currentStock);
-              
-              const daysUntilEmpty = item.averageUsage > 0 ? 
-                Math.floor(item.currentStock / item.averageUsage) : null;
+    return onSnapshot(restockQuery, async (snapshot) => {
+      try {
+        const todaysItems = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        } as any));
 
-              return {
-                id: item.id,
-                itemName: item.itemName,
-                category: item.category,
-                currentStock: item.currentStock,
-                restockThreshold: item.restockThreshold,
-                maxStock: item.maxStock,
-                unitCost: item.unitCost,
-                supplierId: item.supplierId,
-                branchId: item.branchId,
-                location: item.location || 'Unknown',
-                averageUsage: item.averageUsage,
-                status: item.status,
-                priority,
-                suggestedQuantity,
-                stockRatio: Math.round(stockRatio * 100) / 100,
-                daysUntilEmpty,
-                supplier: 'Loading...',
-                lastRestocked: item.lastRestocked,
-                expiryDate: item.expiryDate
-              };
-            });
+        console.log(`📋 Real-time update: ${todaysItems.length} restock items for today`);
 
-          // Sort by priority
-          itemsNeedingRestock.sort((a, b) => {
-            const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-            const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
-            const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
+        // Process and format items for display
+        const itemsNeedingRestock = todaysItems
+          .filter(item => item.status === 'pending' || item.status === 'overdue' || item.status === 'partial')
+          .map(item => {
+            // Convert Firestore Timestamp to readable date
+            const expectedDate = item.expectedDate?.toDate?.() || new Date();
+            const createdDate = item.createdAt?.toDate?.() || new Date();
             
-            if (aPriority !== bPriority) {
-              return aPriority - bPriority;
-            }
-            return a.stockRatio - b.stockRatio;
+            // Calculate days until expected delivery
+            const daysUntilDelivery = Math.ceil((expectedDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+            return {
+              id: item.id,
+              itemName: item.itemName,
+              category: item.category || 'General',
+              currentStock: item.currentStock ?? 0,
+              restockThreshold: item.expectedQuantity || 0,
+              suggestedQuantity: item.expectedQuantity || 0,
+              priority: item.priority || 'medium',
+              supplier: item.supplierName || 'N/A',
+              status: item.status,
+              expectedDate: expectedDate.toLocaleDateString(),
+              createdDate: createdDate.toLocaleDateString(),
+              daysUntilDelivery,
+              unit: item.unit || 'pcs',
+              notes: item.notes || '',
+              receivedQuantity: item.receivedQuantity || 0,
+              itemDescription: item.itemDescription || '',
+              lastRestocked: createdDate.toLocaleDateString(),
+              averageUsage: 0 // Not applicable for restock requests
+            };
           });
 
-          // Get supplier names (optimized batch fetch)
-          const supplierIds = [...new Set(itemsNeedingRestock
-            .map(item => item.supplierId)
-            .filter(Boolean))];
+        // Sort by priority and expected date
+        itemsNeedingRestock.sort((a, b) => {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
+          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
           
-          if (supplierIds.length > 0) {
-            const supplierPromises = supplierIds.map(async (supplierId) => {
-              try {
-                const supplierDoc = await getDoc(doc(db, 'suppliers', supplierId!));
-                return { id: supplierId, name: supplierDoc.exists() ? supplierDoc.data().name : 'Unknown Supplier' };
-              } catch (error) {
-                return { id: supplierId, name: 'Unknown Supplier' };
-              }
-            });
-
-            const suppliers = await Promise.all(supplierPromises);
-            const supplierMap = suppliers.reduce((acc, supplier) => {
-              acc[supplier.id!] = supplier.name;
-              return acc;
-            }, {} as Record<string, string>);
-
-            // Update items with supplier names
-            itemsNeedingRestock.forEach(item => {
-              item.supplier = item.supplierId ? supplierMap[item.supplierId] || 'Unknown Supplier' : 'No Supplier';
-            });
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority;
           }
+          return a.daysUntilDelivery - b.daysUntilDelivery;
+        });
 
-          callback(itemsNeedingRestock);
+        console.log(`✅ Subscription update: ${itemsNeedingRestock.length} items needing attention`);
 
-        } catch (error) {
-          console.error('Error in restock items subscription:', error);
-          callback([]); // Return empty array on error
-        }
-      }, (error) => {
-        console.error('Firestore subscription error:', error);
-        callback([]); // Return empty array on subscription error
-      });
-    }).catch((error) => {
-      console.error('Error getting user data:', error);
-      callback([]);
+        callback(itemsNeedingRestock);
+
+      } catch (error) {
+        console.error('❌ Error in restock items subscription:', error);
+        callback([]); // Return empty array on error
+      }
+    }, (error) => {
+      console.error('❌ Firestore subscription error:', error);
+      callback([]); // Return empty array on subscription error
     });
   }
 }

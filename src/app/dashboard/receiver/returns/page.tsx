@@ -914,17 +914,17 @@ export default function ReturnNotesPage() {
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <Package className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Return Notes Management
                 </h1>
-                <p className="text-purple-100 text-lg">Create and manage return notes for suppliers</p>
+                <p className="text-purple-100 text-base">Create and manage return notes for suppliers</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -1075,36 +1075,182 @@ export default function ReturnNotesPage() {
           </div>
         </div>
 
-        {/* Return Notes Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {returnNotes
-            .filter(returnNote => {
-              const matchesSearch = !searchQuery || 
-                returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                returnNote.items.some(item => 
-                  item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  item.reason.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-              
-              const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
-              const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
-              
-              return matchesSearch && matchesStatus && matchesReason;
-            })
-            .map((returnNote) => (
-              <ReturnNoteCard
-                key={returnNote.id}
-                returnNote={returnNote}
-                onView={handleViewReturnNote}
-                onEdit={handleEditReturnNote}
-                onDelete={(returnNote) => {
-                  setSelectedReturnNote(returnNote);
-                  setShowDeleteModal(true);
-                }}
-                onUpdateStatus={handleUpdateReturnNoteStatus}
-              />
-            ))}
+        {/* Return Notes List */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Return Note #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Supplier
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Return Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Value
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reason
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {returnNotes
+                  .filter(returnNote => {
+                    const matchesSearch = !searchQuery || 
+                      returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      returnNote.items.some(item => 
+                        item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        item.reason.toLowerCase().includes(searchQuery.toLowerCase())
+                      );
+                    
+                    const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
+                    const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
+                    
+                    return matchesSearch && matchesStatus && matchesReason;
+                  })
+                  .length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center">
+                        <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Return Notes Found</h3>
+                        <p className="text-gray-500">
+                          {returnNotes.length === 0 
+                            ? 'Start by creating your first return note'
+                            : 'Try adjusting your search or filter criteria'
+                          }
+                        </p>
+                        {returnNotes.length === 0 && (
+                          <button
+                            onClick={handleCreateReturnNoteClick}
+                            className="mt-4 bg-purple-600 text-white px-6 py-3 rounded-2xl hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto font-semibold"
+                          >
+                            <Plus className="w-5 h-5" />
+                            Create First Return Note
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                  returnNotes
+                    .filter(returnNote => {
+                      const matchesSearch = !searchQuery || 
+                        returnNote.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        returnNote.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        returnNote.items.some(item => 
+                          item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.reason.toLowerCase().includes(searchQuery.toLowerCase())
+                        );
+                      
+                      const matchesStatus = statusFilter === 'all' || returnNote.status === statusFilter;
+                      const matchesReason = reasonFilter === 'all' || returnNote.reason === reasonFilter;
+                      
+                      return matchesSearch && matchesStatus && matchesReason;
+                    })
+                    .map((returnNote) => (
+                    <tr 
+                      key={returnNote.id} 
+                      className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {returnNote.returnNoteNumber}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Created: {returnNote.createdAt.toDate().toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">{returnNote.supplierName}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {returnNote.returnDate.toDate().toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {returnNote.totalQuantity || returnNote.items?.length || 0} items
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          UGX {(returnNote.totalValue || returnNote.items?.reduce((sum, item) => sum + (item.totalValue || (item.quantity * item.unitPrice) || 0), 0) || 0).toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 max-w-xs truncate" title={returnNote.reason}>
+                          {returnNote.reason}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <ReturnNoteStatusBadge status={returnNote.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleViewReturnNote(returnNote)}
+                            className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded transition-colors"
+                            title="View & Manage"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {(returnNote.status === 'draft' || returnNote.status === 'pending') && (
+                            <button
+                              onClick={() => handleEditReturnNote(returnNote)}
+                              className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {returnNote.status === 'approved' && (
+                            <button
+                              onClick={() => handleUpdateReturnNoteStatus(returnNote.id, 'picked_up')}
+                              className="p-1.5 text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded transition-colors"
+                              title="Mark Picked Up"
+                            >
+                              <Truck className="w-4 h-4" />
+                            </button>
+                          )}
+                          {(returnNote.status === 'draft' || returnNote.status === 'pending') && (
+                            <button
+                              onClick={() => {
+                                setSelectedReturnNote(returnNote);
+                                setShowDeleteModal(true);
+                              }}
+                              className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {returnNotes.length === 0 && (
@@ -1251,6 +1397,34 @@ export default function ReturnNotesPage() {
     </div>
   );
 }
+
+// Return Note Status Badge Component
+const ReturnNoteStatusBadge = ({ status }: { status: string }) => {
+  const getStatusColor = (status: string) => {
+    const statusConfig = RETURN_STATUSES.find(s => s.value === status);
+    const color = statusConfig?.color || 'gray';
+    
+    switch (color) {
+      case 'yellow': return 'bg-yellow-100 text-yellow-800';
+      case 'green': return 'bg-green-100 text-green-800';
+      case 'blue': return 'bg-blue-100 text-blue-800';
+      case 'purple': return 'bg-purple-100 text-purple-800';
+      case 'red': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statusConfig = RETURN_STATUSES.find(s => s.value === status);
+    return statusConfig?.label || status.toUpperCase();
+  };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(status)}`}>
+      {getStatusLabel(status)}
+    </span>
+  );
+};
 
 // Return Note Card Component
 const ReturnNoteCard = ({ returnNote, onView, onEdit, onDelete, onUpdateStatus }: {

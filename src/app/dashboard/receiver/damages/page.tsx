@@ -168,17 +168,17 @@ export default function DamagesPage() {
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Damages Management
                 </h1>
-                <p className="text-purple-100 text-lg">Track and manage damaged items from deliveries</p>
+                <p className="text-purple-100 text-base">Track and manage damaged items from deliveries</p>
               </div>
             </div>
             <div className="flex space-x-4">

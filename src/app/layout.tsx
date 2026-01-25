@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import DatabaseLoader from "../components/DatabaseLoader";
+import ClickDebugger from "../components/ui/ClickDebugger";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <DatabaseLoader />
+          <ClickDebugger />
           {children}
         </ThemeProvider>
       </body>

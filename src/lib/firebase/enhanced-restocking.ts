@@ -18,6 +18,7 @@ export interface RestockingItem {
   itemDescription?: string;
   category: string;
   supplierName?: string;
+  currentStock?: number;
   expectedQuantity: number;
   receivedQuantity?: number;
   unit: string;

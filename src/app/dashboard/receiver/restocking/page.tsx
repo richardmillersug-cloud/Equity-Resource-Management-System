@@ -13,6 +13,7 @@ interface RestockingItem {
   itemDescription?: string;
   category: string;
   supplierName?: string;
+  currentStock?: number;
   expectedQuantity: number;
   receivedQuantity?: number;
   unit: string;
@@ -52,12 +53,17 @@ export default function RestockingPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showCarryForwardModal, setShowCarryForwardModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RestockingItem | null>(null);
+  const [receivedQuantity, setReceivedQuantity] = useState(0);
+  const [carryForwardDate, setCarryForwardDate] = useState(new Date().toISOString().split('T')[0]);
   const [editItem, setEditItem] = useState<any>({
     itemName: '',
     itemDescription: '',
     category: '',
     supplierName: '',
+    currentStock: 0,
     expectedQuantity: 1,
     unit: 'pcs',
     expectedDate: new Date().toISOString().split('T')[0],
@@ -71,6 +77,7 @@ export default function RestockingPage() {
     itemDescription: '',
     category: '',
     supplierName: '',
+    currentStock: 0,
     expectedQuantity: 1,
     unit: 'pcs',
     expectedDate: new Date().toISOString().split('T')[0],
@@ -154,6 +161,7 @@ export default function RestockingPage() {
         itemDescription: '',
         category: '',
         supplierName: '',
+        currentStock: 0,
         expectedQuantity: 1,
         unit: 'pcs',
         expectedDate: new Date().toISOString().split('T')[0],
@@ -393,17 +401,17 @@ export default function RestockingPage() {
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <Package className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Restocking Management
                 </h1>
-                <p className="text-purple-100 text-lg">Track expected deliveries and manage inventory restocking</p>
+                <p className="text-purple-100 text-base">Track expected deliveries and manage inventory restocking</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -545,29 +553,136 @@ export default function RestockingPage() {
           </div>
         </div>
 
-        {/* Items Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {restockingItems
-            .filter(item => {
-              const matchesSearch = !searchTerm || 
-                item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (item.supplierName && item.supplierName.toLowerCase().includes(searchTerm.toLowerCase()));
-              
-              const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-              
-              return matchesSearch && matchesStatus;
-            })
-            .map((item) => (
-              <RestockingItemCard
-                key={item.id}
-                item={item}
-                onApprove={handleApproveItem}
-                onCarryForward={handleCarryForward}
-                onEdit={handleEditItem}
-                onDelete={handleDeleteItem}
-              />
-            ))}
+        {/* Items Table */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Received Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {restockingItems
+                  .filter(item => {
+                    const matchesSearch = !searchTerm || 
+                      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      (item.supplierName && item.supplierName.toLowerCase().includes(searchTerm.toLowerCase()));
+                    
+                    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+                    
+                    return matchesSearch && matchesStatus;
+                  })
+                  .map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
+                          {item.itemDescription && (
+                            <div className="text-xs text-gray-500">{item.itemDescription}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.category}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.currentStock ?? 0}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm font-semibold text-gray-900">{item.expectedQuantity} {item.unit}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.receivedQuantity ?? 0} {item.unit}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{item.supplierName || 'N/A'}</span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{item.expectedDate.toDate().toLocaleDateString()}</div>
+                        {item.receivedDate && (
+                          <div className="text-xs text-gray-500">Rcvd: {item.receivedDate.toDate().toLocaleDateString()}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          item.priority === 'high' ? 'bg-red-100 text-red-800' :
+                          item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          item.status === 'received' ? 'bg-green-100 text-green-800' :
+                          item.status === 'partial' ? 'bg-blue-100 text-blue-800' :
+                          item.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEditItem(item)}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          {item.status !== 'received' && (
+                            <button
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setReceivedQuantity(item.receivedQuantity || 0);
+                                setShowApproveModal(true);
+                              }}
+                              className="text-green-600 hover:text-green-800"
+                              title="Approve"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                          {(item.status === 'pending' || item.status === 'overdue') && (
+                            <button
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setCarryForwardDate(new Date().toISOString().split('T')[0]);
+                                setShowCarryForwardModal(true);
+                              }}
+                              className="text-purple-600 hover:text-purple-800"
+                              title="Carry Forward"
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {restockingItems.length === 0 && (
@@ -714,6 +829,109 @@ export default function RestockingPage() {
                 className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Modal */}
+      {showApproveModal && selectedItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Delivery</h3>
+            <p className="text-gray-600 mb-4">
+              Approve delivery for <strong>{selectedItem.itemName}</strong>
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Received Quantity
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={receivedQuantity}
+                  onChange={(e) => setReceivedQuantity(parseInt(e.target.value) || 0)}
+                  className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <span className="text-sm text-gray-600">{selectedItem.unit}</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Expected: {selectedItem.expectedQuantity} {selectedItem.unit}
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowApproveModal(false);
+                  setSelectedItem(null);
+                  setReceivedQuantity(0);
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleApproveItem(selectedItem.id, receivedQuantity);
+                  setShowApproveModal(false);
+                  setSelectedItem(null);
+                  setReceivedQuantity(0);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Carry Forward Modal */}
+      {showCarryForwardModal && selectedItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Carry Forward</h3>
+            <p className="text-gray-600 mb-4">
+              Move <strong>{selectedItem.itemName}</strong> to a new date
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Expected Date
+              </label>
+              <input
+                type="date"
+                value={carryForwardDate}
+                onChange={(e) => setCarryForwardDate(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowCarryForwardModal(false);
+                  setSelectedItem(null);
+                  setCarryForwardDate(new Date().toISOString().split('T')[0]);
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleCarryForward(selectedItem.id, carryForwardDate);
+                  setShowCarryForwardModal(false);
+                  setSelectedItem(null);
+                  setCarryForwardDate(new Date().toISOString().split('T')[0]);
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                Carry Forward
               </button>
             </div>
           </div>
@@ -1008,6 +1226,21 @@ const AddItemModal = ({ newItem, setNewItem, suppliers, categories, units, onSub
               </select>
             </div>
 
+            {/* Current Stock */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Stock
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={newItem.currentStock}
+                onChange={(e) => setNewItem(prev => ({ ...prev, currentStock: parseInt(e.target.value) || 0 }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Current inventory level"
+              />
+            </div>
+
             {/* Expected Quantity */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1197,6 +1430,21 @@ const EditItemModal = ({ editItem, setEditItem, suppliers, categories, units, on
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Current Stock */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Stock
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editItem.currentStock || 0}
+                onChange={(e) => setEditItem(prev => ({ ...prev, currentStock: parseInt(e.target.value) || 0 }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Current inventory level"
+              />
             </div>
 
             {/* Expected Quantity */}

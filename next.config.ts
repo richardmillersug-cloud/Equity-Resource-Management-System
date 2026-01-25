@@ -2,14 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  eslint: {
-    // Disable ESLint during builds to suppress errors
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     // Disable TypeScript errors during builds
     ignoreBuildErrors: true,
   },
+  // Empty turbopack config to acknowledge Turbopack is the default in Next.js 16
+  turbopack: {},
   // Fix for ChunkLoadError - disable chunk optimization during development
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {

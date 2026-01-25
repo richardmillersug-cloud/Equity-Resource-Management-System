@@ -455,6 +455,18 @@ export default function SuppliersPage() {
     }
   };
 
+  if (loading && suppliers.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-900">Loading Suppliers...</h2>
+          <p className="text-gray-600">Please wait while we fetch your data.</p>
+        </div>
+      </div>
+    );
+  }
+
   const printSuppliers = () => {
     try {
       const printWindow = window.open('', '_blank');
@@ -779,17 +791,17 @@ export default function SuppliersPage() {
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mx-4 mt-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <Building className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Building className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Suppliers Management
                 </h1>
-                <p className="text-purple-100 text-lg">Manage supplier information and relationships</p>
+                <p className="text-purple-100 text-base">Manage supplier information and relationships</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -942,67 +954,148 @@ export default function SuppliersPage() {
           </div>
         </div>
 
-        {/* Suppliers Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredSuppliers.map((supplier) => (
-            <div key={supplier.id} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">{supplier.supplierName}</h3>
-                  <p className="text-sm text-gray-500">TIN: {supplier.tinNumber}</p>
-                </div>
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(supplier.status)}`}>
-                  {supplier.status}
-                </span>
+        {/* Suppliers List Table */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <Building className="w-4 h-4 text-white" />
               </div>
-
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                  <span className="truncate">{supplier.address}</span>
-                </div>
-                
-                {supplier.emailAddress && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Mail className="w-4 h-4 mr-2 text-gray-400" />
-                    <span className="truncate">{supplier.emailAddress}</span>
-                  </div>
-                )}
-                
-                {supplier.phoneNumbers && supplier.phoneNumbers.length > 0 && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                    <span>{supplier.phoneNumbers[0]}</span>
-                    {supplier.phoneNumbers.length > 1 && (
-                      <span className="ml-1 text-xs text-gray-400">+{supplier.phoneNumbers.length - 1} more</span>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex items-center text-sm text-gray-600">
-                  <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                  <span>Registered: {supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}</span>
-                </div>
+              Suppliers ({(filteredSuppliers || []).length})
+            </h2>
+          </div>
+          
+          {!filteredSuppliers || filteredSuppliers.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-violet-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Building className="w-12 h-12 text-white" />
               </div>
-
-              <div className="flex gap-2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No suppliers found</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                {searchTerm || statusFilter !== 'All' 
+                  ? 'No suppliers match your current search criteria. Try adjusting your filters or search terms.' 
+                  : 'Get started by creating your first supplier.'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'All' && (
                 <button
-                  onClick={() => handleViewSupplier(supplier)}
-                  className="flex-1 bg-purple-50 text-purple-600 px-3 py-2 rounded-xl hover:bg-purple-100 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
+                  onClick={handleAddSupplier}
+                  className="mt-6 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-8 py-3 rounded-2xl flex items-center gap-2 mx-auto transition-all duration-300 shadow-lg hover:shadow-xl font-medium"
                 >
-                  <Eye className="w-4 h-4" />
-                  View
+                  <Plus className="w-5 h-5" />
+                  <span>Add First Supplier</span>
                 </button>
-                <button
-                  onClick={() => handleEditSupplier(supplier)}
-                  className="flex-1 bg-gray-50 text-gray-600 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-1 text-sm font-medium"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
-              </div>
+              )}
             </div>
-          ))}
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
+                  <tr>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Supplier Details
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact Information
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Address
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Registration Date
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {filteredSuppliers.map((supplier) => (
+                    <tr key={supplier.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
+                      <td className="px-4 lg:px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {supplier.supplierName}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            TIN: {supplier.tinNumber}
+                          </div>
+                          {supplier.routeDays && supplier.routeDays.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {supplier.routeDays.map((day) => (
+                                <span key={day} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                  {day.substring(0, 3)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="space-y-1">
+                          {supplier.phoneNumbers && supplier.phoneNumbers.length > 0 && (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Phone className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                              <span className="truncate max-w-[150px]">{supplier.phoneNumbers[0]}</span>
+                              {supplier.phoneNumbers.length > 1 && (
+                                <span className="ml-1 text-xs text-gray-400">+{supplier.phoneNumbers.length - 1}</span>
+                              )}
+                            </div>
+                          )}
+                          {supplier.emailAddress && (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Mail className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                              <span className="truncate max-w-[200px]">{supplier.emailAddress}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                          <div className="text-sm text-gray-900 truncate max-w-[200px]">{supplier.address}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+                          <div className="text-sm text-gray-900">
+                            {supplier.dateOfRegistration?.toDate ? supplier.dateOfRegistration.toDate().toLocaleDateString() : 'N/A'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(supplier.status)}`}>
+                          {supplier.status}
+                        </span>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">
+                        <div className="flex flex-wrap gap-1">
+                          <button 
+                            onClick={() => handleViewSupplier(supplier)}
+                            className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded transition-colors"
+                            title="View Supplier Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditSupplier(supplier)}
+                            className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded transition-colors"
+                            title="Edit Supplier"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {filteredSuppliers.length === 0 && (

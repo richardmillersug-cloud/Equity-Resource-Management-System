@@ -33,7 +33,7 @@ import {
   PieChart,
   HelpCircle
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
 import HydrationSafeLoader from '../../../components/ui/HydrationSafeLoader';
 
@@ -298,9 +298,23 @@ export default function ReceiverDashboard() {
   };
 
   const updateAnalyticsFromReturnNotes = (returnData: ReturnNote[]) => {
-    const pending = returnData.filter(r => r.status === 'pending').length;
-    const completed = returnData.filter(r => r.status === 'completed').length;
+    const pending = returnData.filter(r => r.status === 'pending' || r.status === 'Pending').length;
+    const completed = returnData.filter(r => r.status === 'completed' || r.status === 'Completed' || r.status === 'processed').length;
     const totalValue = returnData.reduce((sum, r) => sum + (r.totalValue || 0), 0);
+
+    // Calculate reason breakdown
+    const reasonCounts: { [key: string]: { reason: string; count: number; value: number } } = {};
+    returnData.forEach(r => {
+      const reason = r.returnReason || 'Unknown';
+      if (!reasonCounts[reason]) {
+        reasonCounts[reason] = { reason, count: 0, value: 0 };
+      }
+      reasonCounts[reason].count++;
+      reasonCounts[reason].value += r.totalValue || 0;
+    });
+    const reasonBreakdown = Object.values(reasonCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     setAnalyticsData(prev => ({
       ...prev,
@@ -309,16 +323,30 @@ export default function ReceiverDashboard() {
         pending,
         completed,
         totalValue,
-        reasonBreakdown: prev.returnNotes.reasonBreakdown, // Keep existing for now
+        reasonBreakdown,
         monthlyTrend: prev.returnNotes.monthlyTrend // Keep existing for now
       }
     }));
   };
 
   const updateAnalyticsFromDamages = (damageData: DamageReport[]) => {
-    const resolved = damageData.filter(d => d.status === 'resolved').length;
-    const pending = damageData.filter(d => d.status === 'pending').length;
+    const resolved = damageData.filter(d => d.status === 'resolved' || d.status === 'Resolved').length;
+    const pending = damageData.filter(d => d.status === 'pending' || d.status === 'Pending' || d.status === 'reported').length;
     const totalCost = damageData.reduce((sum, d) => sum + (d.estimatedCost || 0), 0);
+
+    // Calculate category breakdown
+    const categoryCounts: { [key: string]: { category: string; count: number; cost: number } } = {};
+    damageData.forEach(d => {
+      const category = d.category || 'Unknown';
+      if (!categoryCounts[category]) {
+        categoryCounts[category] = { category, count: 0, cost: 0 };
+      }
+      categoryCounts[category].count++;
+      categoryCounts[category].cost += d.estimatedCost || 0;
+    });
+    const categoryBreakdown = Object.values(categoryCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     setAnalyticsData(prev => ({
       ...prev,
@@ -327,18 +355,33 @@ export default function ReceiverDashboard() {
         resolved,
         pending,
         totalCost,
-        categoryBreakdown: prev.damages.categoryBreakdown, // Keep existing for now
+        categoryBreakdown,
         trends: prev.damages.trends // Keep existing for now
       }
     }));
   };
 
   const updateAnalyticsFromInvoices = (invoiceData: any[]) => {
-    const pending = invoiceData.filter(i => i.status === 'pending').length;
-    const approved = invoiceData.filter(i => i.status === 'approved').length;
-    const paid = invoiceData.filter(i => i.status === 'paid').length;
+    const pending = invoiceData.filter(i => i.status === 'Pending' || i.status === 'pending').length;
+    const approved = invoiceData.filter(i => i.status === 'Approved' || i.status === 'approved').length;
+    const paid = invoiceData.filter(i => i.status === 'Paid' || i.status === 'paid').length;
     const totalAmount = invoiceData.reduce((sum, i) => sum + (i.amount || 0), 0);
     const averageAmount = invoiceData.length > 0 ? totalAmount / invoiceData.length : 0;
+
+    // Calculate top suppliers by invoice count
+    const supplierCounts: { [key: string]: { name: string; count: number; amount: number } } = {};
+    invoiceData.forEach(inv => {
+      const supplierName = inv.supplierName || 'Unknown';
+      if (!supplierCounts[supplierName]) {
+        supplierCounts[supplierName] = { name: supplierName, count: 0, amount: 0 };
+      }
+      supplierCounts[supplierName].count++;
+      supplierCounts[supplierName].amount += inv.amount || 0;
+    });
+    const topSuppliers = Object.values(supplierCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map(s => ({ name: s.name, amount: s.amount, count: s.count }));
 
     setAnalyticsData(prev => ({
       ...prev,
@@ -350,7 +393,7 @@ export default function ReceiverDashboard() {
         totalAmount,
         averageAmount,
         monthlyTrend: prev.invoices.monthlyTrend, // Keep existing for now
-        topSuppliers: prev.invoices.topSuppliers, // Keep existing for now
+        topSuppliers,
         paymentTrends: prev.invoices.paymentTrends // Keep existing for now
       }
     }));
@@ -420,17 +463,17 @@ export default function ReceiverDashboard() {
       {/* Modern Hero Header */}
       <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm mb-6">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-700 opacity-90"></div>
-        <div className="relative p-8 text-white">
+        <div className="relative p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
-                <Package className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold mb-1 bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                   Receiver Dashboard
                 </h1>
-                <p className="text-purple-100 text-lg">Real-time data from Firestore • Track deliveries, returns, and inventory</p>
+                <p className="text-purple-100 text-base">Real-time data from Firestore • Track deliveries, returns, and inventory</p>
               </div>
             </div>
             <div className="flex space-x-4">
@@ -517,227 +560,417 @@ export default function ReceiverDashboard() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Tabs */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
-            {[
-              { id: 'deliveries', label: 'Deliveries', icon: Truck },
-              { id: 'returns', label: 'Return Notes', icon: FileText },
-              { id: 'damages', label: 'Damages', icon: AlertTriangle },
-              { id: 'restock', label: 'Restock Items', icon: Package }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setViewMode(tab.id as any)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-all duration-200 ${
-                    viewMode === tab.id
-                      ? 'border-purple-500 text-purple-600'
-                      : 'border-transparent text-gray-500 hover:text-purple-600 hover:border-purple-300'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+        {/* Additional Metrics Row */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Invoices</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{analyticsData.invoices.total}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">{formatCurrency(analyticsData.invoices.totalAmount)} total</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <FileText className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Delivery Performance</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{analyticsData.deliveries.performanceScore}%</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">{analyticsData.deliveries.onTime}/{analyticsData.deliveries.total} on time</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Target className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Pending Actions</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">
+                  {analyticsData.returnNotes.pending + analyticsData.damages.pending + analyticsData.invoices.pending}
+                </p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Requires attention</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 text-sm font-medium mb-1">Upcoming Deliveries</p>
+                <p className="text-3xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{analyticsData.deliveries.upcoming}</p>
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                  <span className="text-xs text-gray-500">Scheduled this week</span>
+                </div>
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Calendar className="w-7 h-7 text-white" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="p-6">
-          {viewMode === 'deliveries' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Delivery Management</h3>
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {deliveries.map((delivery) => (
-                      <tr key={delivery.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{delivery.supplierName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{delivery.invoiceNumber}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(delivery.expectedDeliveryDate)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            delivery.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                            delivery.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {delivery.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button className="text-purple-600 hover:text-purple-900 transition-colors">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* Comprehensive Analytics Section */}
+        <div className="grid gap-6 lg:grid-cols-2 mb-8">
+          {/* Delivery Performance Chart */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-purple-600" />
+                  Delivery Performance
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">On-time vs Late deliveries</p>
               </div>
             </div>
-          )}
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[
+                  { name: 'On Time', value: analyticsData.deliveries.onTime, color: '#10b981' },
+                  { name: 'Late', value: analyticsData.deliveries.late, color: '#ef4444' },
+                  { name: 'Pending', value: analyticsData.deliveries.upcoming, color: '#f59e0b' }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[8, 8, 0, 0]}>
+                    {[
+                      { name: 'On Time', value: analyticsData.deliveries.onTime },
+                      { name: 'Late', value: analyticsData.deliveries.late },
+                      { name: 'Pending', value: analyticsData.deliveries.upcoming }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.name === 'On Time' ? '#10b981' : entry.name === 'Late' ? '#ef4444' : '#f59e0b'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{analyticsData.deliveries.onTime}</p>
+                <p className="text-xs text-gray-500">On Time</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-600">{analyticsData.deliveries.late}</p>
+                <p className="text-xs text-gray-500">Late</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-yellow-600">{analyticsData.deliveries.upcoming}</p>
+                <p className="text-xs text-gray-500">Pending</p>
+              </div>
+            </div>
+          </div>
 
-          {viewMode === 'returns' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Return Notes</h3>
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {returnNotes.map((returnNote) => (
-                      <tr key={returnNote.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{returnNote.supplierName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{returnNote.returnReason}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(returnNote.totalValue)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            returnNote.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            returnNote.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {returnNote.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(returnNote.createdAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Invoice Status Breakdown */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <PieChart className="w-5 h-5 text-blue-600" />
+                  Invoice Status
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">Current invoice distribution</p>
               </div>
             </div>
-          )}
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Tooltip />
+                  <Pie
+                    data={[
+                      { name: 'Pending', value: analyticsData.invoices.pending, color: '#f59e0b' },
+                      { name: 'Approved', value: analyticsData.invoices.approved, color: '#10b981' },
+                      { name: 'Paid', value: analyticsData.invoices.paid, color: '#3b82f6' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {[
+                      { name: 'Pending', value: analyticsData.invoices.pending, color: '#f59e0b' },
+                      { name: 'Approved', value: analyticsData.invoices.approved, color: '#10b981' },
+                      { name: 'Paid', value: analyticsData.invoices.paid, color: '#3b82f6' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span className="text-sm text-gray-700">Pending</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{analyticsData.invoices.pending}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm text-gray-700">Approved</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{analyticsData.invoices.approved}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="text-sm text-gray-700">Paid</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{analyticsData.invoices.paid}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          {viewMode === 'damages' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Damage Reports</h3>
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Damage Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estimated Cost</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {damages.map((damage) => (
-                      <tr key={damage.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{damage.itemName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{damage.category}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{damage.damageType}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(damage.estimatedCost)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            damage.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                            damage.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {damage.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* Financial & Operational Metrics */}
+        <div className="grid gap-6 lg:grid-cols-3 mb-8">
+          {/* Financial Summary */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              Financial Summary
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div>
+                  <p className="text-sm text-gray-600">Total Invoice Value</p>
+                  <p className="text-xl font-bold text-blue-600">{formatCurrency(analyticsData.invoices.totalAmount)}</p>
+                </div>
+                <FileText className="w-8 h-8 text-blue-400" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                <div>
+                  <p className="text-sm text-gray-600">Total Damage Cost</p>
+                  <p className="text-xl font-bold text-red-600">{formatCurrency(analyticsData.damages.totalCost)}</p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div>
+                  <p className="text-sm text-gray-600">Return Value</p>
+                  <p className="text-xl font-bold text-green-600">{formatCurrency(analyticsData.returnNotes.totalValue)}</p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-green-400" />
+              </div>
+              <div className="pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Average Invoice</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(analyticsData.invoices.averageAmount)}</p>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {viewMode === 'restock' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Restock Recommendations</h3>
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Minimum Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recommended</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {restockItems.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.currentStock}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.minimumStock}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.recommendedRestock}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{item.supplierName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.priority === 'high' ? 'bg-red-100 text-red-800' :
-                            item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {item.priority}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Operational Efficiency */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <Zap className="w-5 h-5 text-purple-600" />
+              Operational Efficiency
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Delivery On-Time Rate</span>
+                  <span className="text-sm font-semibold text-gray-900">{analyticsData.deliveries.performanceScore}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${analyticsData.deliveries.performanceScore}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Return Resolution Rate</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {analyticsData.returnNotes.total > 0 
+                      ? formatPercentage(analyticsData.returnNotes.completed, analyticsData.returnNotes.total)
+                      : '0%'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: analyticsData.returnNotes.total > 0 
+                        ? `${(analyticsData.returnNotes.completed / analyticsData.returnNotes.total) * 100}%` 
+                        : '0%' 
+                    }}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Damage Resolution Rate</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {analyticsData.damages.total > 0 
+                      ? formatPercentage(analyticsData.damages.resolved, analyticsData.damages.total)
+                      : '0%'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-purple-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: analyticsData.damages.total > 0 
+                        ? `${(analyticsData.damages.resolved / analyticsData.damages.total) * 100}%` 
+                        : '0%' 
+                    }}
+                  ></div>
+                </div>
+              </div>
+              <div className="pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Overall Efficiency</p>
+                  <p className="text-lg font-bold text-purple-600">
+                    {Math.round(
+                      (analyticsData.deliveries.performanceScore + 
+                       (analyticsData.returnNotes.total > 0 ? (analyticsData.returnNotes.completed / analyticsData.returnNotes.total) * 100 : 0) +
+                       (analyticsData.damages.total > 0 ? (analyticsData.damages.resolved / analyticsData.damages.total) * 100 : 0)) / 3
+                    )}%
+                  </p>
+                </div>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Activity Summary */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+              <Activity className="w-5 h-5 text-indigo-600" />
+              Activity Summary
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Truck className="w-5 h-5 text-purple-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Total Deliveries</p>
+                    <p className="text-xs text-gray-500">Processed this period</p>
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-purple-600">{analyticsData.deliveries.total}</p>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Return Notes</p>
+                    <p className="text-xs text-gray-500">{analyticsData.returnNotes.completed} completed</p>
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-green-600">{analyticsData.returnNotes.total}</p>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Damage Reports</p>
+                    <p className="text-xs text-gray-500">{analyticsData.damages.resolved} resolved</p>
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-red-600">{analyticsData.damages.total}</p>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Invoices</p>
+                    <p className="text-xs text-gray-500">{analyticsData.invoices.approved} approved</p>
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">{analyticsData.invoices.total}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trends & Insights */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
+                Performance Trends & Insights
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Key metrics and recommendations</p>
+            </div>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <p className="text-sm font-medium text-gray-900">On-Time Delivery</p>
+              </div>
+              <p className="text-2xl font-bold text-purple-600">{analyticsData.deliveries.onTime}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {analyticsData.deliveries.total > 0 
+                  ? formatPercentage(analyticsData.deliveries.onTime, analyticsData.deliveries.total)
+                  : '0%'} of total deliveries
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUp className="w-5 h-5 text-green-600" />
+                <p className="text-sm font-medium text-gray-900">Completed Returns</p>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{analyticsData.returnNotes.completed}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {analyticsData.returnNotes.total > 0 
+                  ? formatPercentage(analyticsData.returnNotes.completed, analyticsData.returnNotes.total)
+                  : '0%'} resolution rate
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <p className="text-sm font-medium text-gray-900">Pending Issues</p>
+              </div>
+              <p className="text-2xl font-bold text-red-600">
+                {analyticsData.returnNotes.pending + analyticsData.damages.pending}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Requires immediate attention</p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <p className="text-sm font-medium text-gray-900">Invoice Processing</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-600">{analyticsData.invoices.approved}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {analyticsData.invoices.total > 0 
+                  ? formatPercentage(analyticsData.invoices.approved, analyticsData.invoices.total)
+                  : '0%'} approval rate
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
