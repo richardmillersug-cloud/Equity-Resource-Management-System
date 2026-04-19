@@ -54,11 +54,12 @@ export class ExpenseTypesService extends FirestoreService<ExpenseType> {
   // Get all active expense types
   async getActiveExpenseTypes(): Promise<ExpenseType[]> {
     const filters = [{ field: 'isActive', operator: '==', value: true }];
-    const pagination = { 
-      orderBy: 'category',
-      orderDirection: 'asc' as 'asc' | 'desc'
-    };
-    return this.getAll(filters, pagination);
+    // Sort by category in memory so we only need the default single-field index on isActive
+    // (Firestore would otherwise require a composite index: isActive + category).
+    const rows = await this.getAll(filters);
+    return rows.sort((a, b) =>
+      (a.category || '').localeCompare(b.category || '', undefined, { sensitivity: 'base' })
+    );
   }
 
   // Get expense types by category

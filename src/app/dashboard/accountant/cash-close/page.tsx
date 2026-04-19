@@ -27,11 +27,7 @@ import {
   Users,
   PieChart,
   Activity,
-  Eye,
-  Edit,
-  Trash2,
   ShoppingCart,
-  TrendingDown,
   Target,
   Banknote,
   Sun,
@@ -80,7 +76,7 @@ interface CashCloseRecord {
 
 export default function CashClosePage() {
   const [cashCloseRecords, setCashCloseRecords] = useState<CashCloseRecord[]>([]);
-  const [allocationsData, setAllocationsData] = useState<{[cashCloseId: string]: AllocationResult[]}>({});
+  // allocationsData removed — auto-allocation service was removed per user request
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCashCloseForm, setShowCashCloseForm] = useState(false);
@@ -98,8 +94,8 @@ export default function CashClosePage() {
   const [summaryMode, setSummaryMode] = useState<'displayed' | 'filtered'>('displayed');
   const [groupByDate, setGroupByDate] = useState<boolean>(false); // New state for date grouping
   
-  // Sorting states
-  const [sortColumn, setSortColumn] = useState<string>('createdAt');
+  // Sorting states — default to business date descending
+  const [sortColumn, setSortColumn] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Summary statistics
@@ -202,63 +198,48 @@ export default function CashClosePage() {
   // Export functionality
   const exportToCSV = () => {
     const summaryRecords = getSummaryRecords();
-    const headers = ['Date', 'Entry Date', 'Entry Time', 'Created By', 'Entry Delay (Days)', 'Late Entry', 'Revenue', 'Tax', 'Gross Profit', 'Tills', 'Shifts', 'PM Allocations', 'Allocation Status', 'Network', 'Variance', 'Cash Close Status'];
-    const csvData = filteredRecords.map(record => {
-      const allocations = allocationsData[record.id] || [];
-      const totalPM = allocations.reduce((sum, allocation) => sum + allocation.purchasingManagerAmount, 0);
-      const allocatedCount = allocations.filter(a => a.distributionStatus.purchasingManager === 'allocated').length;
-      const totalShifts = allocations.length;
-      
-      let allocationStatus = 'No Allocations';
-      if (totalShifts > 0) {
-        if (allocatedCount === totalShifts) {
-          allocationStatus = 'All Allocated';
-        } else if (allocatedCount > 0) {
-          allocationStatus = `Partial (${allocatedCount}/${totalShifts})`;
-        } else {
-          allocationStatus = 'Not Allocated';
-        }
-      }
+    const headers = [
+      'Business Date', 'Entry Date', 'Entry Time', 'Created By',
+      'Entry Delay (Days)', 'Late Entry',
+      'Revenue (UGX)', 'Tax (UGX)', 'Gross Profit (UGX)',
+      'Expenses (UGX)', 'Network Payments (UGX)', 'PM Fund (UGX)',
+      'Tills', 'Day Shifts', 'Night Shifts',
+      'Variance (UGX)', 'Status'
+    ];
 
-      return [
-        new Date(record.date).toLocaleDateString(),
-        record.createdAt?.toLocaleDateString() || 'Unknown',
-        record.createdAt?.toLocaleTimeString() || 'Unknown',
-        record.createdBy || 'Unknown',
-        record.entryDelay || 0,
-        record.isLateEntry ? 'Yes' : 'No',
-        record.totalRevenue,
-        record.taxAmount,
-        record.profitAmount,
-        record.shifts?.reduce((total, shift) => total + (shift.tills?.length || 0), 0) || 0,
-        `${record.shifts?.filter(shift => shift.shift === 'day')?.length || 0} day, ${record.shifts?.filter(shift => shift.shift === 'night')?.length || 0} night`,
-        totalPM,
-        allocationStatus,
-        record.totalNetworkPayments,
-        record.totalExcess > 0 ? `+${record.totalExcess}` : record.totalShortage > 0 ? `-${record.totalShortage}` : 'Balanced',
-        record.status
-      ];
-    });
-
-    // Add summary totals
-    const totalPMAllocations = summaryRecords.reduce((sum, record) => {
-      const allocations = allocationsData[record.id] || [];
-      return sum + allocations.reduce((allocSum, allocation) => allocSum + allocation.purchasingManagerAmount, 0);
-    }, 0);
+    const csvData = filteredRecords.map(record => [
+      new Date(record.date + 'T00:00:00').toLocaleDateString(),
+      record.createdAt?.toLocaleDateString() || 'Unknown',
+      record.createdAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'Unknown',
+      record.createdBy || 'Unknown',
+      record.entryDelay || 0,
+      record.isLateEntry ? 'Yes' : 'No',
+      record.totalRevenue,
+      record.taxAmount,
+      record.profitAmount,
+      record.totalExpenses || 0,
+      record.totalNetworkPayments || 0,
+      record.purchasingManager || 0,
+      record.shifts?.reduce((total: number, shift: any) => total + (shift.tills?.length || 0), 0) || 0,
+      record.shifts?.filter((s: any) => s.shift === 'day').length || 0,
+      record.shifts?.filter((s: any) => s.shift === 'night').length || 0,
+      record.totalExcess > 0 ? record.totalExcess : record.totalShortage > 0 ? -record.totalShortage : 0,
+      record.status
+    ]);
 
     const summaryData = [
-      '', // Empty date for totals row
-      'TOTALS',
-      summaryRecords.reduce((sum, record) => sum + record.totalRevenue, 0),
-      summaryRecords.reduce((sum, record) => sum + record.taxAmount, 0),
-      summaryRecords.reduce((sum, record) => sum + record.profitAmount, 0),
-      summaryRecords.reduce((sum, record) => sum + (record.shifts?.reduce((total, shift) => total + (shift.tills?.length || 0), 0) || 0), 0),
-      `${summaryRecords.length} records`,
-      totalPMAllocations,
-      `${summaryRecords.filter(r => (allocationsData[r.id] || []).every(a => a.distributionStatus.purchasingManager === 'allocated')).length} fully allocated`,
-      summaryRecords.reduce((sum, record) => sum + record.totalNetworkPayments, 0),
-      summaryRecords.reduce((sum, record) => sum + (record.totalExcess - record.totalShortage), 0),
-      summaryMode === 'displayed' ? 'Displayed Totals' : 'All Filtered Totals'
+      'TOTALS', '', '', '',
+      '', '',
+      summaryRecords.reduce((sum, r) => sum + r.totalRevenue, 0),
+      summaryRecords.reduce((sum, r) => sum + r.taxAmount, 0),
+      summaryRecords.reduce((sum, r) => sum + r.profitAmount, 0),
+      summaryRecords.reduce((sum, r) => sum + (r.totalExpenses || 0), 0),
+      summaryRecords.reduce((sum, r) => sum + (r.totalNetworkPayments || 0), 0),
+      summaryRecords.reduce((sum, r) => sum + (r.purchasingManager || 0), 0),
+      summaryRecords.reduce((sum, r) => sum + (r.shifts?.reduce((t: number, s: any) => t + (s.tills?.length || 0), 0) || 0), 0),
+      '', '',
+      summaryRecords.reduce((sum, r) => sum + (r.totalExcess - r.totalShortage), 0),
+      `${summaryRecords.length} records`
     ];
 
     const csvContent = [headers, ...csvData, [], summaryData]
@@ -278,119 +259,103 @@ export default function CashClosePage() {
 
   const exportToPDF = () => {
     const summaryRecords = getSummaryRecords();
-    // Create a simple HTML table for printing/PDF
     const printWindow = window.open('', '_blank');
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Cash Close Records</title>
+          <title>Cash Close Records — Equity Retail System</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .summary { margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
-            .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px; }
+            body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; color: #1e293b; }
+            h1 { font-size: 20px; margin-bottom: 4px; }
+            p { margin: 2px 0; color: #64748b; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th { background-color: #1e40af; color: white; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+            td { border-bottom: 1px solid #e2e8f0; padding: 7px 10px; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            tr.late { border-left: 3px solid #f59e0b; }
+            .summary { margin: 16px 0; padding: 12px 16px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; }
+            .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
             .summary-item { text-align: center; }
-            .summary-value { font-size: 18px; font-weight: bold; margin-top: 5px; }
-            .totals-row { background-color: #e3f2fd; font-weight: bold; }
+            .summary-label { font-size: 10px; color: #64748b; text-transform: uppercase; }
+            .summary-value { font-size: 15px; font-weight: bold; color: #1e40af; margin-top: 3px; }
+            .badge { display: inline-block; padding: 2px 7px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
+            .badge-completed { background: #dcfce7; color: #166534; }
+            .badge-pending { background: #fef3c7; color: #92400e; }
+            .badge-error { background: #fee2e2; color: #991b1b; }
+            .text-right { text-align: right; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Cash Close Records</h1>
-            <p>Generated on ${new Date().toLocaleDateString()}</p>
-            <p>Total Records: ${filteredRecords.length} | Summary Mode: ${summaryMode === 'displayed' ? 'Displayed Rows' : 'All Filtered'}</p>
-          </div>
-          
+          <h1>Cash Close Records</h1>
+          <p>Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; Records: ${summaryRecords.length} of ${filteredRecords.length} filtered</p>
+
           <div class="summary">
-            <h3>Summary Totals (${summaryRecords.length} records)</h3>
+            <strong>Summary Totals — ${summaryRecords.length} records</strong>
             <div class="summary-grid">
               <div class="summary-item">
-                <div>Total Revenue</div>
-                <div class="summary-value">UGX ${summaryRecords.reduce((sum, record) => sum + record.totalRevenue, 0).toLocaleString()}</div>
+                <div class="summary-label">Total Revenue</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + r.totalRevenue, 0).toLocaleString()}</div>
               </div>
               <div class="summary-item">
-                <div>Total Tax</div>
-                <div class="summary-value">UGX ${summaryRecords.reduce((sum, record) => sum + record.taxAmount, 0).toLocaleString()}</div>
+                <div class="summary-label">Gross Profit</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + r.profitAmount, 0).toLocaleString()}</div>
               </div>
               <div class="summary-item">
-                <div>Total Gross Profit</div>
-                <div class="summary-value">UGX ${summaryRecords.reduce((sum, record) => sum + record.profitAmount, 0).toLocaleString()}</div>
+                <div class="summary-label">Total Expenses</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + (r.totalExpenses || 0), 0).toLocaleString()}</div>
               </div>
               <div class="summary-item">
-                <div>Total Network</div>
-                <div class="summary-value">UGX ${summaryRecords.reduce((sum, record) => sum + record.totalNetworkPayments, 0).toLocaleString()}</div>
+                <div class="summary-label">Network Payments</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + (r.totalNetworkPayments || 0), 0).toLocaleString()}</div>
               </div>
               <div class="summary-item">
-                <div>Net Variance</div>
-                <div class="summary-value">UGX ${summaryRecords.reduce((sum, record) => sum + (record.totalExcess - record.totalShortage), 0).toLocaleString()}</div>
+                <div class="summary-label">PM Fund Total</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + (r.purchasingManager || 0), 0).toLocaleString()}</div>
               </div>
               <div class="summary-item">
-                <div>Total Tills</div>
-                <div class="summary-value">${summaryRecords.reduce((sum, record) => sum + (record.shifts?.reduce((total, shift) => total + (shift.tills?.length || 0), 0) || 0), 0)} tills</div>
+                <div class="summary-label">Net Variance</div>
+                <div class="summary-value">UGX ${summaryRecords.reduce((sum, r) => sum + (r.totalExcess - r.totalShortage), 0).toLocaleString()}</div>
               </div>
             </div>
           </div>
-          
+
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Revenue</th>
-                <th>Tax</th>
-                <th>Gross Profit</th>
-                <th>Tills</th>
-                <th>Shifts</th>
-                <th>PM Allocations</th>
-                <th>Allocation Status</th>
-                <th>Network</th>
-                <th>Variance</th>
+                <th>Business Date</th>
+                <th>Created By</th>
+                <th class="text-right">Revenue</th>
+                <th class="text-right">Tax</th>
+                <th class="text-right">Gross Profit</th>
+                <th class="text-right">Expenses</th>
+                <th class="text-right">Network</th>
+                <th class="text-right">PM Fund</th>
+                <th class="text-right">Variance</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              ${filteredRecords.map(record => {
-                const allocations = allocationsData[record.id] || [];
-                const totalPM = allocations.reduce((sum, allocation) => sum + allocation.purchasingManagerAmount, 0);
-                const allocatedCount = allocations.filter(a => a.distributionStatus.purchasingManager === 'allocated').length;
-                const totalShifts = allocations.length;
-                
-                let allocationStatus = 'No Allocations';
-                if (totalShifts > 0) {
-                  if (allocatedCount === totalShifts) {
-                    allocationStatus = 'All Allocated';
-                  } else if (allocatedCount > 0) {
-                    allocationStatus = `Partial (${allocatedCount}/${totalShifts})`;
-                  } else {
-                    allocationStatus = 'Not Allocated';
-                  }
-                }
-
-                return `
-                <tr>
-                  <td>${new Date(record.date).toLocaleDateString()}</td>
-                  <td>UGX ${record.totalRevenue.toLocaleString()}</td>
-                  <td>UGX ${record.taxAmount.toLocaleString()}</td>
-                  <td>UGX ${record.profitAmount.toLocaleString()}</td>
-                  <td>${record.shifts?.reduce((total, shift) => total + (shift.tills?.length || 0), 0) || 0} tills</td>
-                  <td>${record.shifts?.filter(shift => shift.shift === 'day')?.length || 0} day, ${record.shifts?.filter(shift => shift.shift === 'night')?.length || 0} night</td>
-                  <td>UGX ${totalPM.toLocaleString()}</td>
-                  <td>${allocationStatus}</td>
-                  <td>UGX ${record.totalNetworkPayments.toLocaleString()}</td>
-                  <td>${record.totalExcess > 0 ? `+UGX ${record.totalExcess.toLocaleString()}` : record.totalShortage > 0 ? `-UGX ${record.totalShortage.toLocaleString()}` : 'Balanced'}</td>
-                  <td>${record.status}</td>
+              ${filteredRecords.map(record => `
+                <tr${record.isLateEntry ? ' class="late"' : ''}>
+                  <td>${new Date(record.date + 'T00:00:00').toLocaleDateString('en-UG', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}${record.isLateEntry ? ' ⚠ Late' : ''}</td>
+                  <td>${record.createdBy || 'Unknown'}</td>
+                  <td class="text-right">UGX ${record.totalRevenue.toLocaleString()}</td>
+                  <td class="text-right">UGX ${record.taxAmount.toLocaleString()}</td>
+                  <td class="text-right">UGX ${record.profitAmount.toLocaleString()}</td>
+                  <td class="text-right">UGX ${(record.totalExpenses || 0).toLocaleString()}</td>
+                  <td class="text-right">UGX ${(record.totalNetworkPayments || 0).toLocaleString()}</td>
+                  <td class="text-right">UGX ${(record.purchasingManager || 0).toLocaleString()}</td>
+                  <td class="text-right">${record.totalExcess > 0 ? `+UGX ${record.totalExcess.toLocaleString()}` : record.totalShortage > 0 ? `-UGX ${record.totalShortage.toLocaleString()}` : 'Balanced'}</td>
+                  <td><span class="badge badge-${record.status}">${record.status}</span></td>
                 </tr>
-                `;
-              }).join('')}
+              `).join('')}
             </tbody>
           </table>
         </body>
       </html>
     `;
-    
+
     printWindow?.document.write(htmlContent);
     printWindow?.document.close();
     printWindow?.print();
@@ -544,46 +509,63 @@ export default function CashClosePage() {
         const currentUser = authService.getCurrentUser();
         
         if (currentUser?.employee?.branchId) {
-          // Get cash closes for the user's branch
           cashCloses = await cashCloseService.getBranchCashCloses(currentUser.employee.branchId);
         } else {
-          // Get all cash closes if no specific branch
           cashCloses = await cashCloseService.getAll();
         }
         console.log('✅ Cash closes loaded with regular service:', cashCloses?.length || 0);
       }
+
+      // ─── Robust date parser ────────────────────────────────────────────────
+      // Handles: JS Date | Firestore Timestamp (.toDate()) |
+      //          plain { seconds, nanoseconds } map | ISO/date strings
+      const parseToDate = (v: any): Date | null => {
+        if (!v) return null;
+        if (v instanceof Date)               return isNaN(v.getTime()) ? null : v;
+        if (typeof v?.toDate === 'function') { const d = v.toDate(); return isNaN(d.getTime()) ? null : d; }
+        if (typeof v?.seconds === 'number')  { const d = new Date(v.seconds * 1000); return isNaN(d.getTime()) ? null : d; }
+        if (typeof v === 'string' && v.trim()) { const d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+        return null;
+      };
+
+      const parseDateStr = (v: any): string => {
+        const d = parseToDate(v);
+        return d ? d.toISOString().split('T')[0] : '';
+      };
+      // ──────────────────────────────────────────────────────────────────────
       
       // Transform cash closes to match expected format with comprehensive financial data
       const cashCloseRecords = cashCloses.map(cashClose => {
+        // ── Resolve business date — try every possible field name ──
+        const businessDateObj =
+          parseToDate(cashClose.cashCloseDate) ||
+          parseToDate(cashClose.businessDate) ||
+          parseToDate(cashClose.date) ||
+          parseToDate(cashClose.createdAt); // last resort: use entry date
+
+        const businessDateStr = businessDateObj
+          ? businessDateObj.toISOString().split('T')[0]
+          : '';
+
+        // ── Resolve entry date ──
+        const entryDateObj = parseToDate(cashClose.createdAt) || new Date();
+
+        // Calculate delay in days between business date and entry date
+        const entryDelay = businessDateObj
+          ? Math.floor((entryDateObj.getTime() - businessDateObj.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        const isLateEntry = entryDelay > 1;
+
         // Calculate expense breakdown from shifts data
-        const expenseBreakdown = {
-          general: 0,
-          ura: 0,
-          emergencies: 0,
-          dayToDay: 0
-        };
-        
-        // Calculate purchasing manager breakdown
+        const expenseBreakdown = { general: 0, ura: 0, emergencies: 0, dayToDay: 0 };
+
+        // PM allocation amount comes directly from the record field
         const purchasingManagerBreakdown = {
           allocated: cashClose.purchasingManager || 0,
-          pending: (cashClose.purchasingManager || 0) * 0.3, // 30% typically pending
-          disbursed: (cashClose.purchasingManager || 0) * 0.7  // 70% typically disbursed
+          pending: 0,
+          disbursed: cashClose.purchasingManager || 0
         };
 
-        // Calculate entry timing metrics - handle both Date objects and Firestore timestamps
-        const businessDate = cashClose.cashCloseDate instanceof Date ? 
-          new Date(cashClose.cashCloseDate.getTime()) : 
-          (cashClose.cashCloseDate?.toDate?.() ? 
-            new Date(cashClose.cashCloseDate.toDate().getTime()) : new Date());
-        const entryDate = cashClose.createdAt instanceof Date ? 
-          new Date(cashClose.createdAt.getTime()) : 
-          (cashClose.createdAt?.toDate?.() ? 
-            new Date(cashClose.createdAt.toDate().getTime()) : new Date());
-        
-        // Calculate delay in days between business date and entry date
-        const entryDelay = Math.floor((entryDate.getTime() - businessDate.getTime()) / (1000 * 60 * 60 * 24));
-        const isLateEntry = entryDelay > 1; // Flag entries made more than 1 day after business date
-        
         // Calculate network shift details
         const networkShiftDetails = (cashClose.shifts || []).map((shift: any) => ({
           shift: shift.shift,
@@ -605,18 +587,10 @@ export default function CashClosePage() {
                 if (till.expenseDetails) {
                   till.expenseDetails.forEach((expense: any) => {
                     switch (expense.expenseType) {
-                      case 'GENERAL':
-                        expenseBreakdown.general += expense.amount || 0;
-                        break;
-                      case 'URA':
-                        expenseBreakdown.ura += expense.amount || 0;
-                        break;
-                      case 'EMERGENCIES':
-                        expenseBreakdown.emergencies += expense.amount || 0;
-                        break;
-                      case 'DAY_TO_DAY':
-                        expenseBreakdown.dayToDay += expense.amount || 0;
-                        break;
+                      case 'GENERAL':     expenseBreakdown.general    += expense.amount || 0; break;
+                      case 'URA':         expenseBreakdown.ura         += expense.amount || 0; break;
+                      case 'EMERGENCIES': expenseBreakdown.emergencies += expense.amount || 0; break;
+                      case 'DAY_TO_DAY':  expenseBreakdown.dayToDay    += expense.amount || 0; break;
                     }
                   });
                 }
@@ -627,11 +601,7 @@ export default function CashClosePage() {
         
         return {
           id: cashClose.id,
-          date: cashClose.cashCloseDate instanceof Date ? 
-                cashClose.cashCloseDate.toISOString().split('T')[0] : 
-                (cashClose.cashCloseDate?.toDate?.() ? 
-                  new Date(cashClose.cashCloseDate.toDate().getTime()).toISOString().split('T')[0] : 
-                  new Date().toISOString().split('T')[0]),
+          date: businessDateStr,
           totalRevenue: cashClose.totalRevenue || 0,
           taxAmount: cashClose.taxAmount || 0,
           profitAmount: cashClose.profitAmount || 0,
@@ -647,11 +617,8 @@ export default function CashClosePage() {
           status: cashClose.status || 'completed',
           createdBy: cashClose.createdBy || 'Unknown',
           shifts: cashClose.shifts || [],
-          // Add timing information - create new Date objects to prevent mutation
-          createdAt: new Date(entryDate.getTime()),
-          updatedAt: cashClose.updatedAt?.toDate?.() ? 
-            new Date(cashClose.updatedAt.toDate().getTime()) : 
-            new Date(entryDate.getTime()),
+          createdAt: new Date(entryDateObj.getTime()),
+          updatedAt: parseToDate(cashClose.updatedAt) || new Date(entryDateObj.getTime()),
           entryDelay,
           isLateEntry,
           expenseBreakdown,
@@ -659,7 +626,13 @@ export default function CashClosePage() {
           networkShiftDetails
         };
       })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        .sort((a, b) => {
+          // Records with valid dates sort by date desc; undated records go to end
+          if (!a.date && !b.date) return 0;
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return b.date.localeCompare(a.date);
+        });
 
       console.log('🔍 Setting cash close records. Sample dates:', cashCloseRecords.length > 0 ? {
         id: cashCloseRecords[0].id,
@@ -670,24 +643,8 @@ export default function CashClosePage() {
       
       setCashCloseRecords(cashCloseRecords);
 
-      // Load allocation data for all cash closes
-      console.log('🔄 Loading allocation data for', cashCloseRecords.length, 'cash closes...');
-      const allocationsMap: {[cashCloseId: string]: AllocationResult[]} = {};
-      
-      await Promise.all(cashCloseRecords.map(async (record) => {
-        try {
-          const allocations = await autoAllocationService.getAllAllocationsByCashCloseId(record.id);
-          if (allocations.length > 0) {
-            allocationsMap[record.id] = allocations;
-            console.log(`📊 Found ${allocations.length} allocations for cash close ${record.id.substring(0, 8)}...`);
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to load allocations for cash close ${record.id}:`, error);
-        }
-      }));
-      
-      setAllocationsData(allocationsMap);
-      console.log('✅ Allocation data loaded for', Object.keys(allocationsMap).length, 'cash closes');
+      // Allocation data loading removed — auto-allocation service was removed per user request
+      // PM allocation amounts are read directly from each record's purchasingManager field
 
       // Check if there's a record for today
       const today = new Date().toISOString().split('T')[0];
@@ -714,35 +671,38 @@ export default function CashClosePage() {
 
   const calculateStats = (records: CashCloseRecord[]) => {
     const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Filter today's records specifically
-    const todayRecords = records.filter(r => r.date === today);
+    // Build date strings for boundaries
+    const now = new Date();
+    const weekAgo  = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString().split('T')[0];
+    const monthAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).toISOString().split('T')[0];
+
+    // Only use records that have a valid resolved date (not empty string)
+    const datedRecords = records.filter(r => r.date && r.date.length === 10);
+
+    const todayRecords = datedRecords.filter(r => r.date === today);
     const todayRevenue = todayRecords.reduce((sum, r) => sum + r.totalRevenue, 0);
 
-    // Filter week records
-    const weekRecords = records.filter(r => r.date >= weekAgo && r.date <= today);
+    const weekRecords = datedRecords.filter(r => r.date >= weekAgo && r.date <= today);
     const weekRevenue = weekRecords.reduce((sum, r) => sum + r.totalRevenue, 0);
 
-    // Filter month records
-    const monthRecords = records.filter(r => r.date >= monthAgo && r.date <= today);
+    const monthRecords = datedRecords.filter(r => r.date >= monthAgo && r.date <= today);
     const monthRevenue = monthRecords.reduce((sum, r) => sum + r.totalRevenue, 0);
 
-    const avgDailyRevenue = monthRecords.length > 0 ? monthRevenue / monthRecords.length : 0;
+    // Average across unique business days in the month window
+    const uniqueDays = new Set(monthRecords.map(r => r.date)).size;
+    const avgDailyRevenue = uniqueDays > 0 ? monthRevenue / uniqueDays : 0;
 
-    const totalShortage = records.reduce((sum, r) => sum + r.totalShortage, 0);
-    const totalExcess = records.reduce((sum, r) => sum + r.totalExcess, 0);
+    const totalShortage = datedRecords.reduce((sum, r) => sum + r.totalShortage, 0);
+    const totalExcess   = datedRecords.reduce((sum, r) => sum + r.totalExcess,   0);
 
     console.log('📊 Stats calculated:', {
-      today,
-      todayRecords: todayRecords.length,
-      todayRevenue,
-      weekRecords: weekRecords.length,
-      weekRevenue,
-      monthRecords: monthRecords.length,
-      monthRevenue,
-      avgDailyRevenue
+      today, weekAgo, monthAgo,
+      dated: datedRecords.length,
+      todayRecords: todayRecords.length, todayRevenue,
+      weekRecords: weekRecords.length,  weekRevenue,
+      monthRecords: monthRecords.length, monthRevenue,
+      uniqueDays, avgDailyRevenue
     });
 
     setStats({
@@ -787,491 +747,383 @@ export default function CashClosePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading cash close data...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Calculator className="w-5 h-5 text-blue-400" />
+            </div>
+          </div>
+          <p className="text-base font-semibold text-gray-700">Loading Cash Close Data</p>
+          <p className="text-sm text-gray-400">Fetching records from the database…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-6">
+      <div className="max-w-7xl mx-auto space-y-5">
+
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            Cash Close Management
-            {todaysRecord ? (
-              <span className="text-lg bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
-                ✓ Today: {new Date().toLocaleDateString()}
-              </span>
-            ) : (
-              <span className="text-lg bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-medium">
-                ⚠ Pending: {new Date().toLocaleDateString()}
-              </span>
-            )}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {todaysRecord 
-              ? 'All financial data below reflects today\'s completed cash close' 
-              : 'All financial metrics show 0 until today\'s cash close is created'
-            }
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => {
-              setLoading(true);
-              loadCashCloseData();
-            }}
-            disabled={loading}
-            className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Refreshing...' : 'Refresh Data'}
-          </button>
-          <button
-            onClick={() => setShowCashCloseForm(true)}
-            className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-              todaysRecord
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-yellow-500 text-white hover:bg-yellow-600'
-            }`}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {todaysRecord ? 'New Cash Close' : 'Create Today\'s Cash Close'}
-          </button>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 shadow-xl">
+        <div className="absolute inset-0 opacity-[0.08]"
+          style={{ backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-indigo-300/20 blur-2xl" />
+
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-widest text-blue-100">Accountant Workspace</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Cash Close Management</h1>
+            <p className="text-blue-100 mt-1.5 text-sm">
+              {todaysRecord
+                ? "Today's cash close is complete — financial data is current"
+                : "No cash close for today — metrics will reflect 0 until one is created"}
+            </p>
+            <div className="flex flex-wrap gap-3 mt-4">
+              <div className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 ${todaysRecord ? 'bg-white/15 border-white/25' : 'bg-amber-400/20 border-amber-300/40'}`}>
+                <div className={`w-2 h-2 rounded-full ${todaysRecord ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                <span className={`text-xs font-medium ${todaysRecord ? 'text-white' : 'text-amber-100'}`}>
+                  {todaysRecord ? `Today complete · ${new Date().toLocaleDateString()}` : `Pending · ${new Date().toLocaleDateString()}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5">
+                <div className="w-2 h-2 rounded-full bg-blue-200" />
+                <span className="text-xs text-blue-100">{cashCloseRecords.length} total records</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => { setLoading(true); loadCashCloseData(); }}
+              disabled={loading}
+              className="flex items-center gap-2 bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl px-4 py-2.5 text-white text-sm font-medium transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowCashCloseForm(true)}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all shadow-sm ${
+                todaysRecord
+                  ? 'bg-white text-blue-700 hover:bg-blue-50'
+                  : 'bg-amber-400 hover:bg-amber-300 text-amber-900'
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              {todaysRecord ? 'New Cash Close' : "Create Today's"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
+        <div className="flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-5 py-4">
+          <AlertCircle className="h-5 w-5 shrink-0 text-red-500" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">Error loading data</p>
+            <p className="text-sm text-red-700 mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
-
-
-            {/* Current Day Status Banner */}
+      {/* Current Day Status Banner */}
       {!todaysRecord && (
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-800">No Cash Close for Today</h3>
-              <p className="text-sm text-yellow-700">
-                {new Date().toLocaleDateString()} - All financial metrics below show 0 until today's cash close is completed.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowCashCloseForm(true)}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Create Today's Cash Close
-            </button>
+        <div className="flex items-center gap-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-amber-900 text-sm">No Cash Close for Today</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} — financial metrics will show 0 until today's close is recorded.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCashCloseForm(true)}
+            className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+          >
+            Create Now
+          </button>
         </div>
       )}
 
       {/* Late Entry Alert Banner */}
       {cashCloseRecords.some(record => record.isLateEntry) && (
-        <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-orange-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-orange-800">Late Data Entries Detected</h3>
-              <p className="text-sm text-orange-700">
-                {cashCloseRecords.filter(record => record.isLateEntry).length} out of {cashCloseRecords.length} entries were made after the business date. 
-                This may indicate data entry delays or operational issues.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setEntryTimingFilter('late_entry');
-                setDateFilter('all');
-                setFromDate('');
-                setToDate('');
-                setShiftFilter('all');
-              }}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              View Late Entries
-            </button>
+        <div className="flex items-center gap-4 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4">
+          <div className="w-10 h-10 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-orange-600" />
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-orange-900 text-sm">Late Data Entries Detected</p>
+            <p className="text-xs text-orange-700 mt-0.5">
+              {cashCloseRecords.filter(r => r.isLateEntry).length} of {cashCloseRecords.length} entries were recorded after the business date. This may indicate operational delays.
+            </p>
+          </div>
+          <button
+            onClick={() => { setEntryTimingFilter('late_entry'); setDateFilter('all'); setFromDate(''); setToDate(''); setShiftFilter('all'); }}
+            className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+          >
+            View Late Entries
+          </button>
         </div>
       )}
 
 
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className={`bg-white rounded-lg border p-6 ${todaysRecord ? 'border-gray-200' : 'border-yellow-200 bg-yellow-50'}`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${todaysRecord ? 'bg-blue-100' : 'bg-yellow-100'}`}>
-              {todaysRecord ? (
-              <DollarSign className="h-6 w-6 text-blue-600" />
-              ) : (
-                <AlertCircle className="h-6 w-6 text-yellow-600" />
-              )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Today's Revenue",
+            value: formatCurrency(stats.todayRevenue),
+            sub: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            note: !todaysRecord ? 'Create a cash close to record revenue' : null,
+            icon: <DollarSign className="w-5 h-5" />,
+            iconBg: todaysRecord ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-amber-50 text-amber-600 border-amber-200',
+            valueColor: todaysRecord ? 'text-slate-800' : 'text-amber-600',
+            border: todaysRecord ? 'border-gray-200' : 'border-amber-200',
+          },
+          {
+            label: 'Week Revenue',
+            value: formatCurrency(stats.weekRevenue),
+            sub: 'Last 7 days',
+            note: null,
+            icon: <TrendingUp className="w-5 h-5" />,
+            iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+            valueColor: 'text-slate-800',
+            border: 'border-gray-200',
+          },
+          {
+            label: 'Month Revenue',
+            value: formatCurrency(stats.monthRevenue),
+            sub: 'Last 30 days',
+            note: null,
+            icon: <Calculator className="w-5 h-5" />,
+            iconBg: 'bg-violet-50 text-violet-600 border-violet-200',
+            valueColor: 'text-slate-800',
+            border: 'border-gray-200',
+          },
+          {
+            label: 'Daily Average',
+            value: formatCurrency(stats.avgDailyRevenue),
+            sub: '30-day avg',
+            note: null,
+            icon: <Target className="w-5 h-5" />,
+            iconBg: 'bg-orange-50 text-orange-600 border-orange-200',
+            valueColor: 'text-slate-800',
+            border: 'border-gray-200',
+          },
+        ].map((card, i) => (
+          <div key={i} className={`bg-white rounded-2xl border ${card.border} p-5 shadow-sm`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${card.iconBg}`}>
+                {card.icon}
+              </div>
+              <span className="text-xs font-medium text-slate-400">{card.sub}</span>
             </div>
-            <div className="text-xs font-medium text-gray-500">
-              {new Date().toLocaleDateString()}
-            </div>
+            <p className="text-xs font-medium text-slate-500 mb-1">{card.label}</p>
+            <p className={`text-xl font-bold ${card.valueColor} leading-tight`}>{card.value}</p>
+            {card.note && <p className="text-xs text-amber-600 mt-1.5">{card.note}</p>}
           </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Today's Revenue</p>
-            <p className={`text-2xl font-bold ${todaysRecord ? 'text-gray-900' : 'text-yellow-600'}`}>
-              {formatCurrency(stats.todayRevenue)}
-            </p>
-            {!todaysRecord && (
-              <p className="text-xs text-yellow-600 mt-1">Create cash close to record revenue</p>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="text-xs font-medium text-gray-500">
-              Last 7 days
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Week Revenue</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.weekRevenue)}</p>
-            {!todaysRecord && stats.weekRevenue === stats.todayRevenue && (
-              <p className="text-xs text-orange-500 mt-1">Includes today's missing data</p>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
-              <Calculator className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="text-xs font-medium text-gray-500">
-              Last 30 days
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Month Revenue</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.monthRevenue)}</p>
-            {!todaysRecord && stats.monthRevenue === stats.todayRevenue && (
-              <p className="text-xs text-orange-500 mt-1">Includes today's missing data</p>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
-              <Target className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="text-xs font-medium text-gray-500">
-              30-day avg
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Daily Average</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.avgDailyRevenue)}</p>
-            {!todaysRecord && (
-              <p className="text-xs text-orange-500 mt-1">Average may be affected by missing data</p>
-            )}
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Comprehensive Financial Tracking */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Network Shift Details Section */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Smartphone className="h-5 w-5 text-gray-400 mr-2" />
-                <h3 className="text-lg font-medium text-gray-900">Network Shift Details</h3>
-              </div>
-              <div className="flex space-x-2">
-                <button className="flex items-center px-3 py-1 text-sm bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100">
-                  <Activity className="h-4 w-4 mr-1" />
-                  Day Shift
-                </button>
-                <button className="flex items-center px-3 py-1 text-sm bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100">
-                  <Activity className="h-4 w-4 mr-1" />
-                  Night Shift
-                </button>
+      {/* Financial Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* Network Shift Details */}
+        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-5">
+            <div className="absolute inset-0 opacity-[0.06]"
+              style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white tracking-tight">Network Payments</h3>
+                  <p className="text-xs text-blue-200 mt-0.5">Electronic payments across all shifts</p>
+                </div>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mt-1">Track network payments across shifts and payment methods</p>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-blue-900">Mobile Money</span>
-                  <Smartphone className="h-4 w-4 text-blue-600" />
+
+          <div className="p-6 space-y-5">
+            {/* Payment type KPIs */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: 'Mobile Money',
+                  sub: 'MTN · Airtel',
+                  icon: <Smartphone className="w-4 h-4 text-blue-500" />,
+                  value: formatCurrency(cashCloseRecords.reduce((sum, r) =>
+                    sum + (r.networkShiftDetails?.reduce((s: number, sh: any) => s + (sh.mobilePayments || 0), 0) || 0), 0)),
+                  bg: 'bg-blue-50', border: 'border-blue-200', color: 'text-blue-700',
+                },
+                {
+                  label: 'Card Payments',
+                  sub: 'Visa · Mastercard',
+                  icon: <CreditCard className="w-4 h-4 text-emerald-500" />,
+                  value: formatCurrency(cashCloseRecords.reduce((sum, r) =>
+                    sum + (r.networkShiftDetails?.reduce((s: number, sh: any) => s + (sh.cardPayments || 0), 0) || 0), 0)),
+                  bg: 'bg-emerald-50', border: 'border-emerald-200', color: 'text-emerald-700',
+                },
+                {
+                  label: 'Total Network',
+                  sub: 'All electronic',
+                  icon: <PieChart className="w-4 h-4 text-violet-500" />,
+                  value: formatCurrency(cashCloseRecords.reduce((sum, r) => sum + (r.totalNetworkPayments || 0), 0)),
+                  bg: 'bg-violet-50', border: 'border-violet-200', color: 'text-violet-700',
+                },
+              ].map((kpi, i) => (
+                <div key={i} className={`rounded-xl ${kpi.bg} border ${kpi.border} p-3`}>
+                  <div className="flex items-center gap-1.5 mb-2">{kpi.icon}<span className="text-xs font-medium text-gray-600">{kpi.label}</span></div>
+                  <p className={`text-sm font-bold ${kpi.color}`}>{kpi.value}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{kpi.sub}</p>
                 </div>
-                <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(cashCloseRecords.reduce((sum, r) => {
-                    return sum + (r.networkShiftDetails?.reduce((shiftSum: number, shift: any) => 
-                      shiftSum + (shift.mobilePayments || 0), 0) || 0);
-                  }, 0))}
-                </p>
-                <p className="text-xs text-blue-700 mt-1">MTN, Airtel, M-Sente</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-green-900">Card Payments</span>
-                  <CreditCard className="h-4 w-4 text-green-600" />
-                </div>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(cashCloseRecords.reduce((sum, r) => {
-                    return sum + (r.networkShiftDetails?.reduce((shiftSum: number, shift: any) => 
-                      shiftSum + (shift.cardPayments || 0), 0) || 0);
-                  }, 0))}
-                </p>
-                <p className="text-xs text-green-700 mt-1">Visa, Mastercard</p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-purple-900">Total Network</span>
-                  <PieChart className="h-4 w-4 text-purple-600" />
-                </div>
-                <p className="text-2xl font-bold text-purple-600">
-                  {formatCurrency(cashCloseRecords.reduce((sum, r) => sum + (r.totalNetworkPayments || 0), 0))}
-                </p>
-                <p className="text-xs text-purple-700 mt-1">All electronic payments</p>
-              </div>
+              ))}
             </div>
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                <Users className="h-4 w-4 mr-2" />
-                Shift Performance Breakdown
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Shift</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Till Count</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cash</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Network</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Variance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    <tr>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
-                          Day Shift
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'day')?.reduce((tillSum: number, shift: any) => 
-                            tillSum + (shift.tills?.length || 0), 0) || 0), 0)}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'day')?.reduce((shiftSum: number, shift: any) => 
-                            shiftSum + (shift.shiftTotalCash || 0), 0) || 0), 0))}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'day')?.reduce((shiftSum: number, shift: any) => 
-                            shiftSum + (shift.shiftTotalNetwork || 0), 0) || 0), 0))}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm">
-                        <span className="text-green-600">+{formatCurrency(0)}</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
-                          Night Shift
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'night')?.reduce((tillSum: number, shift: any) => 
-                            tillSum + (shift.tills?.length || 0), 0) || 0), 0)}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'night')?.reduce((shiftSum: number, shift: any) => 
-                            shiftSum + (shift.shiftTotalCash || 0), 0) || 0), 0))}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(cashCloseRecords.reduce((sum, r) => 
-                          sum + (r.shifts?.filter((s: any) => s.shift === 'night')?.reduce((shiftSum: number, shift: any) => 
-                            shiftSum + (shift.shiftTotalNetwork || 0), 0) || 0), 0))}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm">
-                        <span className="text-green-600">+{formatCurrency(0)}</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+
+            {/* Shift breakdown table */}
+            <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <div className="bg-slate-50 border-b border-gray-100 px-4 py-2.5 flex items-center gap-2">
+                <Users className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shift Breakdown</span>
               </div>
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {['Shift', 'Tills', 'Cash', 'Network'].map(h => (
+                      <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {[
+                    { label: 'Day', dot: 'bg-amber-400', shift: 'day' },
+                    { label: 'Night', dot: 'bg-indigo-500', shift: 'night' },
+                  ].map(row => (
+                    <tr key={row.shift} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${row.dot}`} />
+                          {row.label}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {cashCloseRecords.reduce((sum, r) =>
+                          sum + (r.shifts?.filter((s: any) => s.shift === row.shift)?.reduce((ts: number, s: any) => ts + (s.tills?.length || 0), 0) || 0), 0)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-slate-800">
+                        {formatCurrency(cashCloseRecords.reduce((sum, r) =>
+                          sum + (r.shifts?.filter((s: any) => s.shift === row.shift)?.reduce((ss: number, s: any) => ss + (s.shiftTotalCash || 0), 0) || 0), 0))}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatCurrency(cashCloseRecords.reduce((sum, r) =>
+                          sum + (r.shifts?.filter((s: any) => s.shift === row.shift)?.reduce((ss: number, s: any) => ss + (s.shiftTotalNetwork || 0), 0) || 0), 0))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        {/* Today's Purchasing Manager Fund Tracking */}
-        <div className={`bg-white rounded-lg border overflow-hidden ${todaysRecord ? 'border-gray-200' : 'border-yellow-200'}`}>
-          <div className={`px-6 py-4 border-b ${todaysRecord ? 'border-gray-200 bg-white' : 'border-yellow-200 bg-yellow-50'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {todaysRecord ? (
-                  <ShoppingCart className="h-5 w-5 text-gray-400 mr-2" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
-                )}
-                <h3 className="text-lg font-medium text-gray-900">Today's Purchasing Manager Funds</h3>
-                <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                  {new Date().toLocaleDateString()}
-                </span>
+        {/* Today's PM Funds */}
+        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div className={`relative overflow-hidden px-6 py-5 ${todaysRecord ? 'bg-gradient-to-r from-emerald-700 to-teal-700' : 'bg-gradient-to-r from-amber-600 to-orange-600'}`}>
+            <div className="absolute inset-0 opacity-[0.06]"
+              style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
+                  <ShoppingCart className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white tracking-tight">PM Fund Tracking</h3>
+                  <p className={`text-xs mt-0.5 ${todaysRecord ? 'text-emerald-200' : 'text-amber-100'}`}>
+                    {todaysRecord ? "Today's purchasing manager allocation" : "No cash close today — data unavailable"}
+                  </p>
+                </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowCashCloseForm(true)}
-                className={`flex items-center px-3 py-1 text-sm rounded-md ${
-                  todaysRecord 
-                    ? 'bg-green-50 text-green-600 hover:bg-green-100' 
-                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                }`}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-2 text-white text-xs font-medium transition-colors"
               >
-                {todaysRecord ? (
-                  <>
-                    <Wallet className="h-4 w-4 mr-1" />
-                    Allocate Funds
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Create Cash Close
-                  </>
-                )}
+                {todaysRecord ? <Wallet className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                {todaysRecord ? 'Allocate' : 'Create'}
               </button>
             </div>
-            <p className={`text-sm mt-1 ${todaysRecord ? 'text-gray-600' : 'text-yellow-700'}`}>
-              {todaysRecord 
-                ? 'Today\'s purchasing manager fund allocations and disbursements' 
-                : 'No fund allocation data available - create today\'s cash close first'
-              }
-            </p>
           </div>
-          
-          <div className="p-6">
-            {/* Today's Fund Status Cards */}
-            {todaysRecord ? (
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-green-900">Total Allocated</span>
-                    <Target className="h-4 w-4 text-green-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(todaysRecord.purchasingManagerBreakdown?.allocated || todaysRecord.purchasingManager || 0)}
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">User-configured percentage of remaining funds</p>
-                </div>
 
-                <div className="bg-yellow-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-yellow-900">Pending Disbursement</span>
-                    <Clock className="h-4 w-4 text-yellow-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {formatCurrency(todaysRecord.purchasingManagerBreakdown?.pending || 0)}
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">Awaiting purchase manager approval</p>
+          <div className="p-6 space-y-5">
+            <div className="space-y-3">
+              {/* PM Fund from today's cash close */}
+              <div className={`rounded-xl border p-4 flex items-center gap-4 ${todaysRecord ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 border-dashed opacity-60'}`}>
+                <div className={`shrink-0 ${todaysRecord ? 'text-emerald-500' : 'text-slate-400'}`}><Target className="w-4 h-4" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-600">PM Fund Amount</p>
+                  <p className="text-xs text-slate-400">Computed from today's revenue</p>
                 </div>
-
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-900">Disbursed</span>
-                    <CheckCircle className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(todaysRecord.purchasingManagerBreakdown?.disbursed || 0)}
-                  </p>
-                  <p className="text-xs text-blue-700 mt-1">Successfully transferred to purchasing</p>
-                </div>
+                <p className={`text-base font-bold shrink-0 ${todaysRecord ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {todaysRecord ? formatCurrency(todaysRecord.purchasingManager || 0) : formatCurrency(0)}
+                </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4 opacity-60 border-2 border-dashed border-yellow-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Total Allocated</span>
-                    <Target className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-500">{formatCurrency(0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">User-configured percentage of remaining funds</p>
-                  <p className="text-xs text-yellow-600 mt-1">No allocation data today</p>
+              {/* Special funds */}
+              <div className={`rounded-xl border p-4 flex items-center gap-4 ${todaysRecord ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200 border-dashed opacity-60'}`}>
+                <div className={`shrink-0 ${todaysRecord ? 'text-amber-500' : 'text-slate-400'}`}><Wallet className="w-4 h-4" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-600">Special Funds</p>
+                  <p className="text-xs text-slate-400">Retained for special operations</p>
                 </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 opacity-60 border-2 border-dashed border-yellow-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Pending Disbursement</span>
-                    <Clock className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-500">{formatCurrency(0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Awaiting purchase manager approval</p>
-                  <p className="text-xs text-yellow-600 mt-1">No pending data today</p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 opacity-60 border-2 border-dashed border-yellow-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Disbursed</span>
-                    <CheckCircle className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-500">{formatCurrency(0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Successfully transferred to purchasing</p>
-                  <p className="text-xs text-yellow-600 mt-1">No disbursements today</p>
-                </div>
+                <p className={`text-base font-bold shrink-0 ${todaysRecord ? 'text-amber-700' : 'text-slate-400'}`}>
+                  {todaysRecord ? formatCurrency(todaysRecord.specialFunds || 0) : formatCurrency(0)}
+                </p>
               </div>
-            )}
+              {/* Total expenses */}
+              <div className={`rounded-xl border p-4 flex items-center gap-4 ${todaysRecord ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 border-dashed opacity-60'}`}>
+                <div className={`shrink-0 ${todaysRecord ? 'text-blue-500' : 'text-slate-400'}`}><Receipt className="w-4 h-4" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-600">Total Expenses</p>
+                  <p className="text-xs text-slate-400">Operational costs recorded today</p>
+                </div>
+                <p className={`text-base font-bold shrink-0 ${todaysRecord ? 'text-blue-700' : 'text-slate-400'}`}>
+                  {todaysRecord ? formatCurrency(todaysRecord.totalExpenses || 0) : formatCurrency(0)}
+                </p>
+              </div>
+            </div>
 
-            {/* Allocation History */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                <Activity className="h-4 w-4 mr-2" />
-                Recent Allocations
-              </h4>
-              <div className="space-y-2">
-                {cashCloseRecords.slice(0, 3).map((record, index) => (
-                  <div key={record.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+            {/* Recent allocation history */}
+            <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <div className="bg-slate-50 border-b border-gray-100 px-4 py-2.5 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Recent Records</span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {cashCloseRecords.slice(0, 3).map((record) => (
+                  <div key={record.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50 transition-colors">
                     <div>
-                      <span className="text-sm text-gray-900">{record.date}</span>
-                      <p className="text-xs text-gray-500">
-                        {formatCurrency(record.specialFunds)} daily expense fund allocated
-                      </p>
+                      <p className="text-sm font-medium text-slate-700">{new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatCurrency(record.specialFunds)} expense fund</p>
                     </div>
-                    <span className="text-sm font-medium text-green-600">
-                      {formatCurrency(record.purchasingManager)}
-                    </span>
+                    <span className="text-sm font-bold text-emerald-600">{formatCurrency(record.purchasingManager)}</span>
                   </div>
                 ))}
+                {cashCloseRecords.length === 0 && (
+                  <div className="px-4 py-6 text-center text-sm text-slate-400">No records yet</div>
+                )}
               </div>
             </div>
           </div>
@@ -1279,67 +1131,55 @@ export default function CashClosePage() {
       </div>
 
 
-      {/* Recent Cash Close Records */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Cash Close History</h3>
-          <p className="text-sm text-gray-600 mt-1">All cash close entries ordered by date</p>
-        </div>
-        
-        {/* Data Filters */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-md font-medium text-gray-900">Filter Records</h4>
-            <span className="text-sm text-gray-500">
-              Showing {rowsPerPage === -1 ? filteredRecords.length : Math.min(rowsPerPage, filteredRecords.length)} of {filteredRecords.length} filtered records ({cashCloseRecords.length} total)
+      {/* Cash Close History */}
+      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+
+        {/* Section header */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5">
+          <div className="absolute inset-0 opacity-[0.08]"
+            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white tracking-tight">Cash Close History</h3>
+                <p className="text-xs text-blue-100 mt-0.5">All entries ordered by date · {cashCloseRecords.length} total records</p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
+              {rowsPerPage === -1 ? filteredRecords.length : Math.min(rowsPerPage, filteredRecords.length)} of {filteredRecords.length} shown
             </span>
           </div>
-          
-          <div className="flex flex-wrap items-end gap-4">
-            {/* Date Range Inputs */}
+        </div>
+
+        {/* Filter bar */}
+        <div className="px-6 py-4 border-b border-gray-100 bg-blue-50/30">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Date range */}
             <div className="flex items-end gap-2">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  <Calendar className="inline h-3 w-3 mr-1" />
-                  From
-                </label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => {
-                    setFromDate(e.target.value);
-                    setDateFilter('custom');
-                  }}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                <label className="block text-xs font-medium text-slate-500 mb-1">From</label>
+                <input type="date" value={fromDate}
+                  onChange={(e) => { setFromDate(e.target.value); setDateFilter('custom'); }}
+                  className="w-32 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">To</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => {
-                    setToDate(e.target.value);
-                    setDateFilter('custom');
-                  }}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                <label className="block text-xs font-medium text-slate-500 mb-1">To</label>
+                <input type="date" value={toDate}
+                  onChange={(e) => { setToDate(e.target.value); setDateFilter('custom'); }}
+                  className="w-32 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
                 />
               </div>
             </div>
 
-            {/* Quick Presets */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Quick Presets</label>
-              <select 
-                value={dateFilter}
-                onChange={(e) => {
-                  setDateFilter(e.target.value);
-                  if (e.target.value !== 'custom') {
-                    setFromDate('');
-                    setToDate('');
-                  }
-                }}
-                className="w-36 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <label className="block text-xs font-medium text-slate-500 mb-1">Preset</label>
+              <select value={dateFilter}
+                onChange={(e) => { setDateFilter(e.target.value); if (e.target.value !== 'custom') { setFromDate(''); setToDate(''); } }}
+                className="w-36 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -1350,106 +1190,71 @@ export default function CashClosePage() {
               </select>
             </div>
 
-            {/* Shift Filter */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                <Sun className="inline h-3 w-3 mr-1" />
-                Shift
-              </label>
-              <select 
-                value={shiftFilter}
-                onChange={(e) => setShiftFilter(e.target.value)}
-                className="w-28 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <label className="block text-xs font-medium text-slate-500 mb-1">Shift</label>
+              <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}
+                className="w-28 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <option value="all">All</option>
+                <option value="all">All Shifts</option>
                 <option value="day">Day</option>
                 <option value="night">Night</option>
               </select>
             </div>
 
-            {/* Entry Timing Filter */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                <Clock className="inline h-3 w-3 mr-1" />
-                Entry Timing
-              </label>
-              <select 
-                value={entryTimingFilter}
-                onChange={(e) => setEntryTimingFilter(e.target.value)}
-                className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <label className="block text-xs font-medium text-slate-500 mb-1">Entry Timing</label>
+              <select value={entryTimingFilter} onChange={(e) => setEntryTimingFilter(e.target.value)}
+                className="w-36 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
                 <option value="all">All Entries</option>
                 <option value="same_day">Same Day</option>
                 <option value="late_entry">Late Entry</option>
-                <option value="very_late">Very Late (+7 days)</option>
+                <option value="very_late">Very Late (+7d)</option>
               </select>
             </div>
 
-            {/* Date Grouping Toggle */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                <Calendar className="inline h-3 w-3 mr-1" />
-                Display
-              </label>
-              <label className="flex items-center px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer text-sm">
-                <input
-                  type="checkbox"
-                  checked={groupByDate}
-                  onChange={(e) => setGroupByDate(e.target.checked)}
-                  className="mr-2 text-blue-600 focus:ring-blue-500"
+              <label className="block text-xs font-medium text-slate-500 mb-1">Display</label>
+              <label className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-slate-50 text-sm">
+                <input type="checkbox" checked={groupByDate} onChange={(e) => setGroupByDate(e.target.checked)}
+                  className="text-slate-600 focus:ring-slate-400"
                 />
-                <span className="text-xs">Group by Date</span>
+                <span className="text-xs text-slate-600">Group by date</span>
               </label>
             </div>
 
-            {/* Rows Per Page */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">
-                <Eye className="inline h-3 w-3 mr-1" />
-                Show
-              </label>
-              <select 
-                value={rowsPerPage}
-                onChange={(e) => setRowsPerPage(Number(e.target.value))}
-                className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <label className="block text-xs font-medium text-slate-500 mb-1">Show</label>
+              <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
+                {[5, 10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
                 <option value={-1}>All</option>
               </select>
             </div>
 
-            {/* Export Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={exportToCSV}
-                className="flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-                title="Export to CSV"
+            <div className="flex gap-2 ml-auto">
+              <button onClick={exportToCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
               >
-                <Download className="h-3 w-3 mr-1" />
-                CSV
+                <Download className="w-3.5 h-3.5" /> CSV
               </button>
-              <button
-                onClick={exportToPDF}
-                className="flex items-center px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                title="Export to PDF"
+              <button onClick={exportToPDF}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors"
               >
-                <PrinterIcon className="h-3 w-3 mr-1" />
-                PDF
+                <PrinterIcon className="w-3.5 h-3.5" /> PDF
               </button>
             </div>
           </div>
-
         </div>
         
         {filteredRecords.length === 0 ? (
-          <div className="text-center py-12">
-            <Calculator className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No cash close records found</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating your first cash close.</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
+              <Calculator className="w-8 h-8 text-slate-300" />
+            </div>
+            <p className="font-semibold text-slate-600">No records found</p>
+            <p className="text-sm text-slate-400 mt-1">Try adjusting your filters or create a new cash close.</p>
           </div>
         ) : groupByDate ? (
           // Grouped Display by Business Date
@@ -1474,30 +1279,22 @@ export default function CashClosePage() {
                   const hasLateEntries = records.some(r => r.isLateEntry);
                   
                   return (
-                    <div key={date} className={`border rounded-lg overflow-hidden ${hasLateEntries ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
-                      <div className={`px-6 py-4 border-b ${hasLateEntries ? 'bg-orange-100 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Calendar className="h-5 w-5 text-gray-600" />
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {new Date(date).toLocaleDateString('en-US', { 
-                                weekday: 'long',
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
-                            </h3>
-                            {hasLateEntries && (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-200 text-orange-800 rounded-full">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Has Late Entries
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm text-gray-500">{records.length} entries</div>
-                            <div className="text-lg font-semibold text-gray-900">{formatCurrency(totalRevenue)}</div>
-                          </div>
+                    <div key={date} className={`rounded-xl border overflow-hidden ${hasLateEntries ? 'border-orange-200' : 'border-gray-200'}`}>
+                      <div className={`flex items-center justify-between px-5 py-3.5 border-b ${hasLateEntries ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-gray-100'}`}>
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <h3 className="text-sm font-semibold text-slate-800">
+                            {new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                          </h3>
+                          {hasLateEntries && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200 rounded-md">
+                              <AlertCircle className="h-3 w-3" /> Late Entries
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-slate-400">{records.length} entries</div>
+                          <div className="text-sm font-bold text-slate-800">{formatCurrency(totalRevenue)}</div>
                         </div>
                       </div>
                       
@@ -1567,240 +1364,120 @@ export default function CashClosePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-slate-50">
                 <tr>
-                  <SortableHeader column="createdAt" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date & Time Created
+                  <SortableHeader column="date" className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Business Date
                   </SortableHeader>
-                  <SortableHeader column="createdBy" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <SortableHeader column="createdBy" className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Entry Info
                   </SortableHeader>
-                  <SortableHeader column="totalRevenue" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <SortableHeader column="totalRevenue" className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Revenue
                   </SortableHeader>
-                  <SortableHeader column="taxAmount" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tax
+                  <SortableHeader column="taxAmount" className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Tax (12%)
                   </SortableHeader>
-                  <SortableHeader column="profitAmount" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <SortableHeader column="profitAmount" className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Gross Profit
                   </SortableHeader>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tills</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PM Allocations</th>
-                  <SortableHeader column="status" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Expenses</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Network</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">PM Fund</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Variance</th>
+                  <SortableHeader column="status" className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Status
                   </SortableHeader>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Network</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variance</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                                 {(rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage)).map((record) => (
-                  <tr key={record.id} className={`hover:bg-gray-50 ${record.isLateEntry ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 text-gray-400 mr-2" />
+              <tbody className="bg-white divide-y divide-gray-100">
+                {(rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage)).map((record) => (
+                  <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${record.isLateEntry ? 'border-l-4 border-amber-400' : ''}`}>
+                    {/* Business Date — the actual date the cash close is for */}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                         <div>
-                          <div className="text-sm text-gray-900 font-medium">{record.createdAt?.toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-500 mt-1">{record.createdAt?.toLocaleTimeString()}</div>
-                          {record.isLateEntry && (
-                            <div className="flex items-center mt-1">
-                              <AlertCircle className="h-3 w-3 text-yellow-500 mr-1" />
-                              <span className="text-xs text-yellow-600">Late Entry</span>
-                            </div>
-                          )}
+                          <div className="text-sm font-semibold text-slate-800">
+                            {new Date(record.date + 'T00:00:00').toLocaleDateString('en-UG', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {record.shifts?.filter((s: any) => s.shift === 'day').length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs text-amber-600"><Sun className="h-3 w-3" />Day</span>
+                            )}
+                            {record.shifts?.filter((s: any) => s.shift === 'night').length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs text-indigo-500"><Moon className="h-3 w-3" />Night</span>
+                            )}
+                            <span className="text-xs text-slate-400">
+                              · {record.shifts?.reduce((total: number, shift: any) => total + (shift.tills?.length || 0), 0) || 0} tills
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-xs text-gray-500">
-                        <div className="flex items-center mb-1">
-                          <Clock className="h-3 w-3 mr-1" />
-                          <span>Entered: {record.createdAt?.toLocaleDateString()} at {record.createdAt?.toLocaleTimeString()}</span>
+                    {/* Entry Info — when and by whom it was entered, plus late flag */}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="text-xs text-slate-600">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <User className="h-3 w-3 text-slate-400" />
+                          <span className="font-medium">{record.createdBy || 'Unknown'}</span>
                         </div>
-                        <div className="flex items-center">
-                          <User className="h-3 w-3 mr-1" />
-                          <span>By: {record.createdBy}</span>
+                        <div className="flex items-center gap-1 text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          <span>{record.createdAt?.toLocaleDateString()} {record.createdAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         {record.isLateEntry && (
-                          <div className="flex items-center mt-1 text-yellow-600">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            <span>{record.entryDelay} days after business date</span>
+                          <div className="flex items-center gap-1 mt-1 text-amber-600">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>{record.entryDelay}d late entry</span>
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {formatCurrency(record.totalRevenue)}
+                    {/* Revenue */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm font-semibold text-slate-800">{formatCurrency(record.totalRevenue)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(record.taxAmount)}
+                    {/* Tax */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm text-slate-600">{formatCurrency(record.taxAmount)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(record.profitAmount)}
+                    {/* Gross Profit */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm font-medium text-emerald-700">{formatCurrency(record.profitAmount)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <Building className="h-4 w-4 text-gray-400 mr-1" />
-                        {record.shifts?.reduce((total, shift) => total + (shift.tills?.length || 0), 0) || 0} tills
-                      </div>
+                    {/* Expenses */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm text-rose-600">{formatCurrency(record.totalExpenses || 0)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center space-x-2">
-                        {(() => {
-                          // Debug: Log the shifts data structure
-                          console.log('Record shifts:', record.shifts);
-                          
-                          const dayShifts = record.shifts?.filter(shift => shift.shift === 'day')?.length || 0;
-                          const nightShifts = record.shifts?.filter(shift => shift.shift === 'night')?.length || 0;
-                          const totalShifts = record.shifts?.length || 0;
-                          
-                          return (
-                            <>
-                              {dayShifts > 0 && (
-                                <div className="flex items-center">
-                                  <Sun className="h-3 w-3 text-yellow-500 mr-1" />
-                                  <span className="text-xs">{dayShifts}</span>
-                                </div>
-                              )}
-                              {nightShifts > 0 && (
-                                <div className="flex items-center">
-                                  <Moon className="h-3 w-3 text-blue-500 mr-1" />
-                                  <span className="text-xs">{nightShifts}</span>
-                                </div>
-                              )}
-                              {totalShifts === 0 && (
-                                <span className="text-gray-400 text-xs">No shifts</span>
-                              )}
-                              {totalShifts > 0 && dayShifts === 0 && nightShifts === 0 && (
-                                <span className="text-orange-500 text-xs">{totalShifts} shift(s)</span>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
+                    {/* Network payments — UGX amount from totalNetworkPayments */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm text-blue-600">{formatCurrency(record.totalNetworkPayments || 0)}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(() => {
-                        const allocations = allocationsData[record.id] || [];
-                        if (allocations.length === 0) {
-                          return (
-                            <div className="flex items-center text-gray-400">
-                              <Calculator className="h-4 w-4 mr-1" />
-                              <span className="text-xs">No allocations</span>
-                            </div>
-                          );
-                        }
-                        
-                        const totalPM = allocations.reduce((sum, allocation) => sum + allocation.purchasingManagerAmount, 0);
-                        const dayPM = allocations.filter(a => a.shiftType === 'day').reduce((sum, allocation) => sum + allocation.purchasingManagerAmount, 0);
-                        const nightPM = allocations.filter(a => a.shiftType === 'night').reduce((sum, allocation) => sum + allocation.purchasingManagerAmount, 0);
-                        
-                        return (
-                          <div className="space-y-1">
-                            <div className="font-medium text-green-600">
-                              {formatCurrency(totalPM)}
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                              {dayPM > 0 && (
-                                <div className="flex items-center">
-                                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-1"></div>
-                                  <span>{formatCurrency(dayPM)}</span>
-                                </div>
-                              )}
-                              {nightPM > 0 && (
-                                <div className="flex items-center">
-                                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-1"></div>
-                                  <span>{formatCurrency(nightPM)}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {(() => {
-                        const allocations = allocationsData[record.id] || [];
-                        if (allocations.length === 0) {
-                          return (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              No Allocations
-                            </span>
-                          );
-                        }
-                        
-                        const pendingCount = allocations.filter(a => a.distributionStatus.purchasingManager === 'pending').length;
-                        const allocatedCount = allocations.filter(a => a.distributionStatus.purchasingManager === 'allocated').length;
-                        const totalShifts = allocations.length;
-                        
-                        if (allocatedCount === totalShifts) {
-                          return (
-                            <div className="flex items-center space-x-2">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                All Allocated
-                              </span>
-                            </div>
-                          );
-                        } else if (allocatedCount > 0) {
-                          return (
-                            <div className="space-y-1">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                <Clock className="w-3 h-3 mr-1" />
-                                Partial ({allocatedCount}/{totalShifts})
-                              </span>
-                              <div className="text-xs text-gray-500">
-                                {pendingCount} pending
-                              </div>
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Not Allocated
-                            </span>
-                          );
-                        }
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center space-x-1">
-                        {record.shifts?.some(shift => 
-                          shift.tills?.some((till: any) => 
-                            till.networkPayments?.some((p: any) => p.paymentMethod === 'mobile')
-                          )
-                        ) && <Smartphone className="h-3 w-3 text-blue-500" />}
-                        {record.shifts?.some(shift => 
-                          shift.tills?.some((till: any) => 
-                            till.networkPayments?.some((p: any) => p.paymentMethod === 'visa_machine')
-                          )
-                        ) && <CreditCard className="h-3 w-3 text-green-500" />}
-                        <span>
-                          {record.shifts?.reduce((total, shift) => 
-                            total + shift.tills?.reduce((tillTotal: number, till: any) => 
-                              tillTotal + (till.networkPayments?.length || 0), 0) || 0, 0) || 0
-                          }
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {record.totalShortage > 0 && (
-                        <span className="text-red-600">-{formatCurrency(record.totalShortage)}</span>
-                      )}
-                      {record.totalExcess > 0 && (
-                        <span className="text-green-600">+{formatCurrency(record.totalExcess)}</span>
-                      )}
-                      {record.totalShortage === 0 && record.totalExcess === 0 && (
-                        <span className="text-gray-500">Balanced</span>
+                    {/* PM Fund — amount set aside for purchasing manager */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      {record.purchasingManager > 0 ? (
+                        <span className="text-sm font-medium text-indigo-700">{formatCurrency(record.purchasingManager)}</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
+                    {/* Variance */}
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      {record.totalShortage > 0 ? (
+                        <span className="text-sm font-medium text-red-600">−{formatCurrency(record.totalShortage)}</span>
+                      ) : record.totalExcess > 0 ? (
+                        <span className="text-sm font-medium text-green-600">+{formatCurrency(record.totalExcess)}</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Balanced</span>
+                      )}
+                    </td>
+                    {/* Status */}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
                         {getStatusIcon(record.status)}
-                        <span className="ml-1 capitalize">{record.status}</span>
+                        <span className="capitalize">{record.status}</span>
                       </span>
                     </td>
                   </tr>
@@ -1810,23 +1487,19 @@ export default function CashClosePage() {
           </div>
         )}
         
-        {/* Pagination Info */}
+        {/* Pagination footer */}
         {filteredRecords.length > 0 && (
-          <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between text-sm text-gray-500">
-              <span>
-                {rowsPerPage === -1 ? (
-                  `Showing all ${filteredRecords.length} records`
-                ) : (
-                  `Showing ${Math.min(rowsPerPage, filteredRecords.length)} of ${filteredRecords.length} records`
-                )}
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-slate-50">
+            <span className="text-xs text-slate-500">
+              {rowsPerPage === -1
+                ? `All ${filteredRecords.length} records shown`
+                : `${Math.min(rowsPerPage, filteredRecords.length)} of ${filteredRecords.length} records`}
+            </span>
+            {filteredRecords.length > rowsPerPage && rowsPerPage !== -1 && (
+              <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1">
+                {filteredRecords.length - rowsPerPage} more — increase "Show" to view all
               </span>
-              {filteredRecords.length > rowsPerPage && rowsPerPage !== -1 && (
-                <span className="text-amber-600">
-                  {filteredRecords.length - rowsPerPage} more records available - increase rows per page to see all
-                </span>
-              )}
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -1837,6 +1510,7 @@ export default function CashClosePage() {
         onClose={() => setShowCashCloseForm(false)}
         onSubmit={handleCashCloseSubmit}
       />
+
       </div>
     </div>
   );

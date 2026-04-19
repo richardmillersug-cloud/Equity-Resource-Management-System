@@ -49,6 +49,8 @@ export interface FundBalance {
   totalSpent: number;
   lastUpdated: Date;
   branchId: string;
+  /** YYYY-MM — when set, this row is the balance snapshot for that calendar month */
+  periodKey?: string;
   
   // Daily fund specific
   dailyCollection?: number; // 100,000 UGX daily
@@ -59,6 +61,13 @@ export interface FundBalance {
   
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MonthlyFundingAssignmentTotals {
+  dailyFundSpent: number;
+  grossProfitSpent: number;
+  totalSpent: number;
+  assignmentCount: number;
 }
 
 // Funding source analytics
@@ -91,49 +100,119 @@ export class FundingSourceService {
   private allocationsCollection = 'fundingAllocations';
   private balancesCollection = 'fundBalances';
 
+  /** Calendar month key in local time, e.g. 2026-04 */
+  getPeriodKey(ref: Date = new Date()): string {
+    const y = ref.getFullYear();
+    const m = ref.getMonth() + 1;
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }
+
+  private toJsDate(value: unknown): Date {
+    if (!value) return new Date(0);
+    if (value instanceof Date) return value;
+    const v = value as { toDate?: () => Date };
+    if (typeof v.toDate === 'function') return v.toDate();
+    return new Date(value as string);
+  }
+
+  private normalizeFundBalance(id: string, raw: Record<string, unknown>): FundBalance {
+    return {
+      ...(raw as unknown as FundBalance),
+      id,
+      lastUpdated: this.toJsDate(raw.lastUpdated),
+      createdAt: this.toJsDate(raw.createdAt),
+      updatedAt: this.toJsDate(raw.updatedAt),
+    };
+  }
+
+  private pickBalanceForPeriod(
+    rows: FundBalance[],
+    fundType: 'DAILY_EXPENSE_FUND' | 'WALLET_GROSS_PROFIT',
+    periodKey: string
+  ): FundBalance | null {
+    const ofType = rows.filter((r) => r.fundType === fundType);
+    if (!ofType.length) return null;
+
+    const forMonth = ofType.filter((r) => r.periodKey === periodKey);
+    const pickNewest = (list: FundBalance[]) =>
+      [...list].sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())[0] ?? null;
+
+    if (forMonth.length) return pickNewest(forMonth);
+
+    const legacy = ofType.filter((r) => !r.periodKey);
+    if (legacy.length) return pickNewest(legacy);
+
+    // Month-scoped rows exist but none for this month — avoid showing a prior month as "current"
+    return null;
+  }
+
   // ==================== FUND BALANCE MANAGEMENT ====================
 
   /**
-   * Initialize fund balances for a branch
+   * Initialize fund balances for a branch (creates rows for the current month if missing)
    */
   async initializeFundBalances(branchId: string): Promise<void> {
+    const periodKey = this.getPeriodKey(new Date());
+
+    const snapshot = await getDocs(
+      query(collection(db, this.balancesCollection), where('branchId', '==', branchId))
+    );
+
+    const rows = snapshot.docs.map((d) =>
+      this.normalizeFundBalance(d.id, d.data() as Record<string, unknown>)
+    );
+    const thisMonth = rows.filter((r) => r.periodKey === periodKey);
+    const hasDaily = thisMonth.some((r) => r.fundType === 'DAILY_EXPENSE_FUND');
+    const hasGross = thisMonth.some((r) => r.fundType === 'WALLET_GROSS_PROFIT');
+
     const batch = writeBatch(db);
+    let n = 0;
 
-    // Initialize Daily Expense Fund
-    const dailyFundRef = doc(collection(db, this.balancesCollection));
-    batch.set(dailyFundRef, {
-      fundType: 'DAILY_EXPENSE_FUND',
-      currentBalance: 100000, // 100,000 UGX daily collection
-      totalAllocated: 0,
-      totalSpent: 0,
-      lastUpdated: Timestamp.now(),
-      branchId,
-      dailyCollection: 100000,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    });
+    if (!hasDaily) {
+      const dailyFundRef = doc(collection(db, this.balancesCollection));
+      batch.set(dailyFundRef, {
+        fundType: 'DAILY_EXPENSE_FUND',
+        currentBalance: 100000,
+        totalAllocated: 0,
+        totalSpent: 0,
+        lastUpdated: Timestamp.now(),
+        branchId,
+        periodKey,
+        dailyCollection: 100000,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      n++;
+    }
 
-    // Initialize Wallet Gross Profit Fund  
-    const grossProfitRef = doc(collection(db, this.balancesCollection));
-    batch.set(grossProfitRef, {
-      fundType: 'WALLET_GROSS_PROFIT',
-      currentBalance: 0, // Updated from cash close
-      totalAllocated: 0,
-      totalSpent: 0,
-      lastUpdated: Timestamp.now(),
-      branchId,
-      profitPercentage: 12,
-      sourceRevenue: 0,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    });
+    if (!hasGross) {
+      const grossProfitRef = doc(collection(db, this.balancesCollection));
+      batch.set(grossProfitRef, {
+        fundType: 'WALLET_GROSS_PROFIT',
+        currentBalance: 0,
+        totalAllocated: 0,
+        totalSpent: 0,
+        lastUpdated: Timestamp.now(),
+        branchId,
+        periodKey,
+        profitPercentage: 12,
+        sourceRevenue: 0,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      n++;
+    }
 
-    await batch.commit();
-    console.log('✅ Initialized fund balances for branch:', branchId);
+    if (n > 0) {
+      await batch.commit();
+      console.log('Initialized fund balances for branch:', branchId, 'period:', periodKey);
+    } else {
+      console.log('Fund balances already exist for', branchId, periodKey);
+    }
   }
 
   /**
-   * Get current fund balances for a branch
+   * Get fund balances for a branch for the current calendar month (see pickBalanceForPeriod).
    */
   async getFundBalances(branchId: string): Promise<{ dailyFund: FundBalance | null; grossProfit: FundBalance | null }> {
     try {
@@ -141,24 +220,68 @@ export class FundingSourceService {
         collection(db, this.balancesCollection),
         where('branchId', '==', branchId)
       );
-      
+
       const snapshot = await getDocs(q);
-      let dailyFund: FundBalance | null = null;
-      let grossProfit: FundBalance | null = null;
-      
-      snapshot.docs.forEach(doc => {
-        const data = { id: doc.id, ...doc.data() } as FundBalance;
-        if (data.fundType === 'DAILY_EXPENSE_FUND') {
-          dailyFund = data;
-        } else if (data.fundType === 'WALLET_GROSS_PROFIT') {
-          grossProfit = data;
-        }
-      });
-      
-      return { dailyFund, grossProfit };
+      const periodKey = this.getPeriodKey(new Date());
+      const rows = snapshot.docs.map((docSnap) =>
+        this.normalizeFundBalance(docSnap.id, docSnap.data() as Record<string, unknown>)
+      );
+
+      return {
+        dailyFund: this.pickBalanceForPeriod(rows, 'DAILY_EXPENSE_FUND', periodKey),
+        grossProfit: this.pickBalanceForPeriod(rows, 'WALLET_GROSS_PROFIT', periodKey),
+      };
     } catch (error) {
       console.error('Error getting fund balances:', error);
       return { dailyFund: null, grossProfit: null };
+    }
+  }
+
+  /**
+   * Sum payment-time funding assignments for the current calendar month (local time).
+   */
+  async getMonthlyFundingAssignmentTotals(
+    branchId: string,
+    ref: Date = new Date()
+  ): Promise<MonthlyFundingAssignmentTotals> {
+    const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    try {
+      const q = query(collection(db, 'fundingAssignments'), where('branchId', '==', branchId));
+      const snapshot = await getDocs(q);
+
+      let dailyFundSpent = 0;
+      let grossProfitSpent = 0;
+      let assignmentCount = 0;
+
+      snapshot.docs.forEach((docSnap) => {
+        const d = docSnap.data();
+        const ad = this.toJsDate(d.assignmentDate);
+        if (ad < start || ad > end) return;
+        assignmentCount++;
+        const amount = Number(d.amount) || 0;
+        if (d.fundingSource === 'DAILY_EXPENSE_FUND') {
+          dailyFundSpent += amount;
+        } else if (d.fundingSource === 'WALLET_GROSS_PROFIT') {
+          grossProfitSpent += amount;
+        }
+      });
+
+      return {
+        dailyFundSpent,
+        grossProfitSpent,
+        totalSpent: dailyFundSpent + grossProfitSpent,
+        assignmentCount,
+      };
+    } catch (error) {
+      console.error('Error getting monthly funding assignment totals:', error);
+      return {
+        dailyFundSpent: 0,
+        grossProfitSpent: 0,
+        totalSpent: 0,
+        assignmentCount: 0,
+      };
     }
   }
 
@@ -172,20 +295,20 @@ export class FundingSourceService {
     operation: 'allocate' | 'deallocate'
   ): Promise<void> {
     try {
-      const q = query(
-        collection(db, this.balancesCollection),
-        where('branchId', '==', branchId),
-        where('fundType', '==', fundType)
-      );
-      
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
+      const { dailyFund, grossProfit } = await this.getFundBalances(branchId);
+      const target = fundType === 'DAILY_EXPENSE_FUND' ? dailyFund : grossProfit;
+      if (!target?.id) {
         console.error(`Fund balance not found for ${fundType} in branch ${branchId}`);
         return;
       }
-      
-      const fundDoc = snapshot.docs[0];
-      const currentData = fundDoc.data() as FundBalance;
+
+      const fundSnap = await getDoc(doc(db, this.balancesCollection, target.id));
+      if (!fundSnap.exists()) {
+        console.error(`Fund balance doc missing: ${target.id}`);
+        return;
+      }
+
+      const currentData = fundSnap.data() as FundBalance;
       
       const multiplier = operation === 'allocate' ? -1 : 1;
       const newBalance = currentData.currentBalance + (allocationAmount * multiplier);
@@ -193,7 +316,7 @@ export class FundingSourceService {
         ? currentData.totalAllocated + allocationAmount
         : Math.max(0, currentData.totalAllocated - allocationAmount);
       
-      await updateDoc(doc(db, this.balancesCollection, fundDoc.id), {
+      await updateDoc(doc(db, this.balancesCollection, target.id), {
         currentBalance: Math.max(0, newBalance),
         totalAllocated: newTotalAllocated,
         lastUpdated: Timestamp.now(),

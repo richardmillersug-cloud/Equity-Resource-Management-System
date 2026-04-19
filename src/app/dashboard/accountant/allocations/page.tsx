@@ -110,14 +110,9 @@ export default function AccountantAllocationsPage() {
     loadData();
   }, []);
 
-  // Reload data when PM selection changes
+  // Reload suggestions when PM selection changes (no server filter needed — all submitted shown)
   useEffect(() => {
-    if (selectedPM) {
-      loadData(selectedPM);
-    } else {
-      // If no PM selected, load all submitted cash closes
-      loadData();
-    }
+    if (selectedPM) loadData();
   }, [selectedPM]);
 
   const loadData = async (pmFilter?: string) => {
@@ -145,24 +140,13 @@ export default function AccountantAllocationsPage() {
       setPmUsers(pmUsersData);
 
       // Load submitted cash closes for allocation processing
+      // Always fetch ALL submitted closes — the PM filter only controls who to SEND to, not what to show
       try {
-        // Query cashCloses collection with enforced status filter
-        // If PM is selected, filter by createdBy field as well
-        let cashClosesQuery;
-        if (pmFilter) {
-          cashClosesQuery = query(
-            collection(db, 'cashCloses'),
-            where('status', '==', 'submitted'),
-            where('createdBy', '==', pmFilter),
-            orderBy('createdAt', 'desc')
-          );
-        } else {
-          cashClosesQuery = query(
-            collection(db, 'cashCloses'),
-            where('status', '==', 'submitted'),
-            orderBy('createdAt', 'desc')
-          );
-        }
+        const cashClosesQuery = query(
+          collection(db, 'cashCloses'),
+          where('status', '==', 'submitted'),
+          orderBy('createdAt', 'desc')
+        );
         const cashClosesSnapshot = await getDocs(cashClosesQuery);
 
         // Process cash closes data - only those with status = "submitted"
@@ -200,37 +184,81 @@ export default function AccountantAllocationsPage() {
         });
 
         submittedCashCloses.forEach(cashClose => {
+          // Resolve total cash using every known field / structure
+          const resolveTotalCash = (cc: any, shift?: any): number => {
+            // From a specific shift's tills
+            if (shift && Array.isArray(shift.tills)) {
+              const t = shift.tills.reduce((s: number, till: any) =>
+                s + (till.totalCashInTill || till.cashAmount || till.amount || 0), 0);
+              if (t > 0) return t;
+            }
+            // Top-level fields
+            if ((cc.totalCashInTill || 0) > 0) return cc.totalCashInTill;
+            if ((cc.totalRevenue || 0) > 0) return cc.totalRevenue;
+            if ((cc.closeCash || 0) > 0) return cc.closeCash;
+            // Sum across all shifts
+            if (Array.isArray(cc.shifts)) {
+              const t = cc.shifts.reduce((s: number, sh: any) =>
+                s + (Array.isArray(sh.tills)
+                  ? sh.tills.reduce((ts: number, till: any) => ts + (till.totalCashInTill || till.cashAmount || 0), 0)
+                  : 0), 0);
+              if (t > 0) return t;
+            }
+            return 0;
+          };
 
-          if (cashClose.shifts && Array.isArray(cashClose.shifts)) {
-            cashClose.shifts.forEach(shift => {
-              const shiftTotalCash = shift.tills.reduce((sum, till) => sum + (till.totalCashInTill || 0), 0);
-              const profitDeduction = Math.round(shiftTotalCash * 0.12); // 12% profit
+          const monthlyExpenseFund = cashClose.m_expenseFund || cashClose.m_expensefund || 0;
+          const businessDate = cashClose.businessDate || cashClose.cashCloseDate || cashClose.date || new Date().toISOString().split('T')[0];
+          const shiftLabel = (shift?: any) => shift?.shift || cashClose.shiftType || cashClose.shift || 'day';
 
-              // Check if monthly expense fund was enabled in the form (from m_expensefund field)
-              const monthlyExpenseFund = cashClose.m_expensefund || 0; // Use the form's setting, default to 0 if not set
-
-
-              // Calculate total deductions and final suggested amount
+          if (cashClose.shifts && Array.isArray(cashClose.shifts) && cashClose.shifts.length > 0) {
+            cashClose.shifts.forEach((shift: any) => {
+              const shiftTotalCash = resolveTotalCash(cashClose, shift);
+              const profitDeduction = Math.round(shiftTotalCash * 0.12);
               const totalDeductions = profitDeduction + monthlyExpenseFund;
               const suggestedAmount = shiftTotalCash - totalDeductions;
 
               if (suggestedAmount > 0) {
                 suggestions.push({
                   cashCloseId: cashClose.id,
-                  shiftType: shift.shift,
+                  shiftType: shiftLabel(shift),
                   totalCash: shiftTotalCash,
-                  suggestedAmount: suggestedAmount,
-                  profitDeduction: profitDeduction,
-                  monthlyExpenseFund: monthlyExpenseFund,
-                  totalDeductions: totalDeductions,
-                  businessDate: cashClose.businessDate || cashClose.date || new Date().toISOString().split('T')[0],
+                  suggestedAmount,
+                  profitDeduction,
+                  monthlyExpenseFund,
+                  totalDeductions,
+                  businessDate,
                   createdAt: cashClose.createdAt,
                   branchId: cashClose.branchId,
                   createdBy: cashClose.createdBy || 'unknown',
-                  createdByName: 'Loading...', // Will be updated after async lookup
+                  createdByName: 'Loading...',
                 });
               }
             });
+          } else {
+            // No shifts array — resolve from top-level fields
+            const totalCash = resolveTotalCash(cashClose);
+            if (totalCash > 0) {
+              const profitDeduction = Math.round(totalCash * 0.12);
+              const totalDeductions = profitDeduction + monthlyExpenseFund;
+              const suggestedAmount = totalCash - totalDeductions;
+              if (suggestedAmount > 0) {
+                suggestions.push({
+                  cashCloseId: cashClose.id,
+                  shiftType: shiftLabel(),
+                  totalCash,
+                  suggestedAmount,
+                  profitDeduction,
+                  monthlyExpenseFund,
+                  totalDeductions,
+                  businessDate,
+                  createdAt: cashClose.createdAt,
+                  branchId: cashClose.branchId,
+                  createdBy: cashClose.createdBy || 'unknown',
+                  createdByName: 'Loading...',
+                });
+              }
+            }
           }
         });
         
@@ -425,10 +453,26 @@ export default function AccountantAllocationsPage() {
         createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'allocation_PM'), allocationData);
+      await addDoc(collection(db, 'allocation_PM'), allocationData);
 
-      // Reload data to reflect changes
-      await loadData();
+      // Optimistic update — remove from overview immediately
+      setAllCashCloses(prev => prev.filter(cc => cc.id !== cashClose.id));
+      setAllocatedCashCloses(prev => [...prev, {
+        ...cashClose,
+        status: 'allocated',
+        allocationAmount,
+        profitDeduction,
+        monthlyExpenseFund,
+        totalDeductions,
+        allocatedTo: selectedPM,
+        allocatedToName: selectedPMUser.name,
+        allocatedByName: accountantName,
+        allocatedBy: currentUser.uid,
+        allocatedAt: new Date(),
+      }]);
+
+      // Background reload to sync any server-side changes
+      loadData();
 
       const amountText = allocationAmount.toLocaleString();
       alert(`✅ Allocation of UGX ${amountText} sent successfully to ${selectedPMUser.name} for cash close ${cashClose.id.slice(-8)}!`);
@@ -457,17 +501,24 @@ export default function AccountantAllocationsPage() {
     setError('');
 
     try {
+      const submittedByName = `${currentUser.employee?.firstName || ''} ${currentUser.employee?.lastName || ''}`.trim() || currentUser.email || 'Unknown';
+
       // Update the cashCloses collection status to "submitted"
       const cashCloseRef = doc(db, 'cashCloses', cashClose.id);
       await updateDoc(cashCloseRef, {
         status: 'submitted',
         submittedAt: serverTimestamp(),
         submittedBy: currentUser.uid,
-        submittedByName: `${currentUser.employee?.firstName || ''} ${currentUser.employee?.lastName || ''}`.trim() || currentUser.email || 'Unknown'
+        submittedByName,
       });
 
-      // Reload data to reflect changes
-      await loadData();
+      // Optimistic update — flip status in local state immediately so record moves to submitted
+      setAllCashCloses(prev =>
+        prev.map(cc => cc.id === cashClose.id ? { ...cc, status: 'submitted', createdBy: currentUser.uid } : cc)
+      );
+
+      // Background reload to sync
+      loadData();
 
       const amountText = (cashClose.totalCashInTill || 0).toLocaleString();
       alert(`✅ Cash close for ${cashClose.businessDate || cashClose.date || 'N/A'} (${cashClose.shifts?.[0]?.shift || 'Unknown'} shift) has been submitted for allocation!\nTotal Amount: UGX ${amountText}`);
@@ -576,6 +627,17 @@ export default function AccountantAllocationsPage() {
     }
   };
 
+  /** Synchronously resolve a UID to a display name using the already-loaded pmUsers list.
+   *  Falls back to a friendly shortened ID rather than exposing the raw UID. */
+  const resolveName = (uid: string | undefined): string => {
+    if (!uid) return 'Unknown';
+    const match = pmUsers.find(pm => pm.uid === uid);
+    if (match) return match.name;
+    return `User …${uid.slice(-5)}`;
+  };
+
+  const ugx = (n: number) => `UGX ${n.toLocaleString()}`;
+
   // Function to get employee name by ID
   const getEmployeeName = async (employeeId: string): Promise<string> => {
     if (!employeeId || employeeId === 'system' || employeeId === 'unknown') {
@@ -621,843 +683,759 @@ export default function AccountantAllocationsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <div className="ml-4 text-lg text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Send className="w-5 h-5 text-indigo-400" />
+            </div>
+          </div>
+          <p className="text-lg font-semibold text-gray-700">Loading Allocations</p>
+          <p className="text-sm text-gray-400">Fetching cash closes and PM data…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Zap className="w-8 h-8 mr-3 text-yellow-500" />
-            Cash Close Allocation Processing
-          </h1>
-          <p className="text-gray-600 mt-2">Process submitted cash closes and allocate funds to purchase managers</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-6 space-y-5">
+
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 shadow-xl">
+        {/* Subtle grid overlay */}
+        <div className="absolute inset-0 opacity-[0.08]"
+          style={{ backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        {/* Accent glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-indigo-300/20 blur-2xl" />
+
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-widest text-blue-100">Accountant Workspace</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Allocation Processing</h1>
+            <p className="text-blue-100 mt-1.5 text-sm">Review submitted cash closes and dispatch funds to purchase managers</p>
+
+            {/* Quick stats in header */}
+            <div className="flex flex-wrap gap-3 mt-4">
+              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-300" />
+                <span className="text-xs text-white">{cashCloses.length} submitted</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
+                <div className="w-2 h-2 rounded-full bg-amber-300" />
+                <span className="text-xs text-white">{allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
+                <div className="w-2 h-2 rounded-full bg-blue-200" />
+                <span className="text-xs text-white">{allocatedCashCloses.length} allocated</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 self-start sm:self-auto bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl px-5 py-2.5 text-white text-sm font-medium transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
-        <Button onClick={loadData} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
       </div>
 
-
       {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center text-red-800">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              <strong>{error}</strong>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-5 py-4">
+          <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
+          <p className="text-sm font-medium text-red-800">{error}</p>
+        </div>
       )}
 
 
-      {/* PM Selection - Required for all allocations */}
-      <Card className="border-blue-200">
-        <CardHeader>
-          <CardTitle className="flex items-center text-blue-800">
-            <User className="w-5 h-5 mr-2" />
-            Select Purchase Manager
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* PM Selection */}
+      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-700 to-indigo-700">
+          <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+            <User className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-white tracking-tight">Purchase Manager</h2>
+            <p className="text-xs text-blue-200">Select a PM to load their submitted cash closes</p>
+          </div>
+        </div>
+
+        <div className="p-6">
           <select
             value={selectedPM}
             onChange={(e) => setSelectedPM(e.target.value)}
-            className="w-full p-3 border border-blue-300 rounded-lg text-lg"
-            required
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           >
-            <option value="">Choose a Purchase Manager...</option>
+            <option value="">Choose a Purchase Manager…</option>
             {pmUsers.map((pm) => (
-              <option key={pm.uid} value={pm.uid}>
-                {pm.name} ({pm.email})
-              </option>
+              <option key={pm.uid} value={pm.uid}>{pm.name} ({pm.email})</option>
             ))}
           </select>
-          {selectedPM ? (
-            <div className="mt-2 p-2 bg-blue-50 rounded">
-              <span className="text-blue-800 text-sm">
-                ✅ Selected: {pmUsers.find(pm => pm.uid === selectedPM)?.name}
-              </span>
-              <div className="text-xs text-blue-600 mt-1">
-                Showing only submitted cash closes created by this PM
-              </div>
-            </div>
-          ) : (
-            <div className="mt-2 p-2 bg-gray-50 rounded">
-              <span className="text-gray-600 text-sm">
-                ℹ️ Select a PM to filter submitted cash closes by creator
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Suggested Allocations Based on Cash Closes */}
+          <div className="mt-3">
+            {selectedPM ? (
+              <div className="flex items-center gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">{pmUsers.find(pm => pm.uid === selectedPM)?.name}</p>
+                  <p className="text-xs text-blue-500">{pmUsers.find(pm => pm.uid === selectedPM)?.email}</p>
+                </div>
+                <span className="ml-auto text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 rounded-full px-2.5 py-1">Active</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 border-dashed px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-sm text-slate-400">No purchase manager selected yet</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Suggested Allocations */}
       {selectedPM && suggestedAllocations.length > 0 && (
-        <Card className="border-green-200">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-green-800">
-              <div className="flex items-center">
-                <Target className="w-5 h-5 mr-2" />
-                Suggested Allocations from {pmUsers.find(pm => pm.uid === selectedPM)?.name}'s Submitted Cash Closes
+        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+          {/* Section header */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-teal-700 px-6 py-5">
+            <div className="absolute inset-0 opacity-[0.06]"
+              style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white tracking-tight">Suggested Allocations</h2>
+                  <p className="text-xs text-emerald-200 mt-0.5">{pmUsers.find(pm => pm.uid === selectedPM)?.name} · Ready to dispatch</p>
+                </div>
               </div>
-              <div className="text-sm text-green-600 font-medium">
-                {suggestedAllocations.length} available • Filtered by selected PM
-              </div>
-            </CardTitle>
+              <span className="text-xs font-semibold bg-white/15 border border-white/20 text-white rounded-full px-3 py-1.5">
+                {suggestedAllocations.filter(s => {
+                  if (s.branchId === 'test_branch') return false;
+                  const currentYear = new Date().getFullYear();
+                  try {
+                    const date = s.createdAt?.toDate?.() || new Date(s.createdAt);
+                    return !isNaN(date.getTime()) && date.getFullYear() >= currentYear;
+                  } catch { return true; }
+                }).length} available
+              </span>
+            </div>
+          </div>
 
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {suggestedAllocations
-                .filter(suggestion => !isAllocationAlreadySent(suggestion.cashCloseId, suggestion.shiftType))
-                .map((suggestion, index) => (
-                <div key={index} className="border border-green-200 rounded-lg p-4 bg-green-50">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="mb-3">
-                        <div className="flex items-center mb-2">
-                          <Calendar className="w-4 h-4 mr-2 text-green-600" />
-                          <span className="font-semibold text-green-800">
-                            {new Date(suggestion.businessDate).toLocaleDateString()} - {suggestion.shiftType} shift
-                          </span>
-                        </div>
-
-                        {/* Created Date and Time - Enhanced Display */}
-                        <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-                          <div className="grid grid-cols-1 gap-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-xs text-blue-700">
-                                <Clock className="w-3 h-3 mr-1" />
-                                <span className="font-medium">Created:</span>
-                              </div>
-                              <div className={`text-xs font-mono ${(() => {
-                                const result = formatCreatedAt(suggestion.createdAt);
-                                return typeof result === 'object' ? result.urgencyColor : 'text-blue-800';
-                              })()}`}>
-                                {(() => {
-                                  const result = formatCreatedAt(suggestion.createdAt);
-                                  return typeof result === 'object' ? result.fullDisplay : result;
-                                })()}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-xs text-blue-700">
-                                <User className="w-3 h-3 mr-1" />
-                                <span className="font-medium">Created by:</span>
-                              </div>
-                              <div className="text-xs text-blue-800 font-medium flex items-center">
-                                {suggestion.createdByName === 'Loading...' ? (
-                                  <>
-                                    <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                                    Loading...
-                                  </>
-                                ) : (
-                                  suggestion.createdByName
-                                )}
-                                {/* Debug: Show raw employee ID */}
-                                <span className="ml-2 text-xs text-gray-500 font-mono">
-                                  ({suggestion.createdBy})
-                                </span>
-                              </div>
-                            </div>
-
-                            {suggestion.createdAt && (
-                              <div className="text-xs text-blue-600 mt-1 pt-1 border-t border-blue-200">
-                                <span className="font-medium">Full timestamp:</span>
-                                <div className="font-mono mt-1">
-                                  {(() => {
-                                    try {
-                                      const date = suggestion.createdAt?.toDate?.() || new Date(suggestion.createdAt);
-                                      return date.toISOString();
-                                    } catch {
-                                      return 'Unable to parse';
-                                    }
-                                  })()}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Branch Information */}
-                        {suggestion.branchId && (
-                          <div className="flex items-center text-xs text-green-600 mb-2">
-                            <Building2 className="w-3 h-3 mr-1" />
-                            <span>Branch: {suggestion.branchId}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                        <div className="bg-white p-3 rounded border">
-                          <div className="text-green-700 font-medium mb-1">💰 Total Cash in Till</div>
-                          <div className="text-lg font-bold text-green-800">UGX {suggestion.totalCash.toLocaleString()}</div>
-                          <div className="text-xs text-green-600 mt-1">Raw amount before deductions</div>
-                        </div>
-                        <div className="bg-white p-3 rounded border">
-                          <div className="text-green-700 font-medium mb-1">📊 Deductions Breakdown</div>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-red-600">12% Profit:</span>
-                              <span className="font-semibold text-red-600">-UGX {suggestion.profitDeduction.toLocaleString()}</span>
-                            </div>
-                            {suggestion.monthlyExpenseFund > 0 && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-orange-600">Monthly Fund:</span>
-                                <span className="font-semibold text-orange-600">-UGX {suggestion.monthlyExpenseFund.toLocaleString()}</span>
-                              </div>
-                            )}
-                            <div className="border-t border-gray-300 pt-1 mt-2">
-                              <div className="flex justify-between font-semibold">
-                                <span>Total Deductions:</span>
-                                <span className="text-red-600">UGX {suggestion.totalDeductions.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Monthly Expense Fund Deduction - Applied from form settings */}
-                      {suggestion.monthlyExpenseFund > 0 && (
-                        <div className="bg-orange-50 border-2 border-orange-300 rounded p-3 mb-3 relative">
-                          {/* Form Setting Badge */}
-                          <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                            FORM SETTING
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center text-orange-700">
-                              <span className="text-lg mr-2">🏢</span>
-                              <div>
-                                <div className="font-bold text-orange-800">Monthly Expense Fund - Applied</div>
-                                <div className="text-xs text-orange-600 font-medium">
-                                  📝 Deduction enabled in cash close form for {new Date(suggestion.businessDate).toLocaleDateString()}
-                                </div>
-                                <div className="text-xs text-orange-700 mt-1">
-                                  This deduction was set by the accountant in the cash close form
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-orange-800">
-                                -UGX {suggestion.monthlyExpenseFund.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-orange-600 font-medium">
-                                FORM SETTING
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Additional Details Row */}
-                      <div className="grid grid-cols-4 gap-3 text-sm mb-3">
-                        <div className="bg-white p-2 rounded border text-center">
-                          <div className="text-green-700 font-medium text-xs">Record ID</div>
-                          <div className="font-mono text-xs text-green-800 mt-1">{suggestion.cashCloseId.slice(-8)}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded border text-center">
-                          <div className="text-green-700 font-medium text-xs">Shift Type</div>
-                          <div className="font-semibold text-green-800 mt-1 capitalize">{suggestion.shiftType}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded border text-center">
-                          <div className="text-green-700 font-medium text-xs">Monthly Fund</div>
-                          <div className={`font-semibold mt-1 ${suggestion.monthlyExpenseFund > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
-                            {suggestion.monthlyExpenseFund > 0
-                              ? `UGX ${suggestion.monthlyExpenseFund.toLocaleString()}`
-                              : 'None'
-                            }
-                          </div>
-                        </div>
-                        <div className="bg-white p-2 rounded border text-center">
-                          <div className="text-green-700 font-medium text-xs">Total Deductions</div>
-                          <div className="font-semibold text-red-600 mt-1">
-                            UGX {suggestion.totalDeductions.toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-2 p-2 bg-white rounded border">
-                        <span className="text-green-700 text-sm">Suggested PM Allocation:</span>
-                        <div className="text-xl font-bold text-green-600">
-                          UGX {suggestion.suggestedAmount.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Button
-                      onClick={() => handleSendAllocation(suggestion)}
-                      disabled={sending || !selectedPM}
-                      className="bg-green-600 hover:bg-green-700 ml-4"
-                    >
-                      {sending ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-1" />
-                          Send
-                        </>
-                      )}
-                    </Button>
+          <div className="p-6 space-y-4">
+            {suggestedAllocations
+              .filter(s => !isAllocationAlreadySent(s.cashCloseId, s.shiftType))
+              .filter(s => {
+                if (s.branchId === 'test_branch') return false;
+                const currentYear = new Date().getFullYear();
+                try {
+                  const date = s.createdAt?.toDate?.() || new Date(s.createdAt);
+                  return !isNaN(date.getTime()) && date.getFullYear() >= currentYear;
+                } catch { return true; }
+              })
+              .map((suggestion, index) => (
+              <div key={index} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-200 overflow-hidden">
+                {/* Card header row */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3 border-b border-gray-50">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="font-semibold text-slate-800 text-sm">
+                      {new Date(suggestion.businessDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                    <span className="capitalize text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md px-2 py-0.5">
+                      {suggestion.shiftType} shift
+                    </span>
+                    {suggestion.branchId && (
+                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />{suggestion.branchId}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-400 shrink-0">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {(() => {
+                        const r = formatCreatedAt(suggestion.createdAt);
+                        return typeof r === 'object' ? <span className={r.urgencyColor}>{r.timeAgo}</span> : r;
+                      })()}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      {suggestion.createdByName === 'Loading...'
+                        ? <><RefreshCw className="w-3 h-3 animate-spin" /> Loading</>
+                        : suggestion.createdByName}
+                    </span>
+                    <span className="font-mono text-slate-300">#{suggestion.cashCloseId.slice(-6)}</span>
                   </div>
                 </div>
-              ))}
-              
-              {suggestedAllocations.filter(suggestion => !isAllocationAlreadySent(suggestion.cashCloseId, suggestion.shiftType)).length === 0 && (
-                <div className="text-center py-4 text-green-700">
-                  <CheckCircle className="w-8 h-8 mx-auto mb-2" />
-                  <p>All {pmUsers.find(pm => pm.uid === selectedPM)?.name}'s submitted cash closes have been allocated!</p>
-                  <p className="text-sm text-gray-500 mt-1">Select a different PM or check back later for new submissions.</p>
+
+                {/* Financial breakdown */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
+                  <div className="bg-white p-3 text-center">
+                    <p className="text-xs text-gray-400 mb-1">Cash in Till</p>
+                    <p className="text-sm font-bold text-slate-800">{ugx(suggestion.totalCash)}</p>
+                    <p className="text-xs text-gray-300 mt-0.5">Gross</p>
+                  </div>
+                  <div className="bg-white p-3 text-center">
+                    <p className="text-xs text-red-400 mb-1">Profit 12%</p>
+                    <p className="text-sm font-bold text-red-600">−{ugx(suggestion.profitDeduction)}</p>
+                    <p className="text-xs text-red-200 mt-0.5">Retained</p>
+                  </div>
+                  <div className="bg-white p-3 text-center">
+                    <p className="text-xs text-orange-400 mb-1">Expense Fund</p>
+                    <p className={`text-sm font-bold ${suggestion.monthlyExpenseFund > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
+                      {suggestion.monthlyExpenseFund > 0 ? `−${ugx(suggestion.monthlyExpenseFund)}` : '—'}
+                    </p>
+                    <p className="text-xs text-orange-200 mt-0.5">Monthly</p>
+                  </div>
+                  <div className="bg-white p-3 text-center">
+                    <p className="text-xs text-slate-400 mb-1">Total Deducted</p>
+                    <p className="text-sm font-bold text-slate-700">−{ugx(suggestion.totalDeductions)}</p>
+                    <p className="text-xs text-slate-300 mt-0.5">Combined</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+
+                {/* Allocation footer with Send */}
+                <div className="flex items-center justify-between bg-emerald-700 px-5 py-3.5">
+                  <div>
+                    <p className="text-xs text-emerald-300">PM Allocation Amount</p>
+                    <p className="text-xl font-bold text-white">UGX {suggestion.suggestedAmount.toLocaleString()}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const cashClose = cashCloses.find(cc => cc.id === suggestion.cashCloseId);
+                      if (cashClose) handleSendAllocationFromOverview(cashClose);
+                    }}
+                    disabled={sending || !selectedPM}
+                    className="flex items-center gap-2 bg-white text-emerald-700 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    {sending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Send
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {suggestedAllocations
+              .filter(s => !isAllocationAlreadySent(s.cashCloseId, s.shiftType))
+              .filter(s => {
+                if (s.branchId === 'test_branch') return false;
+                const currentYear = new Date().getFullYear();
+                try {
+                  const date = s.createdAt?.toDate?.() || new Date(s.createdAt);
+                  return !isNaN(date.getTime()) && date.getFullYear() >= currentYear;
+                } catch { return true; }
+              }).length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-7 h-7 text-emerald-500" />
+                </div>
+                <p className="font-semibold text-slate-700">All caught up</p>
+                <p className="text-sm text-slate-400 mt-1">All cash closes for this PM have been allocated.</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Cash Closes Overview - Excluding Allocated Records */}
-      <Card className="border-purple-200">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-purple-800">
-            <div className="flex items-center">
-              <FileText className="w-5 h-5 mr-2" />
-              Cash Closes Overview (Excluding Allocated)
+      {/* Cash Closes Overview */}
+      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+        {/* Section header */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-5">
+          <div className="absolute inset-0 opacity-[0.08]"
+            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white tracking-tight">Cash Closes Overview</h2>
+                <p className="text-xs text-blue-200 mt-0.5">Submit pending records to make them available for allocation</p>
+              </div>
             </div>
-            <div className="text-sm text-purple-600 font-medium">
-              {allCashCloses.filter(cc => cc.status !== 'allocated').length} available records • {allCashCloses.filter(cc => cc.status === 'allocated').length} allocated
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
+                {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending
+              </span>
+              <span className="text-xs font-medium bg-white/15 border border-white/20 text-blue-100 rounded-full px-3 py-1.5">
+                {allCashCloses.filter(cc => cc.status === 'allocated').length} allocated
+              </span>
             </div>
-          </CardTitle>
-          <div className="text-sm text-gray-600 mt-2">
-            📋 Overview of available cash close records (excluding already allocated) - submit, allocate, or review
-            <br />
-            📊 Detailed financial breakdown with deductions and suggested allocations
-            <br />
-            🚀 Submit records for allocation or send allocations directly (select a PM first)
           </div>
-        </CardHeader>
-        <CardContent>
-          {allCashCloses.filter(cc => cc.status !== 'allocated').length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                {allCashCloses.length === 0 ? 'No Cash Closes Found' : 'All Records Already Allocated'}
-              </h3>
-              <p className="text-gray-500">
+        </div>
+
+        <div className="p-6">
+          {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length === 0 ? (
+            <div className="text-center py-14">
+              <div className="w-16 h-16 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-purple-300" />
+              </div>
+              <p className="font-semibold text-slate-600">
+                {allCashCloses.length === 0 ? 'No Cash Closes Found' : 'Nothing Pending Submission'}
+              </p>
+              <p className="text-sm text-slate-400 mt-1">
                 {allCashCloses.length === 0
                   ? 'No cash close records exist in the database.'
-                  : 'All cash close records have already been allocated. Check the Recent Allocations section below.'
-                }
+                  : 'All records have been submitted or allocated.'}
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-purple-50 p-4 rounded-lg text-center border-2 border-purple-300">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {allCashCloses.filter(cc => cc.status !== 'allocated').length}
-                  </div>
-                  <div className="text-sm text-purple-700 font-semibold">Available Records</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg text-center border-2 border-green-300">
-                  <div className="text-2xl font-bold text-green-600">
-                    {allCashCloses.filter(cc => cc.status === 'submitted').length}
-                  </div>
-                  <div className="text-sm text-green-700 font-semibold">Ready for Allocation</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {allCashCloses.filter(cc => cc.status === 'completed').length}
-                  </div>
-                  <div className="text-sm text-blue-700">Completed</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {allCashCloses.filter(cc => cc.status === 'allocated').length}
-                  </div>
-                  <div className="text-sm text-orange-700">Already Allocated</div>
-                </div>
-              </div>
-
-              {/* Cash Closes List - Excluding Allocated Records */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {(() => {
-                  const nonAllocatedCashCloses = allCashCloses.filter(cashClose => cashClose.status !== 'allocated');
-                  return nonAllocatedCashCloses.map((cashClose, index) => (
-                    <div key={cashClose.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                        {/* Header with Date, Shift and Status */}
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center">
-                              <Calendar className="w-4 h-4 mr-2 text-purple-600" />
-                              <span className="font-bold text-purple-800 text-lg">
-                                {(() => {
-                                  const date = cashClose.businessDate || cashClose.date;
-                                  if (date) {
-                                    const dateObj = new Date(date);
-                                    return dateObj.toLocaleDateString();
-                                  }
-                                  return 'N/A';
-                                })()} - {cashClose.shifts?.[0]?.shift || 'Unknown'} shift
-                              </span>
-                            </div>
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                              cashClose.status === 'submitted' ? 'bg-green-100 text-green-800 border border-green-300' :
-                              cashClose.status === 'completed' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
-                              cashClose.status === 'allocated' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                              'bg-gray-100 text-gray-800 border border-gray-300'
-                            }`}>
-                              {cashClose.status?.toUpperCase() || 'UNKNOWN'}
-                            </span>
-                          </div>
-
-                          {/* Created Information */}
-                          <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-                            <div className="grid grid-cols-1 gap-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center text-xs text-blue-700">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  <span className="font-medium">Created:</span>
-                                </div>
-                                <div className="text-xs font-mono text-blue-800">
-                                  {(() => {
-                                    const result = formatCreatedAt(cashClose.createdAt);
-                                    return typeof result === 'object' ? result.fullDisplay : result;
-                                  })()}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center text-xs text-blue-700">
-                                  <User className="w-3 h-3 mr-1" />
-                                  <span className="font-medium">Created by:</span>
-                                </div>
-                                <div className="text-xs text-blue-800 font-medium flex items-center">
-                                  {cashClose.createdBy || 'Unknown User'}
-                                  <span className="ml-2 text-xs text-gray-500 font-mono">
-                                    ({cashClose.createdBy?.slice(-8) || 'N/A'})
-                                  </span>
-                                </div>
-                              </div>
-
-                              {cashClose.createdAt && (
-                                <div className="text-xs text-blue-600 mt-1 pt-1 border-t border-blue-200">
-                                  <span className="font-medium">Full timestamp:</span>
-                                  <div className="font-mono mt-1">
-                                    {(() => {
-                                      try {
-                                        const date = cashClose.createdAt?.toDate?.() || new Date(cashClose.createdAt);
-                                        return date.toISOString();
-                                      } catch {
-                                        return 'Unable to parse';
-                                      }
-                                    })()}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Branch Information */}
-                          {cashClose.branchId && (
-                            <div className="flex items-center text-xs text-purple-600 mb-2">
-                              <Building2 className="w-3 h-3 mr-1" />
-                              <span>Branch: {cashClose.branchId}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Financial Breakdown */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">
-                          {/* Total Cash in Till */}
-                          <div className="bg-white p-3 rounded border border-green-200">
-                            <div className="text-green-700 font-medium mb-1 flex items-center">
-                              <span className="text-lg mr-2">💰</span>
-                              Total Cash in Till
-                            </div>
-                            <div className="text-xl font-bold text-green-800">
-                              UGX {(cashClose.totalCashInTill || 0).toLocaleString()}
-                            </div>
-                            <div className="text-xs text-green-600 mt-1">Raw amount before deductions</div>
-                          </div>
-
-                          {/* Deductions Breakdown */}
-                          <div className="bg-white p-3 rounded border border-red-200">
-                            <div className="text-red-700 font-medium mb-2 flex items-center">
-                              <span className="text-lg mr-2">📊</span>
-                              Deductions Breakdown
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-red-600">12% Profit:</span>
-                                <span className="font-semibold text-red-600">
-                                  -UGX {Math.round((cashClose.totalCashInTill || 0) * 0.12).toLocaleString()}
-                                </span>
-                              </div>
-                              {(cashClose.m_expenseFund || cashClose.m_expensefund || 0) > 0 && (
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-orange-600">Monthly Fund:</span>
-                                  <span className="font-semibold text-orange-600">
-                                    -UGX {(cashClose.m_expenseFund || cashClose.m_expensefund || 0).toLocaleString()}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="border-t border-gray-300 pt-1 mt-2">
-                                <div className="flex justify-between font-semibold">
-                                  <span>Total Deductions:</span>
-                                  <span className="text-red-600">
-                                    UGX {(() => {
-                                      const profitDeduction = Math.round((cashClose.totalCashInTill || 0) * 0.12);
-                                      const monthlyExpenseFund = cashClose.m_expenseFund || cashClose.m_expensefund || 0;
-                                      return (profitDeduction + monthlyExpenseFund).toLocaleString();
-                                    })()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Additional Details Row */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-purple-700 font-medium text-xs">Record ID</div>
-                            <div className="font-mono text-xs text-purple-800 mt-1">{cashClose.id.slice(-8)}</div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-purple-700 font-medium text-xs">Shift Type</div>
-                            <div className="font-semibold text-purple-800 mt-1 capitalize">
-                              {cashClose.shifts?.[0]?.shift || 'Unknown'}
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-purple-700 font-medium text-xs">Monthly Fund</div>
-                            <div className={`font-semibold mt-1 ${
-                              (cashClose.m_expenseFund || cashClose.m_expensefund || 0) > 0 ? 'text-orange-600' : 'text-gray-500'
-                            }`}>
-                              {(cashClose.m_expenseFund || cashClose.m_expensefund || 0) > 0
-                                ? `UGX ${(cashClose.m_expenseFund || cashClose.m_expensefund || 0).toLocaleString()}`
-                                : 'None'
-                              }
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-purple-700 font-medium text-xs">Total Deductions</div>
-                            <div className="font-semibold text-red-600 mt-1">
-                              UGX {(() => {
-                                const profitDeduction = Math.round((cashClose.totalCashInTill || 0) * 0.12);
-                                const monthlyExpenseFund = cashClose.m_expenseFund || cashClose.m_expensefund || 0;
-                                return (profitDeduction + monthlyExpenseFund).toLocaleString();
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Suggested PM Allocation */}
-                        <div className="bg-purple-50 p-3 rounded border border-purple-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-purple-700 text-sm font-medium">
-                              Suggested PM Allocation:
-                            </span>
-                            <div className="text-xl font-bold text-purple-600">
-                              UGX {(() => {
-                                const totalCash = cashClose.totalCashInTill || 0;
-                                const profitDeduction = Math.round(totalCash * 0.12);
-                                const monthlyExpenseFund = cashClose.m_expenseFund || cashClose.m_expensefund || 0;
-                                const totalDeductions = profitDeduction + monthlyExpenseFund;
-                                const allocationAmount = totalCash - totalDeductions;
-                                return allocationAmount.toLocaleString();
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div className="text-right space-y-2">
-                        {/* Submit Button - Only show if not already submitted */}
-                        {cashClose.status !== 'submitted' && cashClose.status !== 'allocated' && (
-                          <Button
-                            onClick={() => handleSubmitCashClose(cashClose)}
-                            disabled={submitting}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 w-full mb-2"
-                          >
-                            {submitting ? (
-                              <>
-                                <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                                Submitting...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Submit for Allocation
-                              </>
-                            )}
-                          </Button>
-                        )}
-
-                        {/* Send Allocation Button */}
-                        <Button
-                          onClick={() => handleSendAllocationFromOverview(cashClose)}
-                          disabled={sending || !selectedPM || cashClose.status !== 'submitted'}
-                          size="sm"
-                          className={`${
-                            cashClose.status === 'allocated'
-                              ? 'bg-gray-500 hover:bg-gray-600'
-                              : 'bg-purple-600 hover:bg-purple-700'
-                          } disabled:bg-gray-400 w-full`}
-                        >
-                          {sending ? (
-                            <>
-                              <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                              Sending...
-                            </>
-                          ) : cashClose.status === 'allocated' ? (
-                            <>
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Allocated
-                            </>
-                          ) : cashClose.status === 'submitted' ? (
-                            <>
-                              <Send className="w-3 h-3 mr-1" />
-                              Send Allocation
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3 h-3 mr-1" />
-                              Not Submitted
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  ));
-                })()}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-
-      {/* Summary Stats */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Cash Close Processing Statistics
-            {selectedPM && (
-              <div className="text-sm text-gray-600 mt-1">
-                Filtered for {pmUsers.find(pm => pm.uid === selectedPM)?.name}
-              </div>
-            )}
-          </CardTitle>
-        </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">{cashCloses.length}</div>
-                <div className="text-sm text-orange-800">
-                  {selectedPM ? 'PM\'s Submitted' : 'Submitted'}
-                </div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {suggestedAllocations.reduce((sum, suggestion) => sum + suggestion.suggestedAmount, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-blue-800">Total Suggested</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {suggestedAllocations.reduce((sum, suggestion) => sum + suggestion.profitDeduction, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-green-800">Profit Deductions</div>
-              </div>
-              <div className="text-center p-4 bg-indigo-50 rounded-lg">
-                <div className="text-2xl font-bold text-indigo-600">
-                  {suggestedAllocations.reduce((sum, suggestion) => sum + suggestion.totalDeductions, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-indigo-800">Total Deductions</div>
-              </div>
-            </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Allocations - From Cash Closes with Status ALLOCATED */}
-      <Card className="border-orange-200">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-orange-800">
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Recent Allocations
-            </div>
-            <div className="text-sm text-orange-600 font-medium">
-              {allocatedCashCloses.length} allocated records
-            </div>
-          </CardTitle>
-          <div className="text-sm text-gray-600 mt-2">
-            📋 Showing cash close records that have been allocated to purchase managers
-          </div>
-        </CardHeader>
-        <CardContent>
-          {allocatedCashCloses.length === 0 ? (
-            <div className="text-center py-8">
-              <Receipt className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">No Allocated Cash Closes</h3>
-              <p className="text-gray-500">No cash close records have been allocated yet. Use the buttons above to allocate funds.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="bg-orange-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-orange-600">{allocatedCashCloses.length}</div>
-                  <div className="text-sm text-orange-700">Total Allocated</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {allocatedCashCloses.reduce((sum, cc) => sum + (cc.allocationAmount || 0), 0).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-green-700">Total Allocated Amount</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {new Set(allocatedCashCloses.map(cc => cc.allocatedTo)).size}
-                  </div>
-                  <div className="text-sm text-blue-700">PMs Allocated To</div>
-                </div>
-              </div>
-
-              {/* Allocated Cash Closes List */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {allocatedCashCloses
-                  .sort((a, b) => {
-                    const dateA = a.allocatedAt?.toDate?.() || new Date(a.allocatedAt || 0);
-                    const dateB = b.allocatedAt?.toDate?.() || new Date(b.allocatedAt || 0);
-                    return dateB.getTime() - dateA.getTime();
-                  })
-                  .slice(0, 10)
-                  .map((cashClose, index) => (
-                  <div key={cashClose.id} className="border border-orange-200 rounded-lg p-4 bg-orange-50 hover:bg-orange-100">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        {/* Header with Date, Shift and Status */}
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <Calendar className="w-4 h-4 mr-2 text-orange-600" />
-                              <span className="font-bold text-orange-800">
-                                {(() => {
-                                  const date = cashClose.businessDate || cashClose.date;
-                                  if (date) {
-                                    const dateObj = new Date(date);
-                                    return dateObj.toLocaleDateString();
-                                  }
-                                  return 'N/A';
-                                })()} - {cashClose.shifts?.[0]?.shift || 'Unknown'} shift
-                              </span>
-                            </div>
-                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
-                              ALLOCATED
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Allocation Information */}
-                        <div className="bg-white border border-orange-200 rounded p-3 mb-2">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                              <span className="text-gray-600 text-xs">Allocated To:</span>
-                              <div className="font-medium text-orange-800">
-                                {cashClose.allocatedTo || 'Unknown PM'}
-                              </div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600 text-xs">Allocation Amount:</span>
-                              <div className="font-bold text-green-600">
-                                UGX {(cashClose.allocationAmount || 0).toLocaleString()}
-                              </div>
-                            </div>
-                            <div>
-                              <span className="text-gray-600 text-xs">Allocated By:</span>
-                              <div className="font-medium text-blue-600">
-                                {cashClose.allocatedByName || cashClose.allocatedBy || 'System'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Allocation Timestamp */}
-                          {cashClose.allocatedAt && (
-                            <div className="mt-2 pt-2 border-t border-gray-200">
-                              <div className="flex items-center text-xs text-gray-500">
-                                <Clock className="w-3 h-3 mr-1" />
-                                <span>Allocated: {(() => {
-                                  const result = formatCreatedAt(cashClose.allocatedAt);
-                                  return typeof result === 'object' ? result.fullDisplay : result;
-                                })()}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Financial Summary */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-gray-600">Original Amount</div>
-                            <div className="font-medium text-blue-600">
-                              UGX {(cashClose.totalCashInTill || 0).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-gray-600">Profit Deducted</div>
-                            <div className="font-medium text-red-600">
-                              UGX {(cashClose.profitDeduction || 0).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-gray-600">Monthly Fund</div>
-                            <div className="font-medium text-orange-600">
-                              UGX {(cashClose.monthlyExpenseFund || 0).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 rounded border text-center">
-                            <div className="text-gray-600">Final Allocation</div>
-                            <div className="font-bold text-green-600">
-                              UGX {(cashClose.allocationAmount || 0).toLocaleString()}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right ml-4">
-                        <div className="text-xs text-gray-500 mb-2">
-                          ID: {cashClose.id.slice(-6)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Record #{allocatedCashCloses.length - index}
-                        </div>
-                      </div>
+            <div className="space-y-5">
+              {/* Status pipeline */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Pending Submit', value: allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length, color: 'text-violet-700', icon: <Clock className="w-4 h-4 text-violet-500" />, bg: 'bg-violet-50', border: 'border-violet-200' },
+                  { label: 'Submitted', value: allCashCloses.filter(cc => cc.status === 'submitted').length, color: 'text-emerald-700', icon: <CheckCircle className="w-4 h-4 text-emerald-500" />, bg: 'bg-emerald-50', border: 'border-emerald-200' },
+                  { label: 'Completed', value: allCashCloses.filter(cc => cc.status === 'completed').length, color: 'text-blue-700', icon: <TrendingUp className="w-4 h-4 text-blue-500" />, bg: 'bg-blue-50', border: 'border-blue-200' },
+                  { label: 'Allocated', value: allCashCloses.filter(cc => cc.status === 'allocated').length, color: 'text-orange-700', icon: <Send className="w-4 h-4 text-orange-500" />, bg: 'bg-orange-50', border: 'border-orange-200' },
+                ].map((s, i) => (
+                  <div key={i} className={`rounded-xl ${s.bg} border ${s.border} p-3.5 flex items-center gap-3`}>
+                    {s.icon}
+                    <div>
+                      <p className={`text-xl font-bold ${s.color} leading-none`}>{s.value}</p>
+                      <p className="text-xs text-gray-500 mt-1">{s.label}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Records list */}
+              <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
+                {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').map((cashClose) => {
+                  const totalCash: number = (() => {
+                    if ((cashClose.totalCashInTill || 0) > 0) return cashClose.totalCashInTill;
+                    if ((cashClose.totalRevenue || 0) > 0) return cashClose.totalRevenue;
+                    if ((cashClose.closeCash || 0) > 0) return cashClose.closeCash;
+                    if (Array.isArray(cashClose.shifts)) {
+                      const sum = cashClose.shifts.reduce((s: number, shift: any) =>
+                        s + (Array.isArray(shift.tills)
+                          ? shift.tills.reduce((ts: number, t: any) => ts + (t.totalCashInTill || t.cashAmount || 0), 0)
+                          : 0), 0);
+                      if (sum > 0) return sum;
+                    }
+                    return 0;
+                  })();
+
+                  const dateStr: string = (() => {
+                    const raw = cashClose.businessDate || cashClose.cashCloseDate || cashClose.date;
+                    if (raw) {
+                      const d = new Date(raw);
+                      if (!isNaN(d.getTime())) return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                    }
+                    try {
+                      const d = cashClose.createdAt?.toDate?.() || (cashClose.createdAt ? new Date(cashClose.createdAt) : null);
+                      if (d && !isNaN(d.getTime())) return `~${d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                    } catch {}
+                    return 'Date unknown';
+                  })();
+
+                  const shiftLabel: string =
+                    cashClose.shifts?.[0]?.shift || cashClose.shiftType || cashClose.shift || null;
+
+                  const profitDeduction = Math.round(totalCash * 0.12);
+                  const monthlyFund = cashClose.m_expenseFund || cashClose.m_expensefund || 0;
+                  const totalDeductions = profitDeduction + monthlyFund;
+                  const allocationAmount = totalCash - totalDeductions;
+                  const isIncomplete = totalCash === 0 || !shiftLabel || dateStr === 'Date unknown';
+
+                  return (
+                    <div key={cashClose.id} className={`rounded-xl border bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
+                      isIncomplete ? 'border-amber-200' : 'border-gray-200 hover:border-violet-200'
+                    }`}>
+                      {isIncomplete && (
+                        <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-800">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                          <span><strong>Incomplete record</strong> — some fields are missing or zero. Review this entry.</span>
+                        </div>
+                      )}
+
+                      {/* Card header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3 border-b border-gray-50">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Calendar className="w-4 h-4 text-violet-500 shrink-0" />
+                          <span className="font-semibold text-slate-800 text-sm">{dateStr}</span>
+                          {shiftLabel ? (
+                            <span className="capitalize text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 rounded-md px-2 py-0.5">
+                              {shiftLabel} shift
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-md px-2 py-0.5">Shift unknown</span>
+                          )}
+                          {cashClose.branchId && cashClose.branchId !== 'test_branch' && (
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <Building2 className="w-3 h-3" />{cashClose.branchId}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {cashClose.status ? (
+                            <span className={`text-xs font-semibold rounded-md px-2.5 py-0.5 ${
+                              cashClose.status === 'submitted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              cashClose.status === 'completed' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                              'bg-slate-50 text-slate-600 border border-slate-200'
+                            }`}>{cashClose.status.toUpperCase()}</span>
+                          ) : (
+                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-md px-2.5 py-0.5">NO STATUS</span>
+                          )}
+                          <span className="text-xs text-slate-300 font-mono">#{cashClose.id.slice(-6)}</span>
+                        </div>
+                      </div>
+
+                      {/* Meta row */}
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-400 px-4 py-2.5 bg-slate-50 border-b border-gray-100">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span className="font-medium text-slate-500">Created:</span>
+                          {(() => { const r = formatCreatedAt(cashClose.createdAt); return typeof r === 'object' ? <span className={r.urgencyColor}>{r.fullDisplay}</span> : r; })()}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3 h-3 shrink-0" />
+                          <span className="font-medium text-slate-500">By:</span>
+                          <span className="text-slate-700">{resolveName(cashClose.createdBy)}</span>
+                        </span>
+                      </div>
+
+                      {/* Financial breakdown */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
+                        <div className="bg-white p-3 text-center">
+                          <p className="text-xs text-gray-400 mb-1">Cash in Till</p>
+                          <p className={`text-sm font-bold ${totalCash > 0 ? 'text-slate-800' : 'text-amber-500'}`}>
+                            {totalCash > 0 ? ugx(totalCash) : 'Missing'}
+                          </p>
+                        </div>
+                        <div className="bg-white p-3 text-center">
+                          <p className="text-xs text-red-400 mb-1">Profit 12%</p>
+                          <p className="text-sm font-bold text-red-600">−{ugx(profitDeduction)}</p>
+                        </div>
+                        <div className="bg-white p-3 text-center">
+                          <p className="text-xs text-orange-400 mb-1">Expense Fund</p>
+                          <p className={`text-sm font-bold ${monthlyFund > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
+                            {monthlyFund > 0 ? `−${ugx(monthlyFund)}` : '—'}
+                          </p>
+                        </div>
+                        <div className="bg-white p-3 text-center">
+                          <p className="text-xs text-slate-400 mb-1">Total Deducted</p>
+                          <p className="text-sm font-bold text-slate-700">−{ugx(totalDeductions)}</p>
+                        </div>
+                      </div>
+
+                      {/* Footer: allocation + actions */}
+                      <div className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 ${
+                        isIncomplete ? 'bg-amber-500' : 'bg-violet-700'
+                      }`}>
+                        <div>
+                          <p className={`text-xs ${isIncomplete ? 'text-amber-100' : 'text-violet-300'}`}>
+                            {isIncomplete ? 'Cannot calculate — data incomplete' : 'Suggested Allocation'}
+                          </p>
+                          <p className="text-lg font-bold text-white">
+                            {isIncomplete ? '—' : ugx(allocationAmount)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {cashClose.status !== 'submitted' && cashClose.status !== 'allocated' && (
+                            <button
+                              onClick={() => handleSubmitCashClose(cashClose)}
+                              disabled={submitting}
+                              className="flex items-center gap-1.5 bg-white/90 hover:bg-white text-violet-700 font-semibold text-xs px-3.5 py-2 rounded-xl transition disabled:opacity-50"
+                            >
+                              {submitting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                              Submit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleSendAllocationFromOverview(cashClose)}
+                            disabled={sending || !selectedPM || cashClose.status !== 'submitted'}
+                            className="flex items-center gap-1.5 bg-white text-violet-700 font-semibold text-xs px-3.5 py-2 rounded-xl hover:bg-violet-50 transition disabled:opacity-40"
+                          >
+                            {sending ? <RefreshCw className="w-3 h-3 animate-spin" /> :
+                              cashClose.status === 'submitted' ? <Send className="w-3 h-3" /> :
+                              <Clock className="w-3 h-3" />}
+                            {cashClose.status === 'submitted' ? 'Send' : 'Awaiting Submit'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+
+      {/* Summary Stats */}
+      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-700 to-blue-700 px-6 py-5">
+          <div className="absolute inset-0 opacity-[0.06]"
+            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-white tracking-tight">Processing Statistics</h2>
+              <p className="text-xs text-indigo-200 mt-0.5">
+                {selectedPM ? `Filtered for ${pmUsers.find(pm => pm.uid === selectedPM)?.name}` : 'Aggregate across all cash closes'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              {
+                label: selectedPM ? "PM's Submitted" : 'Total Submitted',
+                value: cashCloses.length,
+                sub: 'cash closes',
+                icon: <FileText className="w-5 h-5 text-amber-500" />,
+                color: 'text-amber-700',
+                bg: 'bg-amber-50',
+                border: 'border-amber-200',
+              },
+              {
+                label: 'Total Suggested',
+                value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.suggestedAmount, 0).toLocaleString()}`,
+                sub: 'to be allocated',
+                icon: <Send className="w-5 h-5 text-blue-500" />,
+                color: 'text-blue-700',
+                bg: 'bg-blue-50',
+                border: 'border-blue-200',
+              },
+              {
+                label: 'Profit Deductions',
+                value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.profitDeduction, 0).toLocaleString()}`,
+                sub: '12% retained',
+                icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
+                color: 'text-emerald-700',
+                bg: 'bg-emerald-50',
+                border: 'border-emerald-200',
+              },
+              {
+                label: 'Total Deductions',
+                value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.totalDeductions, 0).toLocaleString()}`,
+                sub: 'profit + expenses',
+                icon: <Calculator className="w-5 h-5 text-indigo-500" />,
+                color: 'text-indigo-700',
+                bg: 'bg-indigo-50',
+                border: 'border-indigo-200',
+              },
+            ].map((stat, i) => (
+              <div key={i} className={`rounded-xl ${stat.bg} border ${stat.border} p-4`}>
+                <div className="flex items-center justify-between mb-2">
+                  {stat.icon}
+                </div>
+                <p className={`text-lg font-bold ${stat.color} leading-tight`}>{stat.value}</p>
+                <p className="text-xs font-medium text-gray-600 mt-0.5">{stat.label}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Allocations */}
+      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+
+        {/* Header */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5">
+          <div className="absolute inset-0 opacity-[0.08]"
+            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white tracking-tight">Recent Allocations</h2>
+                <p className="text-xs text-blue-100 mt-0.5">Funds dispatched to purchase managers</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
+                {allocatedCashCloses.length} records
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {allocatedCashCloses.length === 0 ? (
+            <div className="text-center py-14">
+              <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Receipt className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="font-semibold text-slate-600">No Allocated Records Yet</p>
+              <p className="text-sm text-slate-400 mt-1">Allocated cash closes will appear here once sent.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+
+              {/* KPI strip */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: 'Total Dispatched',
+                    value: allocatedCashCloses.length,
+                    suffix: 'records',
+                    icon: <CheckCircle className="w-4 h-4" />,
+                    color: 'text-slate-700',
+                    iconColor: 'text-slate-500',
+                    bg: 'bg-slate-50',
+                    border: 'border-slate-200',
+                  },
+                  {
+                    label: 'Total Amount',
+                    value: `UGX ${allocatedCashCloses.reduce((s, cc) => s + (cc.allocationAmount || 0), 0).toLocaleString()}`,
+                    suffix: '',
+                    icon: <DollarSign className="w-4 h-4" />,
+                    color: 'text-emerald-700',
+                    iconColor: 'text-emerald-500',
+                    bg: 'bg-emerald-50',
+                    border: 'border-emerald-200',
+                  },
+                  {
+                    label: 'PMs Covered',
+                    value: new Set(allocatedCashCloses.map(cc => cc.allocatedTo)).size,
+                    suffix: 'managers',
+                    icon: <User className="w-4 h-4" />,
+                    color: 'text-indigo-700',
+                    iconColor: 'text-indigo-500',
+                    bg: 'bg-indigo-50',
+                    border: 'border-indigo-200',
+                  },
+                ].map((kpi, i) => (
+                  <div key={i} className={`rounded-xl ${kpi.bg} border ${kpi.border} p-4 flex items-center gap-3`}>
+                    <div className={`${kpi.iconColor} shrink-0`}>{kpi.icon}</div>
+                    <div>
+                      <p className={`text-lg font-bold ${kpi.color} leading-none`}>{kpi.value}</p>
+                      <p className="text-xs text-gray-500 mt-1">{kpi.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Timeline list */}
+              <div className="relative max-h-[36rem] overflow-y-auto pr-1">
+                {/* Vertical rail */}
+                <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-100" />
+
+                <div className="space-y-3">
+                  {[...allocatedCashCloses]
+                    .sort((a, b) => {
+                      const dA = a.allocatedAt?.toDate?.() || new Date(a.allocatedAt || 0);
+                      const dB = b.allocatedAt?.toDate?.() || new Date(b.allocatedAt || 0);
+                      return dB.getTime() - dA.getTime();
+                    })
+                    .slice(0, 15)
+                    .map((cashClose, index) => {
+                      const dateStr = (() => {
+                        const d = cashClose.businessDate || cashClose.date;
+                        return d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                      })();
+                      const allocatedAt = (() => {
+                        const r = formatCreatedAt(cashClose.allocatedAt);
+                        return typeof r === 'object' ? r : null;
+                      })();
+
+                      return (
+                        <div key={cashClose.id} className="relative pl-10">
+                          {/* Timeline dot */}
+                          <div className="absolute left-0 top-4 w-9 h-9 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm z-10">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                          </div>
+
+                          <div className="rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 overflow-hidden">
+                            {/* Card header */}
+                            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-50">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-slate-800 text-sm">{dateStr}</span>
+                                <span className="capitalize text-xs font-medium bg-slate-100 text-slate-600 rounded-md px-2 py-0.5">
+                                  {cashClose.shifts?.[0]?.shift || cashClose.shiftType || 'Unknown'} shift
+                                </span>
+                                {cashClose.branchId && cashClose.branchId !== 'test_branch' && (
+                                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" />{cashClose.branchId}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                                  <CheckCircle className="w-3 h-3" /> Allocated
+                                </span>
+                                <span className="text-xs text-slate-300 font-mono">#{cashClose.id.slice(-6)}</span>
+                              </div>
+                            </div>
+
+                            {/* People row */}
+                            <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                              <div className="bg-white px-4 py-2.5">
+                                <p className="text-xs text-gray-400 mb-0.5">Sent to</p>
+                                <p className="text-sm font-semibold text-slate-800 truncate">
+                                  {cashClose.allocatedToName || resolveName(cashClose.allocatedTo)}
+                                </p>
+                              </div>
+                              <div className="bg-white px-4 py-2.5">
+                                <p className="text-xs text-gray-400 mb-0.5">Sent by</p>
+                                <p className="text-sm font-medium text-slate-600 truncate">
+                                  {cashClose.allocatedByName || resolveName(cashClose.allocatedBy)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Financial strip */}
+                            <div className="grid grid-cols-4 gap-px bg-gray-100">
+                              <div className="bg-white px-3 py-2.5 text-center">
+                                <p className="text-xs text-gray-400 mb-0.5">Cash in Till</p>
+                                <p className="text-xs font-bold text-gray-800">{ugx(cashClose.totalCashInTill || 0)}</p>
+                              </div>
+                              <div className="bg-white px-3 py-2.5 text-center">
+                                <p className="text-xs text-red-400 mb-0.5">Profit 12%</p>
+                                <p className="text-xs font-bold text-red-600">−{ugx(cashClose.profitDeduction || 0)}</p>
+                              </div>
+                              <div className="bg-white px-3 py-2.5 text-center">
+                                <p className="text-xs text-orange-400 mb-0.5">Exp. Fund</p>
+                                <p className="text-xs font-bold text-orange-600">
+                                  {(cashClose.monthlyExpenseFund || 0) > 0 ? `−${ugx(cashClose.monthlyExpenseFund)}` : '—'}
+                                </p>
+                              </div>
+                              <div className="bg-emerald-600 px-3 py-2.5 text-center">
+                                <p className="text-xs text-emerald-200 mb-0.5">Sent</p>
+                                <p className="text-xs font-bold text-white">{ugx(cashClose.allocationAmount || 0)}</p>
+                              </div>
+                            </div>
+
+                            {/* Footer timestamp */}
+                            {allocatedAt && (
+                              <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border-t border-gray-100">
+                                <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="text-xs text-slate-400">Dispatched</span>
+                                <span className={`text-xs font-medium ${allocatedAt.urgencyColor}`}>{allocatedAt.fullDisplay}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

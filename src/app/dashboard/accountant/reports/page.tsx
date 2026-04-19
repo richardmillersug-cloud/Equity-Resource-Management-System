@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { authService } from '@/lib/firebase/auth';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 // import {
 //   DollarSign,
 //   TrendingUp,
@@ -14,6 +16,67 @@ import { authService } from '@/lib/firebase/auth';
 //   Filter,
 //   RefreshCw,
 // } from 'lucide-react';
+
+
+// ─── monthly gross profit ─────────────────────────────────────────────────────
+
+/** Resolve a Firestore Timestamp, Date, or date string to a JS Date. */
+function resolveDate(v: unknown): Date {
+  if (!v) return new Date(NaN);
+  if (v instanceof Date) return v;
+  const ts = v as { toDate?: () => Date };
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  return new Date(v as string);
+}
+
+/**
+ * Pick the best date from a cash-close doc.
+ * Tries cashCloseDate → createdAt → date → businessDate in order.
+ */
+function bestDate(d: Record<string, unknown>): Date {
+  for (const field of ['cashCloseDate', 'createdAt', 'date', 'businessDate']) {
+    const dt = resolveDate(d[field]);
+    if (!isNaN(dt.getTime())) return dt;
+  }
+  return new Date(NaN);
+}
+
+/**
+ * Fetch all cashCloses for the current calendar month (full scan, in-memory date filter).
+ * Tries every date field so docs with only createdAt are still counted.
+ * Sums profitAmount per close; falls back to totalCashInTill × profitPercentage%.
+ */
+async function fetchMonthlyGrossTotal(): Promise<{ total: number; closeCount: number }> {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const start = new Date(y, m, 1, 0, 0, 0, 0);
+  const end   = new Date(y, m + 1, 0, 23, 59, 59, 999);
+
+  let allDocs: Record<string, unknown>[] = [];
+  try {
+    const snap = await getDocs(collection(db, 'cashCloses'));
+    allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Record<string, unknown>[];
+  } catch (e) {
+    console.warn('cashCloses fetch failed:', e);
+    return { total: 0, closeCount: 0 };
+  }
+
+  const inMonth = allDocs.filter(d => {
+    const dt = bestDate(d);
+    return !isNaN(dt.getTime()) && dt >= start && dt <= end;
+  });
+
+  let total = 0;
+  for (const d of inMonth) {
+    const pa = Number(d.profitAmount ?? 0);
+    if (pa > 0) { total += pa; continue; }
+    const base = Number(d.totalCashInTill ?? d.totalRevenue ?? d.closeCash ?? 0) || 0;
+    const pct  = Number(d.profitPercentage) || 12;
+    if (base > 0) total += base * pct / 100;
+  }
+
+  return { total: Math.round(total), closeCount: inMonth.length };
+}
 
 export default function FinancialReportsPage() {
   const [loading, setLoading] = useState(true);
@@ -32,96 +95,88 @@ export default function FinancialReportsPage() {
   });
   const [dateRange, setDateRange] = useState('last6months');
   const [reportType, setReportType] = useState('summary');
+  const [monthlyGross, setMonthlyGross] = useState<{ total: number; closeCount: number }>({ total: 0, closeCount: 0 });
+  const [displayedGross, setDisplayedGross] = useState(0);
+  const [grossCardVisible, setGrossCardVisible] = useState(false);
+  const grossAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 
   useEffect(() => {
     loadReportData();
   }, [dateRange, reportType]);
 
+  useEffect(() => {
+    if (monthlyGross.total === 0) return;
+    setGrossCardVisible(false);
+    setDisplayedGross(0);
+    const delay = setTimeout(() => {
+      setGrossCardVisible(true);
+      const target = monthlyGross.total;
+      const duration = 1400;
+      const steps = 60;
+      const increment = target / steps;
+      let current = 0;
+      let step = 0;
+      if (grossAnimRef.current) clearInterval(grossAnimRef.current);
+      grossAnimRef.current = setInterval(() => {
+        step++;
+        current = step >= steps ? target : Math.round(increment * step);
+        setDisplayedGross(current);
+        if (step >= steps) clearInterval(grossAnimRef.current!);
+      }, duration / steps);
+    }, 150);
+    return () => {
+      clearTimeout(delay);
+      if (grossAnimRef.current) clearInterval(grossAnimRef.current);
+    };
+  }, [monthlyGross.total]);
+
+
   const loadReportData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const currentUser = authService.getCurrentUser();
-      if (!currentUser) {
-        throw new Error('No authenticated user found');
-      }
+      if (!currentUser) throw new Error('No authenticated user found');
 
-      console.log('Loading financial report data...');
-      
+      // Monthly gross: sum profitAmount (or 12% of till total) for this calendar month
+      const gross = await fetchMonthlyGrossTotal();
+      setMonthlyGross(gross);
+
+      // Other report data
       let cashAllocations: Record<string, unknown>[] = [];
-      let expenses: Record<string, unknown>[] = [];
-      let specialFunds: Record<string, unknown>[] = [];
-      
+      let expenses:        Record<string, unknown>[] = [];
+      let specialFunds:    Record<string, unknown>[] = [];
       try {
-        // Load all data sources
         cashAllocations = await AccountantQueries.getCashAllocations();
-        expenses = await AccountantQueries.getExpenseManagement();
-        specialFunds = await AccountantQueries.getSpecialFundsTracker();
-        
-        console.log('✅ Report data loaded from Firebase');
+        expenses        = await AccountantQueries.getExpenseManagement();
+        specialFunds    = await AccountantQueries.getSpecialFundsTracker();
       } catch (err) {
-        console.warn('⚠️ Failed to load report data from Firebase:', err);
-        
-        // NO MORE PLACEHOLDER DATA - Set empty arrays
-        cashAllocations = [];
-        expenses = [];
-        specialFunds = [];
-        
-        console.log('📋 No report data available - showing empty state');
+        console.warn('Secondary report data failed:', err);
       }
 
-      // Use real data only - no placeholder merging
-      const finalCashAllocations = cashAllocations;
-      const finalExpenses = expenses;
-      const finalSpecialFunds = specialFunds;
-
-      // Calculate summary metrics
-      const totalAllocated = finalCashAllocations.reduce((sum, allocation) => sum + (allocation.cashCloseTotal || 0), 0);
-      const totalExpenses = finalExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-      const totalPaid = finalExpenses.reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
-      const pendingPayments = totalExpenses - totalPaid;
-      const savingsTotal = finalCashAllocations.reduce((sum, allocation) => sum + (allocation.savings || 0), 0);
-      const specialFundsTotal = finalSpecialFunds.reduce((sum, fund) => sum + (fund.specialFundsBalance || 0), 0);
-
-      // Calculate real monthly trends and categories from actual data
-      const monthlyTrends = calculateMonthlyTrends(finalCashAllocations, finalExpenses);
-      const expensesByCategory = calculateExpensesByCategory(finalExpenses);
+      const totalAllocated    = cashAllocations.reduce((s, a) => s + Number((a as any).cashCloseTotal ?? 0), 0);
+      const totalExpenses     = expenses.reduce((s, e)        => s + Number((e as any).amount ?? 0), 0);
+      const totalPaid         = expenses.reduce((s, e)        => s + Number((e as any).paidAmount ?? 0), 0);
+      const savingsTotal      = cashAllocations.reduce((s, a) => s + Number((a as any).savings ?? 0), 0);
+      const specialFundsTotal = specialFunds.reduce((s, f)    => s + Number((f as any).specialFundsBalance ?? 0), 0);
 
       setReportData({
-        summary: {
-          totalAllocated,
-          totalExpenses,
-          totalPaid,
-          pendingPayments,
-          savingsTotal,
-          specialFundsTotal
-        },
-        monthlyTrends,
-        expensesByCategory
+        summary: { totalAllocated, totalExpenses, totalPaid, pendingPayments: totalExpenses - totalPaid, savingsTotal, specialFundsTotal },
+        monthlyTrends:      calculateMonthlyTrends(cashAllocations, expenses),
+        expensesByCategory: calculateExpensesByCategory(expenses),
       });
 
     } catch (err: unknown) {
       console.error('Error loading report data:', err);
-      
-      // NO MORE PLACEHOLDER DATA - Show empty state
-      setReportData({
-        summary: {
-          totalAllocated: 0,
-          totalExpenses: 0,
-          totalPaid: 0,
-          pendingPayments: 0,
-          savingsTotal: 0,
-          specialFundsTotal: 0
-        },
-        monthlyTrends: [],
-        expensesByCategory: []
-      });
-      setError(`Database connection failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setMonthlyGross({ total: 0, closeCount: 0 });
+      setError('Database connection failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
   };
+
 
   // Helper functions to calculate real data from database
   const calculateMonthlyTrends = (allocations: any[], expenses: any[]) => {
@@ -210,10 +265,19 @@ export default function FinancialReportsPage() {
            {/* Monthly Equity Wallet Accumulation Cards */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
              {/* Monthly Gross Profit Accumulation Card */}
-             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-6 shadow-sm">
+             <div
+               className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-6 shadow-sm transition-all duration-700"
+               style={{
+                 opacity: grossCardVisible ? 1 : 0,
+                 transform: grossCardVisible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
+               }}
+             >
                <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center">
-                   <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center">
+                   <div
+                     className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center"
+                     style={{ animation: grossCardVisible ? 'grossIconPulse 2s ease-in-out infinite' : 'none' }}
+                   >
                      <span className="text-white text-2xl">💰</span>
                    </div>
                    <div className="ml-3">
@@ -228,37 +292,49 @@ export default function FinancialReportsPage() {
                    <div className="text-xs text-green-500">Resets monthly</div>
                  </div>
                </div>
-               
-               <div className="space-y-3">
-                 <div className="flex justify-between items-center">
-                   <span className="text-sm font-medium text-green-700">This Month:</span>
-                   <span className="text-2xl font-bold text-green-800">
-                     UGX {(() => {
-                       const currentMonth = new Date().getMonth();
-                       const currentYear = new Date().getFullYear();
-                       // Calculate current month's accumulation (simplified for demo)
-                       return Math.floor(reportData.summary.savingsTotal / 12).toLocaleString();
-                     })()}
+
+               <div className="mt-2">
+                 <div
+                   className="text-3xl font-bold text-green-800 mb-1 tabular-nums transition-all duration-150"
+                   style={{ letterSpacing: '-0.5px' }}
+                 >
+                   UGX {displayedGross.toLocaleString()}
+                 </div>
+                 <p className="text-sm text-green-600">
+                   {monthlyGross.closeCount > 0
+                     ? `${monthlyGross.closeCount} cash close${monthlyGross.closeCount === 1 ? '' : 's'} this month`
+                     : 'No cash closes recorded yet this month'}
+                 </p>
+               </div>
+
+               <div className="bg-white rounded-lg p-3 border border-green-200 mt-3">
+                 <div className="flex justify-between items-center mb-2">
+                   <span className="text-xs text-green-600">Monthly Progress</span>
+                   <span className="text-xs text-green-600">
+                     📅 {new Date().getDate()} days × 12% profit
                    </span>
                  </div>
-                 
-                 <div className="bg-white rounded-lg p-3 border border-green-200">
-                   <div className="flex justify-between items-center mb-2">
-                     <span className="text-xs text-green-600">Monthly Progress</span>
-                     <span className="text-xs text-green-600">📅 Day {new Date().getDate()}/{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}</span>
-                   </div>
-                   <div className="w-full bg-green-200 rounded-full h-2">
-                     <div className="bg-green-600 h-2 rounded-full" style={{
-                       width: `${(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100}%`
-                     }}></div>
-                   </div>
-                   <div className="text-xs text-green-500 mt-1">12% saved from each daily cash close</div>
+                 <div className="w-full bg-green-200 rounded-full h-2">
+                   <div
+                     className="bg-green-600 h-2 rounded-full transition-all duration-1000 ease-out"
+                     style={{
+                       width: grossCardVisible
+                         ? `${(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100}%`
+                         : '0%',
+                     }}
+                   />
                  </div>
-                 
-                 <div className="text-xs text-green-600 bg-white bg-opacity-50 rounded p-2">
-                   🔄 Monthly accumulation resets to zero at the end of each month, starting fresh for the next month's collection.
+                 <div className="text-xs text-green-500 mt-1">
+                   12% gross profit tracked from each cash close
                  </div>
                </div>
+
+               <style>{`
+                 @keyframes grossIconPulse {
+                   0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.5); transform: scale(1); }
+                   50% { box-shadow: 0 0 0 8px rgba(22,163,74,0); transform: scale(1.07); }
+                 }
+               `}</style>
              </div>
 
              {/* Monthly Daily Expense Fund Card */}
@@ -315,11 +391,9 @@ export default function FinancialReportsPage() {
              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
                  <div className="text-2xl font-bold text-purple-600 mb-2">
-                   UGX {(() => {
-                     const currentMonthProfit = Math.floor(reportData.summary.savingsTotal / 12);
-                     const currentMonthExpense = new Date().getDate() * 100000;
-                     return (currentMonthProfit + currentMonthExpense).toLocaleString();
-                   })()}
+                   UGX {(
+                     monthlyGross.total + new Date().getDate() * 100000
+                   ).toLocaleString()}
                  </div>
                  <div className="text-sm text-purple-600 font-medium">This Month Total</div>
                  <div className="text-xs text-purple-500 mt-1">Combined monthly accumulation</div>
@@ -365,46 +439,6 @@ export default function FinancialReportsPage() {
              </div>
            </div>
 
-           {/* Traditional Reports Summary */}
-           <div className="bg-white rounded-lg border border-gray-200 p-6">
-             <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Financial Metrics</h2>
-             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-               <div className="text-center">
-                 <div className="text-2xl font-bold text-blue-600">
-                   UGX {reportData.summary.totalAllocated.toLocaleString()}
-                 </div>
-                 <div className="text-sm text-gray-500">Total Allocated</div>
-               </div>
-               <div className="text-center">
-                 <div className="text-2xl font-bold text-red-600">
-                   UGX {reportData.summary.totalExpenses.toLocaleString()}
-                 </div>
-                 <div className="text-sm text-gray-500">Total Expenses</div>
-               </div>
-               <div className="text-center">
-                 <div className="text-2xl font-bold text-green-600">
-                   UGX {reportData.summary.totalPaid.toLocaleString()}
-                 </div>
-                 <div className="text-sm text-gray-500">Total Paid</div>
-               </div>
-               <div className="text-center">
-                 <div className="text-2xl font-bold text-orange-600">
-                   UGX {reportData.summary.pendingPayments.toLocaleString()}
-                 </div>
-                 <div className="text-sm text-gray-500">Pending Payments</div>
-               </div>
-             </div>
-
-             {reportData.monthlyTrends.length === 0 && reportData.expensesByCategory.length === 0 && (
-               <div className="mt-8 text-center py-12 bg-gray-50 rounded-lg">
-                 <div className="text-gray-400 text-lg mb-2">📊</div>
-                 <h3 className="text-gray-600 font-medium">No Historical Data Available</h3>
-                 <p className="text-gray-500 text-sm mt-1">
-                   Create cash closes and expense records to see detailed reports and trends.
-                 </p>
-               </div>
-             )}
-           </div>
          </>
        )}
     </div>

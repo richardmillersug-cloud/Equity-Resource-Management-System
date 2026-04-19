@@ -97,8 +97,7 @@ export default function ProtectedRoute({
       <AuthContainer 
         onAuthSuccess={(user) => {
           setCurrentUser(user);
-          // Redirect to dashboard after successful login
-          router.push('/dashboard');
+          router.push(authService.getDefaultDashboardPath(user));
         }} 
       />
     );

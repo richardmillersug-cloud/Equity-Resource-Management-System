@@ -333,6 +333,15 @@ class FirebaseAuthService {
     return roles.some(role => this.hasRole(role));
   }
 
+  /** Landing route after login/signup: accountants use analytics as home. */
+  getDefaultDashboardPath(user: AuthUser): string {
+    if (!user.employee) return '/dashboard';
+    const isAccountant = user.employee.roles.some(
+      (r) => r.jobTitle.toLowerCase() === 'accountant'
+    );
+    return isAccountant ? '/dashboard/analytics' : '/dashboard';
+  }
+
   // Get user permissions
   getUserPermissions() {
     if (!this.currentUser?.employee) return null;

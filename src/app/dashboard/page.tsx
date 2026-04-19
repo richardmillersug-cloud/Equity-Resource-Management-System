@@ -106,7 +106,7 @@ export default function DashboardPage() {
           'Admin': '/dashboard/admin',
           'Managing Director': '/dashboard/managing-director',
           'Manager': '/dashboard/manager',
-          'Accountant': '/dashboard/accountant',
+          'Accountant': '/dashboard/analytics',
           'Purchase Manager': '/dashboard/purchase-manager',
           'Purchasing Manager': '/dashboard/purchase-manager', // Added alias for consistency
           'HR Manager': '/dashboard/hr',

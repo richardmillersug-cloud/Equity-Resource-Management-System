@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calculator, DollarSign, Users, Banknote, FileText, AlertCircle, Plus, Minus, CreditCard, Smartphone, Building, CheckCircle, Wallet, TrendingUp, Calendar } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 import { InterfaceDatabaseConnector } from '../../lib/firebase/interface-database-connector';
 import { authService } from '../../lib/firebase/auth';
 import { CashCloseService } from '../../lib/firebase/firestore-service';
@@ -955,7 +956,7 @@ export default function ComprehensiveCashCloseForm({
       const cashCloseDocument = {
         createdBy: currentUser.uid,
         branchId: (currentUser as any).branchId || 'default-branch',
-        cashCloseDate: { seconds: Math.floor(new Date(cashCloseData.businessDate + 'T00:00:00').getTime() / 1000), nanoseconds: 0 } as any,
+        cashCloseDate: Timestamp.fromDate(new Date(cashCloseData.businessDate + 'T00:00:00')),
         
         // Global Settings
         profitPercentage: cashCloseData.profitPercentage,
@@ -1932,7 +1933,7 @@ export default function ComprehensiveCashCloseForm({
                       const draftDocument = {
                         createdBy: currentUser.uid,
                         branchId: (currentUser as any).branchId || 'default-branch',
-                        cashCloseDate: { seconds: Math.floor(new Date(cashCloseData.businessDate + 'T00:00:00').getTime() / 1000), nanoseconds: 0 } as any,
+                        cashCloseDate: Timestamp.fromDate(new Date(cashCloseData.businessDate + 'T00:00:00')),
                         profitPercentage: cashCloseData.profitPercentage,
                         taxRate: cashCloseData.taxRate,
                         notes: cashCloseData.notes || `Draft cash close - ${new Date().toLocaleDateString()}`,

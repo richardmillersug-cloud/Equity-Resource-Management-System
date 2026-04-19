@@ -1,6 +1,16 @@
 import { collection, getDocs, query, orderBy, limit, where, and } from 'firebase/firestore';
 import { db } from './config';
 
+// Robust date converter: handles Firestore Timestamp, plain {seconds,nanoseconds} map, Date, or string
+function toJsDate(v: any): Date | undefined {
+  if (!v) return undefined;
+  if (v instanceof Date)               return isNaN(v.getTime()) ? undefined : v;
+  if (typeof v?.toDate === 'function') { const d = v.toDate(); return isNaN(d.getTime()) ? undefined : d; }
+  if (typeof v?.seconds === 'number')  { const d = new Date(v.seconds * 1000); return isNaN(d.getTime()) ? undefined : d; }
+  if (typeof v === 'string')           { const d = new Date(v); return isNaN(d.getTime()) ? undefined : d; }
+  return undefined;
+}
+
 // Simple service without complex queries to avoid index issues
 export class SimpleCashCloseService {
   
@@ -15,13 +25,10 @@ export class SimpleCashCloseService {
       const documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        // Convert Firestore timestamps - create new Date objects to prevent mutation
-        createdAt: doc.data().createdAt?.toDate?.() ? 
-          new Date(doc.data().createdAt.toDate().getTime()) : doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.() ? 
-          new Date(doc.data().updatedAt.toDate().getTime()) : doc.data().updatedAt,
-        cashCloseDate: doc.data().cashCloseDate?.toDate?.() ? 
-          new Date(doc.data().cashCloseDate.toDate().getTime()) : doc.data().cashCloseDate,
+        // Normalise all date fields to JS Date objects regardless of how they were stored
+        createdAt:     toJsDate(doc.data().createdAt)     ?? doc.data().createdAt,
+        updatedAt:     toJsDate(doc.data().updatedAt)     ?? doc.data().updatedAt,
+        cashCloseDate: toJsDate(doc.data().cashCloseDate) ?? doc.data().cashCloseDate,
       }));
       
       console.log(`✅ Found ${documents.length} cash close documents`);
@@ -50,13 +57,9 @@ export class SimpleCashCloseService {
       const documents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        // Convert Firestore timestamps - create new Date objects to prevent mutation
-        createdAt: doc.data().createdAt?.toDate?.() ? 
-          new Date(doc.data().createdAt.toDate().getTime()) : doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.() ? 
-          new Date(doc.data().updatedAt.toDate().getTime()) : doc.data().updatedAt,
-        cashCloseDate: doc.data().cashCloseDate?.toDate?.() ? 
-          new Date(doc.data().cashCloseDate.toDate().getTime()) : doc.data().cashCloseDate,
+        createdAt:     toJsDate(doc.data().createdAt)     ?? doc.data().createdAt,
+        updatedAt:     toJsDate(doc.data().updatedAt)     ?? doc.data().updatedAt,
+        cashCloseDate: toJsDate(doc.data().cashCloseDate) ?? doc.data().cashCloseDate,
       }));
       
       console.log(`✅ Found ${documents.length} recent cash closes`);
@@ -100,13 +103,9 @@ export class SimpleCashCloseService {
         .map(doc => ({
           id: doc.id,
           ...doc.data(),
-          // Convert Firestore timestamps - create new Date objects to prevent mutation
-          createdAt: doc.data().createdAt?.toDate?.() ?
-            new Date(doc.data().createdAt.toDate().getTime()) : doc.data().createdAt,
-          updatedAt: doc.data().updatedAt?.toDate?.() ?
-            new Date(doc.data().updatedAt.toDate().getTime()) : doc.data().updatedAt,
-          cashCloseDate: doc.data().cashCloseDate?.toDate?.() ?
-            new Date(doc.data().cashCloseDate.toDate().getTime()) : doc.data().cashCloseDate,
+          createdAt:     toJsDate(doc.data().createdAt)     ?? doc.data().createdAt,
+          updatedAt:     toJsDate(doc.data().updatedAt)     ?? doc.data().updatedAt,
+          cashCloseDate: toJsDate(doc.data().cashCloseDate) ?? doc.data().cashCloseDate,
         }))
         .filter(doc => {
           // Filter by date in memory

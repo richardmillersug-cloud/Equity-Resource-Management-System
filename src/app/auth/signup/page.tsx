@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import AuthContainer from '../../../components/auth/AuthContainer';
+import { authService } from '@/lib/firebase/auth';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -10,8 +11,7 @@ export default function SignupPage() {
     <AuthContainer 
       defaultMode="signup"
       onAuthSuccess={(user) => {
-        // Redirect to dashboard after successful authentication
-        router.push('/dashboard');
+        router.push(authService.getDefaultDashboardPath(user));
       }}
     />
   );

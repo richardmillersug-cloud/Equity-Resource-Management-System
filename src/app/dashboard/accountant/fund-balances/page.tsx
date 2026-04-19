@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { fundingSourceService } from '@/lib/firebase/funding-source-service';
+import { useState, useEffect, useCallback } from 'react';
+import { fundingSourceService, MonthlyFundingAssignmentTotals } from '@/lib/firebase/funding-source-service';
 import { authService } from '@/lib/firebase/auth';
 import { 
   DollarSign, 
-  TrendingUp, 
   AlertCircle, 
   CheckCircle, 
   RefreshCw,
   Plus,
   Wallet,
-  Building
+  Building,
+  Info,
 } from 'lucide-react';
 
 interface FundBalance {
@@ -22,6 +22,7 @@ interface FundBalance {
   totalSpent: number;
   lastUpdated: Date;
   branchId: string;
+  periodKey?: string;
   dailyCollection?: number;
   profitPercentage?: number;
   sourceRevenue?: number;
@@ -30,30 +31,34 @@ interface FundBalance {
 export default function FundBalancesPage() {
   const [dailyFund, setDailyFund] = useState<FundBalance | null>(null);
   const [grossProfit, setGrossProfit] = useState<FundBalance | null>(null);
+  const [monthlyAssignments, setMonthlyAssignments] = useState<MonthlyFundingAssignmentTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(false);
 
-  useEffect(() => {
-    loadFundBalances();
-  }, []);
+  const monthLabel = new Date().toLocaleDateString('en-UG', { month: 'long', year: 'numeric' });
+  const periodKey = fundingSourceService.getPeriodKey(new Date());
 
-  const loadFundBalances = async () => {
+  const loadFundBalances = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const currentUser = authService.getCurrentUser();
-      const branchId = currentUser?.branchId || 'kyengera';
-      
-      const { dailyFund, grossProfit } = await fundingSourceService.getFundBalances(branchId);
-      
-      setDailyFund(dailyFund);
-      setGrossProfit(grossProfit);
-      
-      if (!dailyFund && !grossProfit) {
-        setError('Fund balances not found. Click "Initialize Fund Balances" to set them up.');
+      const bid = currentUser?.employee?.branchId ?? 'kyengera';
+
+      const [{ dailyFund: d, grossProfit: g }, monthly] = await Promise.all([
+        fundingSourceService.getFundBalances(bid),
+        fundingSourceService.getMonthlyFundingAssignmentTotals(bid),
+      ]);
+
+      setDailyFund(d as FundBalance | null);
+      setGrossProfit(g as FundBalance | null);
+      setMonthlyAssignments(monthly);
+
+      if (!d && !g) {
+        setError('Fund balances not found. Click "Initialize Fund Balances" to create rows for this month.');
       }
     } catch (err: any) {
       console.error('Error loading fund balances:', err);
@@ -61,7 +66,15 @@ export default function FundBalancesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadFundBalances();
+    const unsub = authService.onAuthStateChange(() => {
+      loadFundBalances();
+    });
+    return unsub;
+  }, [loadFundBalances]);
 
   const initializeFundBalances = async () => {
     try {
@@ -70,11 +83,13 @@ export default function FundBalancesPage() {
       setSuccess(null);
       
       const currentUser = authService.getCurrentUser();
-      const branchId = currentUser?.branchId || 'kyengera';
-      
-      await fundingSourceService.initializeFundBalances(branchId);
-      
-      setSuccess('Fund balances initialized successfully! Daily Expense Fund has been set to UGX 100,000.');
+      const bid = currentUser?.employee?.branchId ?? 'kyengera';
+
+      await fundingSourceService.initializeFundBalances(bid);
+
+      setSuccess(
+        `Fund balances for ${monthLabel} (${periodKey}) are ready. Daily Expense Fund starts at UGX 100,000 where a new row was created.`
+      );
       
       // Reload balances
       await loadFundBalances();
@@ -92,14 +107,6 @@ export default function FundBalancesPage() {
       currency: 'UGX',
       minimumFractionDigits: 0
     }).format(amount);
-  };
-
-  const getFundIcon = (fundType: string) => {
-    return fundType === 'DAILY_EXPENSE_FUND' ? Building : Wallet;
-  };
-
-  const getFundColor = (fundType: string) => {
-    return fundType === 'DAILY_EXPENSE_FUND' ? 'blue' : 'green';
   };
 
   if (loading) {
@@ -127,7 +134,9 @@ export default function FundBalancesPage() {
                   <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
                     Fund Balances
                   </h1>
-                  <p className="text-blue-100 text-lg">Monitor and manage funding sources for expenses</p>
+                  <p className="text-blue-100 text-lg">
+                    Current month: {monthLabel} ({periodKey}) — balances and payment totals are scoped to this period.
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -170,6 +179,30 @@ export default function FundBalancesPage() {
               <div>
                 <h3 className="font-medium text-red-800">Error</h3>
                 <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {monthlyAssignments && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">This month — recorded at payment time</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Amounts assigned to each fund when processing expense payments ({monthlyAssignments.assignmentCount}{' '}
+              assignment{monthlyAssignments.assignmentCount === 1 ? '' : 's'} this month).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+              <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
+                <p className="text-blue-800 font-medium">Daily expense fund</p>
+                <p className="text-2xl font-bold text-blue-900">{formatCurrency(monthlyAssignments.dailyFundSpent)}</p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+                <p className="text-emerald-800 font-medium">Wallet gross profit</p>
+                <p className="text-2xl font-bold text-emerald-900">{formatCurrency(monthlyAssignments.grossProfitSpent)}</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
+                <p className="text-gray-700 font-medium">Total assigned</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(monthlyAssignments.totalSpent)}</p>
               </div>
             </div>
           </div>
@@ -224,6 +257,20 @@ export default function FundBalancesPage() {
                     {formatCurrency(dailyFund.totalAllocated)}
                   </span>
                 </div>
+                {monthlyAssignments && (
+                  <div className="flex justify-between border-t border-gray-100 pt-2 mt-1">
+                    <span className="text-gray-600">Paid this month (tracked):</span>
+                    <span className="font-medium text-blue-700">
+                      {formatCurrency(monthlyAssignments.dailyFundSpent)}
+                    </span>
+                  </div>
+                )}
+                {dailyFund.periodKey && (
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Balance row period</span>
+                    <span className="font-mono">{dailyFund.periodKey}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Last Updated:</span>
                   <span className="text-sm text-gray-500">
@@ -277,6 +324,20 @@ export default function FundBalancesPage() {
                     {formatCurrency(grossProfit.totalAllocated)}
                   </span>
                 </div>
+                {monthlyAssignments && (
+                  <div className="flex justify-between border-t border-gray-100 pt-2 mt-1">
+                    <span className="text-gray-600">Paid this month (tracked):</span>
+                    <span className="font-medium text-emerald-700">
+                      {formatCurrency(monthlyAssignments.grossProfitSpent)}
+                    </span>
+                  </div>
+                )}
+                {grossProfit.periodKey && (
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Balance row period</span>
+                    <span className="font-mono">{grossProfit.periodKey}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Source Revenue:</span>
                   <span className="font-medium text-gray-900">
@@ -303,32 +364,42 @@ export default function FundBalancesPage() {
           </div>
         </div>
 
-        {/* Usage Instructions */}
+        {/* Payment-time fund guidance */}
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">Payment-Time Fund Assignment</h3>
-          <div className="mb-4 p-4 bg-blue-100 rounded-xl">
-            <p className="text-blue-800 text-sm">
-              <strong>📝 New Logic:</strong> Funding sources are now assigned only when making payments. 
-              No pre-allocation is required - simply select the appropriate fund during payment processing.
-            </p>
+          <div className="mb-6 p-4 bg-blue-100 rounded-xl flex gap-3">
+            <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" aria-hidden />
+            <div className="text-sm text-blue-800 space-y-1">
+              <p className="font-semibold text-blue-900">New logic</p>
+              <p>
+                Funding sources are now assigned only when making payments. No pre-allocation is required -
+                simply select the appropriate fund during payment processing.
+              </p>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <h4 className="font-medium text-blue-800 mb-2">🏦 Daily Expense Fund</h4>
-              <ul className="space-y-1 text-blue-700">
-                <li>• Regular operational expenses</li>
-                <li>• Routine maintenance costs</li>
-                <li>• Daily supplier payments</li>
-                <li>• Small emergency expenses (under 50K)</li>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div className="rounded-xl bg-white/60 border border-blue-100/80 p-4">
+              <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                <Building className="w-4 h-4 text-blue-600" aria-hidden />
+                Daily Expense Fund
+              </h4>
+              <ul className="list-disc pl-5 space-y-1.5 text-blue-800">
+                <li>Regular operational expenses</li>
+                <li>Routine maintenance costs</li>
+                <li>Daily supplier payments</li>
+                <li>Small emergency expenses (under 50K)</li>
               </ul>
             </div>
-            <div>
-              <h4 className="font-medium text-blue-800 mb-2">💰 Wallet Gross Profit</h4>
-              <ul className="space-y-1 text-blue-700">
-                <li>• Larger investments (over 50K)</li>
-                <li>• Strategic business expenses</li>
-                <li>• Equipment purchases</li>
-                <li>• Business development costs</li>
+            <div className="rounded-xl bg-white/60 border border-blue-100/80 p-4">
+              <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-emerald-600" aria-hidden />
+                Wallet Gross Profit
+              </h4>
+              <ul className="list-disc pl-5 space-y-1.5 text-blue-800">
+                <li>Larger investments (over 50K)</li>
+                <li>Strategic business expenses</li>
+                <li>Equipment purchases</li>
+                <li>Business development costs</li>
               </ul>
             </div>
           </div>
