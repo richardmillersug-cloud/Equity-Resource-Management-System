@@ -5,11 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
   collection, 
-  getDocs, 
-  query,
-  orderBy,
-  limit,
-  where
+  getDocs
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
@@ -196,13 +192,10 @@ export default function PMAllocationsPage() {
     try {
       console.log('📊 Loading cash close records from cashCloses collection');
 
-      const cashClosesQuery = query(
-        collection(db, 'cashCloses'),
-        orderBy('cashCloseDate', 'desc'),
-        limit(100)
-      );
-
-      const cashClosesSnapshot = await getDocs(cashClosesQuery);
+      // No orderBy here — Firestore's orderBy silently excludes documents
+      // that don't have the ordered field, causing recent records to disappear.
+      // We fetch all docs and sort client-side instead.
+      const cashClosesSnapshot = await getDocs(collection(db, 'cashCloses'));
       const cashClosesData: CashClose[] = [];
 
       cashClosesSnapshot.docs.forEach(doc => {
@@ -211,6 +204,18 @@ export default function PMAllocationsPage() {
               id: doc.id,
           ...data
         });
+      });
+
+      // Sort client-side: prefer cashCloseDate, fall back to createdAt
+      cashClosesData.sort((a, b) => {
+        const getTime = (v: any): number => {
+          if (!v) return 0;
+          if (v.toDate) return v.toDate().getTime();
+          return new Date(v).getTime();
+        };
+        const aTime = getTime(a.cashCloseDate) || getTime(a.createdAt);
+        const bTime = getTime(b.cashCloseDate) || getTime(b.createdAt);
+        return bTime - aTime;
       });
 
       setCashCloses(cashClosesData);

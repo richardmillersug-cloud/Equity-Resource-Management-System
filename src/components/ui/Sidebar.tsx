@@ -55,6 +55,7 @@ interface NavigationItem {
   label: string;
   path?: string;
   roles: string[];
+  isGroupHeader?: boolean;
   submenu?: {
     id: string;
     icon: React.ReactNode;
@@ -216,18 +217,20 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
+
+  // Group: Procurement
+  {
+    id: 'pm-group-procurement',
+    icon: <span />,
+    label: 'Procurement',
+    isGroupHeader: true,
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
   { 
     id: 'restock-orders', 
     icon: <Package className="w-5 h-5" />, 
     label: 'Restock Orders', 
     path: '/dashboard/purchase-manager/restock-orders',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'daily-allocation', 
-    icon: <Calendar className="w-5 h-5" />, 
-    label: 'Daily Fund Allocation', 
-    path: '/dashboard/purchase-manager/daily-allocation',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -238,17 +241,10 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'payments', 
-    icon: <CreditCard className="w-5 h-5" />, 
-    label: 'Payments', 
-    path: '/dashboard/purchase-manager/payments',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
-  },
-  { 
-    id: 'supplier-totals', 
-    icon: <Calculator className="w-5 h-5" />, 
-    label: 'Supplier Totals', 
-    path: '/dashboard/purchase-manager/supplier-totals',
+    id: 'pm-return-notes', 
+    icon: <RefreshCw className="w-5 h-5" />, 
+    label: 'Return Notes & Restocking', 
+    path: '/dashboard/purchase-manager/return-notes',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -258,18 +254,48 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager/suppliers',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
-  { 
-    id: 'pm-allocations', 
-    icon: <Send className="w-5 h-5" />, 
-    label: 'Detailed Cash by Accountant', 
-    path: '/dashboard/purchase-manager/allocations',
+  {
+    id: 'supplier-totals', 
+    icon: <Calculator className="w-5 h-5" />, 
+    label: 'Supplier Totals', 
+    path: '/dashboard/purchase-manager/supplier-totals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+
+  // Group: Finance & Cash
+  {
+    id: 'pm-group-finance',
+    icon: <span />,
+    label: 'Finance & Cash',
+    isGroupHeader: true,
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'till-cash-closes', 
+    id: 'pm-account', 
     icon: <Wallet className="w-5 h-5" />, 
-    label: 'Till Cash Closes', 
-    path: '/dashboard/purchase-manager/till-cash-closes',
+    label: 'PM Account', 
+    path: '/dashboard/purchase-manager/pm-account',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'daily-allocation', 
+    icon: <Calendar className="w-5 h-5" />, 
+    label: 'Daily Fund Allocation', 
+    path: '/dashboard/purchase-manager/daily-allocation',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'payments',
+    icon: <CreditCard className="w-5 h-5" />,
+    label: 'Payments',
+    path: '/dashboard/purchase-manager/payments',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'pm-cheques', 
+    icon: <Banknote className="w-5 h-5" />, 
+    label: 'Cheque Tracker', 
+    path: '/dashboard/purchase-manager/cheques',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
@@ -280,10 +306,17 @@ const navigationItems: NavigationItem[] = [
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
   { 
-    id: 'pm-return-notes', 
-    icon: <RefreshCw className="w-5 h-5" />, 
-    label: 'Return Notes & Restocking', 
-    path: '/dashboard/purchase-manager/return-notes',
+    id: 'pm-allocations', 
+    icon: <Send className="w-5 h-5" />, 
+    label: 'Cash Close Records', 
+    path: '/dashboard/purchase-manager/allocations',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  { 
+    id: 'till-cash-closes', 
+    icon: <Wallet className="w-5 h-5" />, 
+    label: 'Till Cash Closes', 
+    path: '/dashboard/purchase-manager/till-cash-closes',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
 
@@ -927,6 +960,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       <nav className="flex flex-col gap-1 flex-1 px-3">
         {filteredItems.map((item) => (
           <div key={item.id}>
+          {item.isGroupHeader ? (
+            // Group header label
+            isExpanded ? (
+              <div className="px-3 pt-4 pb-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 select-none">
+                  {item.label}
+                </span>
+              </div>
+            ) : (
+              <div className="my-2 mx-2 border-t border-gray-100" />
+            )
+          ) : (
+          <>
           <button
             onClick={() => handleItemClick(item)}
               className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative w-full ${
@@ -1182,6 +1228,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                 </div>
               </div>
             )}
+          </>
+          )}
           </div>
         ))}
       </nav>
