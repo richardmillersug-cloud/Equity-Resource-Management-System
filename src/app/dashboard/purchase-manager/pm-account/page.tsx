@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Eye,
   PlusCircle,
+  Copy,
+  CheckCheck,
 } from 'lucide-react';
 import {
   collection,
@@ -81,6 +83,24 @@ const safeNum = (v: any): number => {
   return isNaN(n) ? 0 : n;
 };
 
+// ── Account helpers ───────────────────────────────────────────────────────────
+
+/** Deterministic account number from branchId — same input always gives same output */
+function generateAccountNumber(branchId: string): string {
+  let hash = 5381;
+  for (let i = 0; i < branchId.length; i++) {
+    hash = ((hash << 5) + hash + branchId.charCodeAt(i)) & 0x7fffffff;
+  }
+  const digits = String(hash).padStart(10, '1').slice(0, 10);
+  return `1001 ${digits.slice(0, 4)} ${digits.slice(4, 8)}`;
+}
+
+function maskAccountNumber(acct: string): string {
+  const parts = acct.split(' ');
+  if (parts.length < 3) return acct;
+  return `${parts[0]} •••• ${parts[2]}`;
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PMAccountPage() {
@@ -97,6 +117,12 @@ export default function PMAccountPage() {
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
 
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  // ── Bank card state ────────────────────────────────────────────────────────
+  const [branchId, setBranchId] = useState('');
+  const [holderName, setHolderName] = useState('Equity Shoppers');
+  const [showFull, setShowFull] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // ── Deposit modal ──────────────────────────────────────────────────────────
 
@@ -151,6 +177,19 @@ export default function PMAccountPage() {
   const loadData = useCallback(async (uid: string) => {
     setLoading(true);
     try {
+      // Populate bank card info from the current user
+      const user = authService.getCurrentUser();
+      if (user) {
+        const bid = user.employee?.branchId || 'default-branch';
+        setBranchId(bid);
+        const accountUserName =
+          user.displayName?.trim() ||
+          [user.employee?.firstName, user.employee?.lastName].filter(Boolean).join(' ').trim() ||
+          user.email?.split('@')[0] ||
+          '';
+        if (accountUserName) setHolderName(accountUserName.toUpperCase());
+      }
+
       const [allocSnap, invPaySnap, expPaySnap, depositSnap] = await Promise.all([
         getDocs(collection(db, 'cashAllocations')),
         getDocs(collection(db, 'invoicePayments')),
@@ -385,6 +424,16 @@ export default function PMAccountPage() {
     totalItems: ledgerTotal,
   } = usePagination(filtered, 15);
 
+  // ── Bank card helpers ──────────────────────────────────────────────────────
+
+  const accountNumber = generateAccountNumber(branchId || 'default-branch');
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(accountNumber.replace(/\s/g, ''));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (authLoading || loading) {
@@ -426,6 +475,85 @@ export default function PMAccountPage() {
             >
               <RefreshCw className="w-4 h-4" /> Refresh
             </button>
+          </div>
+        </div>
+
+        {/* ── Equity Shoppers Bank Card ── */}
+        <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl select-none"
+          style={{ aspectRatio: '1.586 / 1', maxHeight: 280 }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600" />
+          <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/5" />
+          <div className="absolute -right-4 -bottom-20 w-72 h-72 rounded-full bg-white/5" />
+          <div className="absolute left-1/2 -bottom-32 w-80 h-80 rounded-full bg-emerald-900/40" />
+
+          {/* Chip */}
+          <div className="absolute top-7 left-7">
+            <div className="w-10 h-8 rounded-md bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-inner grid grid-cols-3 gap-px p-1">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="bg-yellow-400/60 rounded-sm" />
+              ))}
+            </div>
+          </div>
+
+          {/* Contactless icon */}
+          <div className="absolute top-7 right-7 opacity-60">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 text-white fill-none stroke-white stroke-2">
+              <path d="M12 20.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" />
+              <path d="M8.5 17.5a5 5 0 0 1 7 0" strokeLinecap="round" />
+              <path d="M5 14a9 9 0 0 1 14 0" strokeLinecap="round" />
+              <path d="M1.5 10.5a13.5 13.5 0 0 1 21 0" strokeLinecap="round" />
+            </svg>
+          </div>
+
+          <div className="absolute inset-0 flex flex-col justify-between p-7">
+            {/* Top: brand */}
+            <div className="flex items-center gap-2 mt-5">
+              <Wallet className="w-5 h-5 text-emerald-200" />
+              <span className="text-emerald-100 font-bold text-sm tracking-widest uppercase">
+                Equity Shoppers
+              </span>
+            </div>
+
+            {/* Middle: balance */}
+            <div>
+              <p className="text-emerald-300 text-xs tracking-widest uppercase mb-1">Available Balance</p>
+              <p className="text-white text-3xl font-bold tabular-nums tracking-tight">
+                UGX {Math.round(balance).toLocaleString()}
+              </p>
+            </div>
+
+            {/* Bottom: account number + holder */}
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-emerald-300 text-xs tracking-widest uppercase mb-1">Account Number</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-white font-mono text-base tracking-widest">
+                    {showFull ? accountNumber : maskAccountNumber(accountNumber)}
+                  </p>
+                  <button
+                    onClick={() => setShowFull((v) => !v)}
+                    className="text-emerald-300 hover:text-white transition-colors text-xs underline underline-offset-2"
+                  >
+                    {showFull ? 'hide' : 'show'}
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="text-emerald-300 hover:text-white transition-colors"
+                    title="Copy account number"
+                  >
+                    {copied
+                      ? <CheckCheck className="w-4 h-4 text-green-300" />
+                      : <Copy className="w-4 h-4" />
+                    }
+                  </button>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-emerald-300 text-xs tracking-widest uppercase mb-1">Account Holder</p>
+                <p className="text-white font-semibold text-sm tracking-wide">{holderName}</p>
+              </div>
+            </div>
           </div>
         </div>
 

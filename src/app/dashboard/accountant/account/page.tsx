@@ -119,12 +119,14 @@ export default function YourAccountPage() {
         (user as Record<string, unknown>).branchId as string ||
         'default-branch';
 
-      const firstName = user.employee?.firstName ?? '';
-      const lastName = user.employee?.lastName ?? '';
-      const fullName = [firstName, lastName].filter(Boolean).join(' ');
+      const accountUserName =
+        user.displayName?.trim() ||
+        [user.employee?.firstName, user.employee?.lastName].filter(Boolean).join(' ').trim() ||
+        user.email?.split('@')[0] ||
+        '';
 
       setBranchId(bid);
-      if (fullName) setHolderName(fullName.toUpperCase());
+      if (accountUserName) setHolderName(accountUserName.toUpperCase());
 
       const s = await walletLedgerService.getWalletSummary(bid, key);
       setSummary(s);
