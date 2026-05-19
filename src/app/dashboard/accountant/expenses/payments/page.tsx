@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { 
   FileText, 
   Search, 
@@ -27,6 +28,18 @@ export default function PaymentRecordsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedPayments,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(filteredPayments, 10);
 
   const expenseService = new ExpenseService();
 
@@ -181,39 +194,54 @@ export default function PaymentRecordsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading payment records...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Receipt className="w-6 h-6 text-blue-400" />
+            </div>
+          </div>
+          <p className="text-lg font-semibold text-gray-700">Loading Payment Records</p>
+          <p className="text-sm text-gray-400">Fetching expense payment data…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-8 space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Payment Records</h1>
-            <p className="text-gray-600 mt-1">View all payments made to receipts and invoices</p>
-          </div>
-          <div className="flex space-x-3">
-            <button
-              onClick={loadData}
-              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </button>
-            <button
-              onClick={exportToCSV}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </button>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 shadow-xl">
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <Receipt className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-blue-200">Accountant Workspace</span>
+              </div>
+              <h1 className="text-3xl font-bold text-white">Payment Records</h1>
+              <p className="text-blue-200 mt-1 text-sm">View all payments made to receipts and invoices</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={loadData}
+                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-medium transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+              <button
+                onClick={exportToCSV}
+                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-medium transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
+            </div>
           </div>
         </div>
 
@@ -344,7 +372,7 @@ export default function PaymentRecordsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPayments.map((payment) => {
+                  {paginatedPayments.map((payment) => {
                     const expense = expenses.find(e => e.id === payment.expenseId);
                     return (
                       <tr key={payment.id} className="hover:bg-gray-50">
@@ -450,8 +478,17 @@ export default function PaymentRecordsPage() {
               </table>
             </div>
           )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            rowsPerPage={rowsPerPage}
+            startIndex={pageStartIndex}
+            endIndex={pageEndIndex}
+            totalItems={filteredPayments.length}
+            onPageChange={setCurrentPage}
+            onRowsPerPageChange={setRowsPerPage}
+          />
         </div>
-      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { fundingSourceService } from './funding-source-service';
+import { walletLedgerService } from './wallet-ledger-service';
 
 // Payment method interface with comprehensive field support
 export interface PaymentMethod {
@@ -265,9 +266,16 @@ export class ExpensePaymentService {
     // Commit the batch
     await batch.commit();
     
-    // Record funding source assignment for payment tracking (no pre-allocation)
+    // Deduct from fund balance and record the assignment
+    const branchId = expense.branchId || 'kyengera';
     try {
-      // Simply record which funding source was selected for this payment
+      await fundingSourceService.updateFundBalance(branchId, fundingSource, paymentAmount, 'allocate');
+      console.log(`✅ Deducted ${paymentAmount} UGX from ${fundingSource}`);
+    } catch (balanceError) {
+      console.warn('⚠️ Could not update fund balance:', balanceError);
+    }
+
+    try {
       await fundingSourceService.recordFundingSourceAssignment(
         expenseId,
         paymentRef.id,
@@ -276,7 +284,7 @@ export class ExpensePaymentService {
         paidBy,
         paidByName,
         expense.name || expense.description || 'Expense payment',
-        expense.branchId || 'kyengera',
+        branchId,
         {
           vendor: expense.vendor,
           category: expense.category,
@@ -286,9 +294,26 @@ export class ExpensePaymentService {
       console.log(`✅ Payment recorded with ${fundingSource} assignment: ${paymentAmount} UGX`);
     } catch (recordingError) {
       console.warn('⚠️ Could not record funding source assignment:', recordingError);
-      // Payment still succeeds even if funding source recording fails
     }
-    
+
+    // Record debit in walletLedger so the account page shows the payment out
+    try {
+      await walletLedgerService.recordExpensePaymentDebit({
+        expensePaymentId: paymentRef.id,
+        expenseId,
+        expenseDescription: expense.name || expense.description || 'Expense payment',
+        vendor: expense.vendor || 'Unknown vendor',
+        amount: paymentAmount,
+        fundingSource,
+        branchId,
+        paidBy,
+        paidByName,
+        notes: notes || undefined,
+      });
+    } catch (ledgerError) {
+      console.warn('⚠️ Could not record wallet ledger debit:', ledgerError);
+    }
+
     console.log(`✅ Expense payment processed: ${paymentReference} for ${paymentAmount} from ${fundingSource}`);
     return paymentRef.id;
   }

@@ -1,446 +1,441 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { AccountantQueries } from '@/lib/firebase/role-based-queries';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { authService } from '@/lib/firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-// import {
-//   DollarSign,
-//   TrendingUp,
-//   TrendingDown,
-//   PieChart,
-//   BarChart3,
-//   Download,
-//   Calendar,
-//   Filter,
-//   RefreshCw,
-// } from 'lucide-react';
+import { walletLedgerService, WalletMonthlySummary, WalletLedgerEntry } from '@/lib/firebase/wallet-ledger-service';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// ─── monthly gross profit ─────────────────────────────────────────────────────
-
-/** Resolve a Firestore Timestamp, Date, or date string to a JS Date. */
-function resolveDate(v: unknown): Date {
-  if (!v) return new Date(NaN);
-  if (v instanceof Date) return v;
-  const ts = v as { toDate?: () => Date };
-  if (typeof ts.toDate === 'function') return ts.toDate();
-  return new Date(v as string);
+function fmtUGX(n: number): string {
+  return `UGX ${Math.round(n).toLocaleString()}`;
 }
 
-/**
- * Pick the best date from a cash-close doc.
- * Tries cashCloseDate → createdAt → date → businessDate in order.
- */
-function bestDate(d: Record<string, unknown>): Date {
-  for (const field of ['cashCloseDate', 'createdAt', 'date', 'businessDate']) {
-    const dt = resolveDate(d[field]);
-    if (!isNaN(dt.getTime())) return dt;
-  }
-  return new Date(NaN);
+function fmtDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-UG', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-/**
- * Fetch all cashCloses for the current calendar month (full scan, in-memory date filter).
- * Tries every date field so docs with only createdAt are still counted.
- * Sums profitAmount per close; falls back to totalCashInTill × profitPercentage%.
- */
-async function fetchMonthlyGrossTotal(): Promise<{ total: number; closeCount: number }> {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  const start = new Date(y, m, 1, 0, 0, 0, 0);
-  const end   = new Date(y, m + 1, 0, 23, 59, 59, 999);
-
-  let allDocs: Record<string, unknown>[] = [];
-  try {
-    const snap = await getDocs(collection(db, 'cashCloses'));
-    allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Record<string, unknown>[];
-  } catch (e) {
-    console.warn('cashCloses fetch failed:', e);
-    return { total: 0, closeCount: 0 };
-  }
-
-  const inMonth = allDocs.filter(d => {
-    const dt = bestDate(d);
-    return !isNaN(dt.getTime()) && dt >= start && dt <= end;
-  });
-
-  let total = 0;
-  for (const d of inMonth) {
-    const pa = Number(d.profitAmount ?? 0);
-    if (pa > 0) { total += pa; continue; }
-    const base = Number(d.totalCashInTill ?? d.totalRevenue ?? d.closeCash ?? 0) || 0;
-    const pct  = Number(d.profitPercentage) || 12;
-    if (base > 0) total += base * pct / 100;
-  }
-
-  return { total: Math.round(total), closeCount: inMonth.length };
-}
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FinancialReportsPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reportData, setReportData] = useState<any>({
-    summary: {
-      totalAllocated: 0,
-      totalExpenses: 0,
-      totalPaid: 0,
-      pendingPayments: 0,
-      savingsTotal: 0,
-      specialFundsTotal: 0
-    },
-    monthlyTrends: [],
-    expensesByCategory: []
-  });
-  const [dateRange, setDateRange] = useState('last6months');
-  const [reportType, setReportType] = useState('summary');
-  const [monthlyGross, setMonthlyGross] = useState<{ total: number; closeCount: number }>({ total: 0, closeCount: 0 });
-  const [displayedGross, setDisplayedGross] = useState(0);
-  const [grossCardVisible, setGrossCardVisible] = useState(false);
-  const grossAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [summary, setSummary]           = useState<WalletMonthlySummary | null>(null);
+  const [grossVisible, setGrossVisible] = useState(false);
+  const [dailyVisible, setDailyVisible] = useState(false);
+  const [displayGross, setDisplayGross] = useState(0);
+  const [displayDaily, setDisplayDaily] = useState(0);
+  const grossAnim = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dailyAnim = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Pagination for ledger entries
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedEntries,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(summary?.entries ?? [], 10);
 
-  useEffect(() => {
-    loadReportData();
-  }, [dateRange, reportType]);
+  // month selector – default current month
+  const now = new Date();
+  const currentPeriodKey = walletLedgerService.getPeriodKey(now);
+  const [periodKey, setPeriodKey] = useState(currentPeriodKey);
 
-  useEffect(() => {
-    if (monthlyGross.total === 0) return;
-    setGrossCardVisible(false);
-    setDisplayedGross(0);
-    const delay = setTimeout(() => {
-      setGrossCardVisible(true);
-      const target = monthlyGross.total;
-      const duration = 1400;
-      const steps = 60;
-      const increment = target / steps;
-      let current = 0;
-      let step = 0;
-      if (grossAnimRef.current) clearInterval(grossAnimRef.current);
-      grossAnimRef.current = setInterval(() => {
-        step++;
-        current = step >= steps ? target : Math.round(increment * step);
-        setDisplayedGross(current);
-        if (step >= steps) clearInterval(grossAnimRef.current!);
-      }, duration / steps);
-    }, 150);
-    return () => {
-      clearTimeout(delay);
-      if (grossAnimRef.current) clearInterval(grossAnimRef.current);
-    };
-  }, [monthlyGross.total]);
+  // build last-12-months selector options
+  const monthOptions: { key: string; label: string }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = walletLedgerService.getPeriodKey(d);
+    const label = d.toLocaleDateString('en-UG', { month: 'long', year: 'numeric' });
+    monthOptions.push({ key, label });
+  }
 
+  // ── Animated counter helper
+  function animateCounter(
+    target: number,
+    setter: (v: number) => void,
+    animRef: React.MutableRefObject<ReturnType<typeof setInterval> | null>
+  ) {
+    if (animRef.current) clearInterval(animRef.current);
+    if (target === 0) { setter(0); return; }
+    const steps = 60;
+    const duration = 1400;
+    const increment = target / steps;
+    let step = 0;
+    animRef.current = setInterval(() => {
+      step++;
+      setter(step >= steps ? target : Math.round(increment * step));
+      if (step >= steps) clearInterval(animRef.current!);
+    }, duration / steps);
+  }
 
-  const loadReportData = async () => {
+  const load = async (key: string) => {
+    setLoading(true);
+    setError(null);
+    setGrossVisible(false);
+    setDailyVisible(false);
     try {
-      setLoading(true);
-      setError(null);
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('Not authenticated');
 
-      const currentUser = authService.getCurrentUser();
-      if (!currentUser) throw new Error('No authenticated user found');
+      const branchId =
+        (user as any).branchId ||
+        (user as any).employee?.branchId ||
+        'default-branch';
 
-      // Monthly gross: sum profitAmount (or 12% of till total) for this calendar month
-      const gross = await fetchMonthlyGrossTotal();
-      setMonthlyGross(gross);
+      const s = await walletLedgerService.getWalletSummary(branchId, key);
+      setSummary(s);
 
-      // Other report data
-      let cashAllocations: Record<string, unknown>[] = [];
-      let expenses:        Record<string, unknown>[] = [];
-      let specialFunds:    Record<string, unknown>[] = [];
-      try {
-        cashAllocations = await AccountantQueries.getCashAllocations();
-        expenses        = await AccountantQueries.getExpenseManagement();
-        specialFunds    = await AccountantQueries.getSpecialFundsTracker();
-      } catch (err) {
-        console.warn('Secondary report data failed:', err);
-      }
-
-      const totalAllocated    = cashAllocations.reduce((s, a) => s + Number((a as any).cashCloseTotal ?? 0), 0);
-      const totalExpenses     = expenses.reduce((s, e)        => s + Number((e as any).amount ?? 0), 0);
-      const totalPaid         = expenses.reduce((s, e)        => s + Number((e as any).paidAmount ?? 0), 0);
-      const savingsTotal      = cashAllocations.reduce((s, a) => s + Number((a as any).savings ?? 0), 0);
-      const specialFundsTotal = specialFunds.reduce((s, f)    => s + Number((f as any).specialFundsBalance ?? 0), 0);
-
-      setReportData({
-        summary: { totalAllocated, totalExpenses, totalPaid, pendingPayments: totalExpenses - totalPaid, savingsTotal, specialFundsTotal },
-        monthlyTrends:      calculateMonthlyTrends(cashAllocations, expenses),
-        expensesByCategory: calculateExpensesByCategory(expenses),
-      });
-
+      // Animate cards in after a short delay
+      setTimeout(() => {
+        setGrossVisible(true);
+        animateCounter(s.grossProfitTotal, setDisplayGross, grossAnim);
+      }, 120);
+      setTimeout(() => {
+        setDailyVisible(true);
+        animateCounter(s.dailyExpenseTotal, setDisplayDaily, dailyAnim);
+      }, 300);
     } catch (err: unknown) {
-      console.error('Error loading report data:', err);
-      setMonthlyGross({ total: 0, closeCount: 0 });
-      setError('Database connection failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setError(err instanceof Error ? err.message : 'Failed to load wallet data');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    load(periodKey);
+    return () => {
+      if (grossAnim.current) clearInterval(grossAnim.current);
+      if (dailyAnim.current) clearInterval(dailyAnim.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodKey]);
 
-  // Helper functions to calculate real data from database
-  const calculateMonthlyTrends = (allocations: any[], expenses: any[]) => {
-    // Group allocations and expenses by month and calculate trends
-    const monthlyData = new Map();
-    
-    allocations.forEach(allocation => {
-      const date = allocation.allocationDate?.toDate?.() || new Date(allocation.allocationDate);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!monthlyData.has(monthKey)) {
-        monthlyData.set(monthKey, { allocated: 0, expenses: 0, month: date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) });
-      }
-      
-      const current = monthlyData.get(monthKey);
-      current.allocated += allocation.cashCloseTotal || 0;
-    });
-
-    expenses.forEach(expense => {
-      const date = expense.expenseDate?.toDate?.() || new Date(expense.expenseDate);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!monthlyData.has(monthKey)) {
-        monthlyData.set(monthKey, { allocated: 0, expenses: 0, month: date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) });
-      }
-      
-      const current = monthlyData.get(monthKey);
-      current.expenses += expense.amount || 0;
-    });
-
-    return Array.from(monthlyData.values()).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
-  };
-
-  const calculateExpensesByCategory = (expenses: any[]) => {
-    const categoryData = new Map();
-    let totalAmount = 0;
-
-    expenses.forEach(expense => {
-      const category = expense.category || 'Uncategorized';
-      const amount = expense.amount || 0;
-      totalAmount += amount;
-
-      if (!categoryData.has(category)) {
-        categoryData.set(category, { category, amount: 0 });
-      }
-
-      categoryData.get(category).amount += amount;
-    });
-
-    return Array.from(categoryData.values()).map(item => ({
-      ...item,
-      percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
-    })).sort((a, b) => b.amount - a.amount);
-  };
+  // days in selected month
+  const [selYear, selMonth] = periodKey.split('-').map(Number);
+  const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+  const isCurrentMonth = periodKey === currentPeriodKey;
+  const dayProgress = isCurrentMonth ? now.getDate() : daysInMonth;
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Equity Wallet</h1>
-          <p className="text-gray-600 mt-2">Track gross profit & expense fund accumulation across daily, weekly, and monthly periods</p>
+          <p className="text-gray-600 mt-1">
+            Real-time ledger — 12% gross profit &amp; 100,000 UGX daily expense fund tracked from every cash close
+          </p>
         </div>
+        {/* Month selector */}
+        <select
+          value={periodKey}
+          onChange={(e) => setPeriodKey(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        >
+          {monthOptions.map((o) => (
+            <option key={o.key} value={o.key}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
+      {/* ── Loading ── */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-3 text-gray-600">Loading real report data from database...</span>
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
+          <span className="ml-3 text-gray-600">Loading wallet ledger…</span>
         </div>
       )}
 
+      {/* ── Error ── */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <div className="text-red-400 mr-3">⚠️</div>
-            <div>
-              <h3 className="text-red-800 font-medium">Report Data Error</h3>
-              <p className="text-red-700 text-sm mt-1">{error}</p>
-            </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-red-400 text-xl">⚠️</span>
+          <div>
+            <p className="text-red-800 font-medium">Failed to load wallet data</p>
+            <p className="text-red-600 text-sm mt-1">{error}</p>
           </div>
         </div>
       )}
 
-              {!loading && (
-         <>
-           {/* Monthly Equity Wallet Accumulation Cards */}
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-             {/* Monthly Gross Profit Accumulation Card */}
-             <div
-               className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 p-6 shadow-sm transition-all duration-700"
-               style={{
-                 opacity: grossCardVisible ? 1 : 0,
-                 transform: grossCardVisible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
-               }}
-             >
-               <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center">
-                   <div
-                     className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center"
-                     style={{ animation: grossCardVisible ? 'grossIconPulse 2s ease-in-out infinite' : 'none' }}
-                   >
-                     <span className="text-white text-2xl">💰</span>
-                   </div>
-                   <div className="ml-3">
-                     <h3 className="text-lg font-semibold text-green-800">Monthly Gross Profit</h3>
-                     <p className="text-sm text-green-600">12% Accumulation This Month</p>
-                   </div>
-                 </div>
-                 <div className="text-right">
-                   <div className="text-xs text-green-600 font-medium">
-                     {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                   </div>
-                   <div className="text-xs text-green-500">Resets monthly</div>
-                 </div>
-               </div>
+      {!loading && summary && (
+        <>
+          {/* ── Wallet cards ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Gross Profit Wallet */}
+            <div
+              className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-6 shadow-sm transition-all duration-700"
+              style={{
+                opacity: grossVisible ? 1 : 0,
+                transform: grossVisible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center text-2xl">
+                    💰
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-800">Gross Profit Wallet</h3>
+                    <p className="text-sm text-green-600">12% deposit per cash close</p>
+                  </div>
+                </div>
+                <div className="text-right text-xs text-green-600">
+                  <div className="font-medium">
+                    {new Date(selYear, selMonth - 1, 1).toLocaleDateString('en-UG', { month: 'long', year: 'numeric' })}
+                  </div>
+                  <div className="text-green-500">{summary.entryCount} close{summary.entryCount !== 1 ? 's' : ''} recorded</div>
+                </div>
+              </div>
 
-               <div className="mt-2">
-                 <div
-                   className="text-3xl font-bold text-green-800 mb-1 tabular-nums transition-all duration-150"
-                   style={{ letterSpacing: '-0.5px' }}
-                 >
-                   UGX {displayedGross.toLocaleString()}
-                 </div>
-                 <p className="text-sm text-green-600">
-                   {monthlyGross.closeCount > 0
-                     ? `${monthlyGross.closeCount} cash close${monthlyGross.closeCount === 1 ? '' : 's'} this month`
-                     : 'No cash closes recorded yet this month'}
-                 </p>
-               </div>
+              <div className="text-3xl font-bold text-green-800 tabular-nums mb-1" style={{ letterSpacing: '-0.5px' }}>
+                {fmtUGX(displayGross)}
+              </div>
+              <p className="text-sm text-green-600 mb-3">
+                {summary.entryCount > 0
+                  ? `Accumulated across ${summary.entryCount} cash close${summary.entryCount !== 1 ? 's' : ''}`
+                  : 'No cash closes recorded yet for this month'}
+              </p>
 
-               <div className="bg-white rounded-lg p-3 border border-green-200 mt-3">
-                 <div className="flex justify-between items-center mb-2">
-                   <span className="text-xs text-green-600">Monthly Progress</span>
-                   <span className="text-xs text-green-600">
-                     📅 {new Date().getDate()} days × 12% profit
-                   </span>
-                 </div>
-                 <div className="w-full bg-green-200 rounded-full h-2">
-                   <div
-                     className="bg-green-600 h-2 rounded-full transition-all duration-1000 ease-out"
-                     style={{
-                       width: grossCardVisible
-                         ? `${(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100}%`
-                         : '0%',
-                     }}
-                   />
-                 </div>
-                 <div className="text-xs text-green-500 mt-1">
-                   12% gross profit tracked from each cash close
-                 </div>
-               </div>
+              <div className="bg-white rounded-lg p-3 border border-green-200">
+                <div className="flex justify-between text-xs text-green-600 mb-2">
+                  <span>Month progress</span>
+                  <span>📅 {dayProgress} / {daysInMonth} days</span>
+                </div>
+                <div className="w-full bg-green-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${(dayProgress / daysInMonth) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-green-500 mt-1">12% of each day&apos;s totalCashInTill deposited on close</p>
+              </div>
+            </div>
 
-               <style>{`
-                 @keyframes grossIconPulse {
-                   0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.5); transform: scale(1); }
-                   50% { box-shadow: 0 0 0 8px rgba(22,163,74,0); transform: scale(1.07); }
-                 }
-               `}</style>
-             </div>
+            {/* Daily Expense Fund Wallet */}
+            <div
+              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6 shadow-sm transition-all duration-700"
+              style={{
+                opacity: dailyVisible ? 1 : 0,
+                transform: dailyVisible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-2xl">
+                    🏦
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-800">Daily Expense Fund</h3>
+                    <p className="text-sm text-blue-600">100,000 UGX per business day</p>
+                  </div>
+                </div>
+                <div className="text-right text-xs text-blue-600">
+                  <div className="font-medium">
+                    {new Date(selYear, selMonth - 1, 1).toLocaleDateString('en-UG', { month: 'long', year: 'numeric' })}
+                  </div>
+                  <div className="text-blue-500">{summary.daysCovered} day{summary.daysCovered !== 1 ? 's' : ''} covered</div>
+                </div>
+              </div>
 
-             {/* Monthly Daily Expense Fund Card */}
-             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-6 shadow-sm">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center">
-                   <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                     <span className="text-white text-2xl">🏦</span>
-                   </div>
-                   <div className="ml-3">
-                     <h3 className="text-lg font-semibold text-blue-800">Monthly Expense Fund</h3>
-                     <p className="text-sm text-blue-600">100,000 UGX Daily Collection</p>
-                   </div>
-                 </div>
-                 <div className="text-right">
-                   <div className="text-xs text-blue-600 font-medium">
-                     {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                   </div>
-                   <div className="text-xs text-blue-500">Resets monthly</div>
-                 </div>
-               </div>
-               
-               <div className="space-y-3">
-                 <div className="flex justify-between items-center">
-                   <span className="text-sm font-medium text-blue-700">This Month:</span>
-                   <span className="text-2xl font-bold text-blue-800">
-                     UGX {(new Date().getDate() * 100000).toLocaleString()}
-                   </span>
-                 </div>
-                 
-                 <div className="bg-white rounded-lg p-3 border border-blue-200">
-                   <div className="flex justify-between items-center mb-2">
-                     <span className="text-xs text-blue-600">Daily Collection</span>
-                     <span className="text-xs text-blue-600">📅 {new Date().getDate()} days × 100K</span>
-                   </div>
-                   <div className="w-full bg-blue-200 rounded-full h-2">
-                     <div className="bg-blue-600 h-2 rounded-full" style={{
-                       width: `${(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100}%`
-                     }}></div>
-                   </div>
-                   <div className="text-xs text-blue-500 mt-1">100,000 UGX collected each business day</div>
-                 </div>
-                 
-                 <div className="text-xs text-blue-600 bg-white bg-opacity-50 rounded p-2">
-                   🔄 Monthly fund resets to zero at month-end, providing fresh expense coverage for the new month.
-                 </div>
-               </div>
-             </div>
-           </div>
+              <div className="text-3xl font-bold text-blue-800 tabular-nums mb-1" style={{ letterSpacing: '-0.5px' }}>
+                {fmtUGX(displayDaily)}
+              </div>
+              <p className="text-sm text-blue-600 mb-3">
+                {summary.daysCovered > 0
+                  ? `100k collected on ${summary.daysCovered} business day${summary.daysCovered !== 1 ? 's' : ''}`
+                  : 'No daily collections recorded yet for this month'}
+              </p>
 
-           {/* Monthly Summary & Next Month Transition */}
-           <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-             <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Equity Wallet Overview</h3>
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-               <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-                 <div className="text-2xl font-bold text-purple-600 mb-2">
-                   UGX {(
-                     monthlyGross.total + new Date().getDate() * 100000
-                   ).toLocaleString()}
-                 </div>
-                 <div className="text-sm text-purple-600 font-medium">This Month Total</div>
-                 <div className="text-xs text-purple-500 mt-1">Combined monthly accumulation</div>
-               </div>
-               
-               <div className="text-center p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                 <div className="text-2xl font-bold text-indigo-600 mb-2">
-                   {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate()}
-                 </div>
-                 <div className="text-sm text-indigo-600 font-medium">Days Remaining</div>
-                 <div className="text-xs text-indigo-500 mt-1">Until monthly reset</div>
-               </div>
-               
-               <div className="text-center p-4 bg-teal-50 rounded-lg border border-teal-200">
-                 <div className="text-2xl font-bold text-teal-600 mb-2">
-                   {new Date().getDate()}
-                 </div>
-                 <div className="text-sm text-teal-600 font-medium">Collection Days</div>
-                 <div className="text-xs text-teal-500 mt-1">This month so far</div>
-               </div>
-               
-               <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
-                 <div className="text-2xl font-bold text-orange-600 mb-2">
-                   {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                 </div>
-                 <div className="text-sm text-orange-600 font-medium">Next Reset</div>
-                 <div className="text-xs text-orange-500 mt-1">Start of next month</div>
-               </div>
-             </div>
-             
-             {/* Monthly Reset Explanation */}
-             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-               <div className="flex items-center">
-                 <span className="text-2xl mr-3">🔄</span>
-                 <div>
-                   <h4 className="text-sm font-semibold text-yellow-800">Monthly Reset System</h4>
-                   <p className="text-xs text-yellow-700 mt-1">
-                     At the end of each month, both the 12% gross profit and 100,000 UGX daily fund accumulations 
-                     reset to zero, starting fresh for the new month. This provides clear monthly financial targets and clean accounting periods.
-                   </p>
-                 </div>
-               </div>
-             </div>
-           </div>
+              <div className="bg-white rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between text-xs text-blue-600 mb-2">
+                  <span>Days covered</span>
+                  <span>📅 {summary.daysCovered} / {daysInMonth} days</span>
+                </div>
+                <div className="w-full bg-blue-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((summary.daysCovered / daysInMonth) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-blue-500 mt-1">Collected once per business day regardless of shift count</p>
+              </div>
+            </div>
+          </div>
 
-         </>
-       )}
+          {/* ── Overview row ── */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Wallet Overview</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Stat
+                label="Combined Total"
+                value={fmtUGX(summary.combinedTotal)}
+                sub="Gross + Daily"
+                color="purple"
+              />
+              <Stat
+                label="Gross Profit"
+                value={fmtUGX(summary.grossProfitTotal)}
+                sub={`${summary.entryCount} closes`}
+                color="green"
+              />
+              <Stat
+                label="Expense Fund"
+                value={fmtUGX(summary.dailyExpenseTotal)}
+                sub={`${summary.daysCovered} days`}
+                color="blue"
+              />
+              <Stat
+                label="Days Remaining"
+                value={isCurrentMonth ? String(daysInMonth - now.getDate()) : '—'}
+                sub={isCurrentMonth ? 'Until month end' : 'Past period'}
+                color="orange"
+              />
+            </div>
+          </div>
+
+          {/* ── Ledger table ── */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Ledger — Cash Close Deposits</h3>
+              <span className="text-sm text-gray-500">{summary.entries.length} entries</span>
+            </div>
+
+            {summary.entries.length === 0 ? (
+              <div className="py-16 text-center text-gray-500">
+                <div className="text-4xl mb-3">📒</div>
+                <p className="font-medium">No ledger entries for this month</p>
+                <p className="text-sm mt-1">Deposits are recorded automatically when a cash close is submitted.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="text-left px-4 py-3 font-medium">Date</th>
+                      <th className="text-left px-4 py-3 font-medium">Shift</th>
+                      <th className="text-right px-4 py-3 font-medium">Revenue</th>
+                      <th className="text-right px-4 py-3 font-medium">Gross (12%)</th>
+                      <th className="text-right px-4 py-3 font-medium">Daily 100k</th>
+                      <th className="text-right px-4 py-3 font-medium">Total Deposit</th>
+                      <th className="text-left px-4 py-3 font-medium">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedEntries.map((e) => (
+                      <LedgerRow key={e.id} entry={e} />
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50 font-semibold text-gray-800 border-t-2 border-gray-200">
+                      <td colSpan={3} className="px-4 py-3 text-sm">Totals</td>
+                      <td className="px-4 py-3 text-right text-green-700">{fmtUGX(summary.grossProfitTotal)}</td>
+                      <td className="px-4 py-3 text-right text-blue-700">{fmtUGX(summary.dailyExpenseTotal)}</td>
+                      <td className="px-4 py-3 text-right text-purple-700">{fmtUGX(summary.combinedTotal)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              rowsPerPage={rowsPerPage}
+              startIndex={pageStartIndex}
+              endIndex={pageEndIndex}
+              totalItems={summary?.entries.length ?? 0}
+              onPageChange={setCurrentPage}
+              onRowsPerPageChange={setRowsPerPage}
+            />
+          </div>
+
+          {/* ── Info note ── */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
+            <span className="text-yellow-500 text-xl">🔄</span>
+            <div>
+              <p className="text-sm font-semibold text-yellow-800">Monthly Reset</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Ledger entries are per-month. At month end the gross profit and daily expense fund balances
+                reset to zero, giving clean accounting periods. Historical months remain accessible via the
+                month selector above.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
-} 
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Stat({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  color: 'purple' | 'green' | 'blue' | 'orange';
+}) {
+  const colors: Record<string, string> = {
+    purple: 'bg-purple-50 border-purple-200 text-purple-600',
+    green:  'bg-green-50  border-green-200  text-green-600',
+    blue:   'bg-blue-50   border-blue-200   text-blue-600',
+    orange: 'bg-orange-50 border-orange-200 text-orange-600',
+  };
+  return (
+    <div className={`text-center p-4 rounded-lg border ${colors[color]}`}>
+      <div className="text-xl font-bold mb-1 break-all">{value}</div>
+      <div className="text-sm font-medium">{label}</div>
+      <div className="text-xs mt-1 opacity-75">{sub}</div>
+    </div>
+  );
+}
+
+function LedgerRow({ entry }: { entry: WalletLedgerEntry }) {
+  const totalDeposit = entry.grossProfitDeposit + entry.dailyExpenseDeposit;
+  return (
+    <tr className="hover:bg-gray-50 transition-colors">
+      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{fmtDate(entry.date)}</td>
+      <td className="px-4 py-3">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            entry.shiftType === 'day'
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-indigo-100 text-indigo-800'
+          }`}
+        >
+          {entry.shiftType === 'day' ? '☀️ Day' : '🌙 Night'}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right text-gray-600">
+        {fmtUGX(entry.sourceRevenue)}
+      </td>
+      <td className="px-4 py-3 text-right font-medium text-green-700">
+        {fmtUGX(entry.grossProfitDeposit)}
+      </td>
+      <td className="px-4 py-3 text-right font-medium text-blue-700">
+        {entry.dailyExpenseDeposit > 0 ? (
+          fmtUGX(entry.dailyExpenseDeposit)
+        ) : (
+          <span className="text-gray-400 text-xs italic">already collected</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right font-semibold text-purple-700">
+        {fmtUGX(totalDeposit)}
+      </td>
+      <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px] truncate">
+        {entry.notes || '—'}
+      </td>
+    </tr>
+  );
+}

@@ -7,6 +7,7 @@ import { InterfaceDatabaseConnector } from '../../lib/firebase/interface-databas
 import { authService } from '../../lib/firebase/auth';
 import { CashCloseService } from '../../lib/firebase/firestore-service';
 import { AutomatedAllocationService } from '../../lib/firebase/automated-allocation-service';
+import { walletLedgerService } from '../../lib/firebase/wallet-ledger-service';
 
 interface TillNetworkPayment {
   id: string;
@@ -1057,7 +1058,37 @@ export default function ComprehensiveCashCloseForm({
       console.log('💾 Calling createCashClose...');
       const cashCloseId = await cashCloseService.createCashClose(cashCloseDocument);
       console.log('🎉 Cash close created with ID:', cashCloseId);
-      
+
+      // ── Wallet ledger deposit ──────────────────────────────────────────────
+      // Record the 12% gross profit and 100k daily expense fund deposit so the
+      // accountant reports page can show real tracked balances instead of
+      // calendar estimates.
+      try {
+        const branchId = (currentUser as any).branchId || (currentUser as any).employee?.branchId || 'default-branch';
+        const shiftEntries = cashCloseData.shifts;
+        const primaryShift: 'day' | 'night' =
+          shiftEntries.length > 0 ? shiftEntries[0].shift : (new Date().getHours() >= 6 && new Date().getHours() < 18 ? 'day' : 'night');
+
+        await walletLedgerService.recordCashCloseDeposit({
+          cashCloseId,
+          date: cashCloseData.businessDate,
+          branchId,
+          createdBy: currentUser.uid,
+          shiftType: primaryShift,
+          totalRevenue: totals.totalCashInTill,
+          profitPercentage: cashCloseData.profitPercentage || 12,
+          // Honour the 100k toggle captured at creation time
+          enableMonthlyExpenseFund: cashCloseData.enableMonthlyExpenseFund,
+          monthlyExpenseFundAmount: cashCloseData.monthlyExpenseFundDeduction || 100000,
+          notes: cashCloseData.notes || undefined,
+        });
+        console.log('✅ Wallet ledger deposit recorded');
+      } catch (ledgerErr) {
+        // Non-fatal — cash close is already saved; ledger error should not block the user
+        console.error('⚠️ Wallet ledger deposit failed (non-fatal):', ledgerErr);
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Count total expenses for feedback
       const totalExpenses = cashCloseData.shifts.reduce((total, shift) => 
         total + shift.tills.reduce((shiftTotal, till) => 

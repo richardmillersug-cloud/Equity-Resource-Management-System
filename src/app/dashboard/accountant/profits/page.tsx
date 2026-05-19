@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { CashCloseService } from '@/lib/firebase/firestore-service';
 import { SimpleCashCloseService } from '@/lib/firebase/firestore-service-simple';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
@@ -16,7 +17,6 @@ import {
   Building,
   AlertCircle,
   Download,
-  Eye,
   BarChart3,
   PieChart,
   RefreshCw
@@ -63,9 +63,20 @@ export default function ProfitsPage() {
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
-  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [sortBy, setSortBy] = useState<'date' | 'grossProfit' | 'specialFunds' | 'netProfit' | 'expenses'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedRecords,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(filteredRecords, 10);
 
   // Summary data
   const [summary, setSummary] = useState<ProfitSummary>({
@@ -385,33 +396,43 @@ export default function ProfitsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading profit data...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-blue-400" />
+            </div>
+          </div>
+          <p className="text-lg font-semibold text-gray-700">Loading Profit Analysis</p>
+          <p className="text-sm text-gray-400">Fetching cash close and expense records…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Profit Analysis</h1>
-          <p className="text-gray-600 mt-1">Track profits and expenses to calculate actual profit saved</p>
-          <p className="text-sm text-gray-500 mt-2">
-            <strong>Accountant expenses:</strong> Pulled from all entries in the expenses table (matched by date)
-          </p>
-        </div>
-        <div className="flex space-x-3">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 sm:p-8 shadow-xl">
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-widest text-blue-200">Accountant Workspace</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white">Profit Analysis</h1>
+            <p className="text-blue-200 mt-1 text-sm">Track profits and expenses to calculate actual profit saved</p>
+          </div>
           <button
             onClick={loadProfitData}
-            className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-medium transition-colors self-start sm:self-auto"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4" />
             Refresh
           </button>
         </div>
@@ -490,7 +511,7 @@ export default function ProfitsPage() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium text-gray-900">Filter & Analysis Controls</h3>
           <span className="text-sm text-gray-500">
-            Showing {rowsPerPage === -1 ? filteredRecords.length : Math.min(rowsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+            {filteredRecords.length} records
           </span>
         </div>
         
@@ -576,25 +597,6 @@ export default function ProfitsPage() {
             </select>
           </div>
 
-          {/* Rows Per Page */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">
-              <Eye className="inline h-3 w-3 mr-1" />
-              Show
-            </label>
-            <select 
-              value={rowsPerPage}
-              onChange={(e) => setRowsPerPage(Number(e.target.value))}
-              className="w-20 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={-1}>All</option>
-            </select>
-          </div>
-
           {/* Export */}
           <button
             onClick={exportToCSV}
@@ -640,7 +642,7 @@ export default function ProfitsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {(rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage)).map((record) => (
+                {paginatedRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -680,7 +682,16 @@ export default function ProfitsPage() {
             </table>
           </div>
         )}
-      </div>
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          rowsPerPage={rowsPerPage}
+          startIndex={pageStartIndex}
+          endIndex={pageEndIndex}
+          totalItems={filteredRecords.length}
+          onPageChange={setCurrentPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
       </div>
     </div>
   );

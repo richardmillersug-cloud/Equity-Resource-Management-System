@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { 
   DollarSign, 
   Calendar, 
@@ -24,6 +25,18 @@ export default function DailyAllocationPage() {
   const [allocations, setAllocations] = useState<DailyAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedAllocations,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(allocations, 10);
   const [selectedAllocation, setSelectedAllocation] = useState<DailyAllocation | null>(null);
   const [stats, setStats] = useState({
     totalPending: 0,
@@ -291,7 +304,7 @@ export default function DailyAllocationPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {allocations.map((allocation) => (
+              {paginatedAllocations.map((allocation) => (
                 <div key={allocation.id} className="p-6 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-start space-x-4">
@@ -391,6 +404,16 @@ export default function DailyAllocationPage() {
               ))}
             </div>
           )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            rowsPerPage={rowsPerPage}
+            startIndex={pageStartIndex}
+            endIndex={pageEndIndex}
+            totalItems={allocations.length}
+            onPageChange={setCurrentPage}
+            onRowsPerPageChange={setRowsPerPage}
+          />
         </div>
 
         {/* Create Allocation Modal */}

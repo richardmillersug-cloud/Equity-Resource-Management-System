@@ -683,64 +683,61 @@ export default function AccountantAllocationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-5 bg-white rounded-3xl p-12 shadow-xl border border-slate-100 text-center">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-[3px] border-slate-100" />
+            <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-indigo-600 animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Send className="w-5 h-5 text-indigo-400" />
+              <Send className="w-5 h-5 text-indigo-500" />
             </div>
           </div>
-          <p className="text-lg font-semibold text-gray-700">Loading Allocations</p>
-          <p className="text-sm text-gray-400">Fetching cash closes and PM data…</p>
+          <div>
+            <p className="text-lg font-semibold text-slate-800">Loading Allocations</p>
+            <p className="text-sm text-slate-400 mt-1">Fetching cash closes and PM data…</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-6 space-y-5">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 space-y-5">
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 shadow-xl">
-        {/* Subtle grid overlay */}
-        <div className="absolute inset-0 opacity-[0.08]"
-          style={{ backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-        {/* Accent glow */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-indigo-300/20 blur-2xl" />
+      {/* ── Hero Header ─────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-600 p-6 sm:p-8 shadow-lg">
+        <div className="absolute inset-0 opacity-[0.05]"
+          style={{ backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+        <div className="absolute -top-10 -right-10 w-52 h-52 rounded-full bg-blue-400/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-40 h-40 rounded-full bg-indigo-300/20 blur-2xl pointer-events-none" />
 
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-widest text-blue-100">Accountant Workspace</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-200">Accountant Workspace</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Allocation Processing</h1>
-            <p className="text-blue-100 mt-1.5 text-sm">Review submitted cash closes and dispatch funds to purchase managers</p>
-
-            {/* Quick stats in header */}
-            <div className="flex flex-wrap gap-3 mt-4">
-              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-300" />
-                <span className="text-xs text-white">{cashCloses.length} submitted</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
-                <div className="w-2 h-2 rounded-full bg-amber-300" />
-                <span className="text-xs text-white">{allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-lg px-3 py-1.5">
-                <div className="w-2 h-2 rounded-full bg-blue-200" />
-                <span className="text-xs text-white">{allocatedCashCloses.length} allocated</span>
-              </div>
+            <p className="text-indigo-200 mt-1.5 text-sm leading-relaxed">Review submitted cash closes and dispatch funds to purchase managers</p>
+            <div className="flex flex-wrap gap-2.5 mt-4">
+              {[
+                { dot: 'bg-emerald-400', label: `${cashCloses.length} submitted` },
+                { dot: 'bg-amber-400', label: `${allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending` },
+                { dot: 'bg-blue-300', label: `${allocatedCashCloses.length} allocated` },
+              ].map((s, i) => (
+                <div key={i} className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                  <span className="text-xs text-white/90">{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           <button
             onClick={loadData}
-            className="flex items-center gap-2 self-start sm:self-auto bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl px-5 py-2.5 text-white text-sm font-medium transition-all"
+            className="flex items-center gap-2 self-start sm:self-auto shrink-0 bg-white/10 hover:bg-white/20 active:bg-white/25 border border-white/25 rounded-xl px-5 py-2.5 text-white text-sm font-medium transition-all duration-150"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -748,31 +745,31 @@ export default function AccountantAllocationsPage() {
         </div>
       </div>
 
+      {/* ── Error banner ─────────────────────────────────────────────── */}
       {error && (
-        <div className="flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-5 py-4">
-          <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
-          <p className="text-sm font-medium text-red-800">{error}</p>
+        <div className="flex items-start gap-3 rounded-xl bg-rose-50 border border-rose-200 px-5 py-4">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+          <p className="text-sm text-rose-800 font-medium">{error}</p>
         </div>
       )}
 
-
-      {/* PM Selection */}
-      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-700 to-indigo-700">
-          <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
-            <User className="w-5 h-5 text-white" />
+      {/* ── PM Selection ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
+            <User className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-white tracking-tight">Purchase Manager</h2>
-            <p className="text-xs text-blue-200">Select a PM to load their submitted cash closes</p>
+            <h2 className="text-sm font-semibold text-slate-800">Purchase Manager</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Select a PM to load their submitted cash closes</p>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 space-y-3">
           <select
             value={selectedPM}
             onChange={(e) => setSelectedPM(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 hover:bg-white px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer"
           >
             <option value="">Choose a Purchase Manager…</option>
             {pmUsers.map((pm) => (
@@ -780,56 +777,49 @@ export default function AccountantAllocationsPage() {
             ))}
           </select>
 
-          <div className="mt-3">
-            {selectedPM ? (
-              <div className="flex items-center gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">{pmUsers.find(pm => pm.uid === selectedPM)?.name}</p>
-                  <p className="text-xs text-blue-500">{pmUsers.find(pm => pm.uid === selectedPM)?.email}</p>
-                </div>
-                <span className="ml-auto text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 rounded-full px-2.5 py-1">Active</span>
+          {selectedPM ? (
+            <div className="flex items-center gap-3 rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+              <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-white" />
               </div>
-            ) : (
-              <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 border-dashed px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="text-sm text-slate-400">No purchase manager selected yet</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-indigo-900 truncate">{pmUsers.find(pm => pm.uid === selectedPM)?.name}</p>
+                <p className="text-xs text-indigo-400 truncate">{pmUsers.find(pm => pm.uid === selectedPM)?.email}</p>
               </div>
-            )}
-          </div>
+              <span className="shrink-0 text-xs font-semibold text-indigo-600 bg-indigo-100 border border-indigo-200 rounded-full px-2.5 py-1">Active</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 border-dashed px-4 py-3">
+              <AlertCircle className="w-4 h-4 text-slate-300 shrink-0" />
+              <span className="text-sm text-slate-400">No purchase manager selected yet</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Suggested Allocations */}
+      {/* ── Suggested Allocations ────────────────────────────────────── */}
       {selectedPM && suggestedAllocations.length > 0 && (
-        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-          {/* Section header */}
-          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-teal-700 px-6 py-5">
-            <div className="absolute inset-0 opacity-[0.06]"
-              style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-white tracking-tight">Suggested Allocations</h2>
-                  <p className="text-xs text-emerald-200 mt-0.5">{pmUsers.find(pm => pm.uid === selectedPM)?.name} · Ready to dispatch</p>
-                </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0">
+                <Target className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xs font-semibold bg-white/15 border border-white/20 text-white rounded-full px-3 py-1.5">
-                {suggestedAllocations.filter(s => {
-                  if (s.branchId === 'test_branch') return false;
-                  const currentYear = new Date().getFullYear();
-                  try {
-                    const date = s.createdAt?.toDate?.() || new Date(s.createdAt);
-                    return !isNaN(date.getTime()) && date.getFullYear() >= currentYear;
-                  } catch { return true; }
-                }).length} available
-              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">Suggested Allocations</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{pmUsers.find(pm => pm.uid === selectedPM)?.name} · Ready to dispatch</p>
+              </div>
             </div>
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5">
+              {suggestedAllocations.filter(s => {
+                if (s.branchId === 'test_branch') return false;
+                const currentYear = new Date().getFullYear();
+                try {
+                  const date = s.createdAt?.toDate?.() || new Date(s.createdAt);
+                  return !isNaN(date.getTime()) && date.getFullYear() >= currentYear;
+                } catch { return true; }
+              }).length} available
+            </span>
           </div>
 
           <div className="p-6 space-y-4">
@@ -844,15 +834,14 @@ export default function AccountantAllocationsPage() {
                 } catch { return true; }
               })
               .map((suggestion, index) => (
-              <div key={index} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-200 overflow-hidden">
-                {/* Card header row */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3 border-b border-gray-50">
+              <div key={index} className="rounded-xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all duration-200 overflow-hidden bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="font-semibold text-slate-800 text-sm">
                       {new Date(suggestion.businessDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
-                    <span className="capitalize text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md px-2 py-0.5">
+                    <span className="capitalize text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5">
                       {suggestion.shiftType} shift
                     </span>
                     {suggestion.branchId && (
@@ -875,41 +864,39 @@ export default function AccountantAllocationsPage() {
                         ? <><RefreshCw className="w-3 h-3 animate-spin" /> Loading</>
                         : suggestion.createdByName}
                     </span>
-                    <span className="font-mono text-slate-300">#{suggestion.cashCloseId.slice(-6)}</span>
+                    <span className="font-mono text-slate-300 text-[11px]">#{suggestion.cashCloseId.slice(-6)}</span>
                   </div>
                 </div>
 
                 {/* Financial breakdown */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
-                  <div className="bg-white p-3 text-center">
-                    <p className="text-xs text-gray-400 mb-1">Cash in Till</p>
-                    <p className="text-sm font-bold text-slate-800">{ugx(suggestion.totalCash)}</p>
-                    <p className="text-xs text-gray-300 mt-0.5">Gross</p>
-                  </div>
-                  <div className="bg-white p-3 text-center">
-                    <p className="text-xs text-red-400 mb-1">Profit 12%</p>
-                    <p className="text-sm font-bold text-red-600">−{ugx(suggestion.profitDeduction)}</p>
-                    <p className="text-xs text-red-200 mt-0.5">Retained</p>
-                  </div>
-                  <div className="bg-white p-3 text-center">
-                    <p className="text-xs text-orange-400 mb-1">Expense Fund</p>
-                    <p className={`text-sm font-bold ${suggestion.monthlyExpenseFund > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
-                      {suggestion.monthlyExpenseFund > 0 ? `−${ugx(suggestion.monthlyExpenseFund)}` : '—'}
-                    </p>
-                    <p className="text-xs text-orange-200 mt-0.5">Monthly</p>
-                  </div>
-                  <div className="bg-white p-3 text-center">
-                    <p className="text-xs text-slate-400 mb-1">Total Deducted</p>
-                    <p className="text-sm font-bold text-slate-700">−{ugx(suggestion.totalDeductions)}</p>
-                    <p className="text-xs text-slate-300 mt-0.5">Combined</p>
+                <div className="mx-4 mb-3 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
+                  <div className="grid grid-cols-4 divide-x divide-slate-100">
+                    <div className="p-3 text-center">
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1 uppercase tracking-wider">Cash in Till</p>
+                      <p className="text-sm font-bold text-slate-800">{ugx(suggestion.totalCash)}</p>
+                    </div>
+                    <div className="p-3 text-center">
+                      <p className="text-[10px] font-semibold text-rose-400 mb-1 uppercase tracking-wider">Profit 12%</p>
+                      <p className="text-sm font-bold text-rose-600">−{ugx(suggestion.profitDeduction)}</p>
+                    </div>
+                    <div className="p-3 text-center">
+                      <p className="text-[10px] font-semibold text-amber-500 mb-1 uppercase tracking-wider">Exp. Fund</p>
+                      <p className={`text-sm font-bold ${suggestion.monthlyExpenseFund > 0 ? 'text-amber-600' : 'text-slate-300'}`}>
+                        {suggestion.monthlyExpenseFund > 0 ? `−${ugx(suggestion.monthlyExpenseFund)}` : '—'}
+                      </p>
+                    </div>
+                    <div className="p-3 text-center">
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1 uppercase tracking-wider">Deducted</p>
+                      <p className="text-sm font-bold text-slate-700">−{ugx(suggestion.totalDeductions)}</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Allocation footer with Send */}
-                <div className="flex items-center justify-between bg-emerald-700 px-5 py-3.5">
+                {/* Action footer */}
+                <div className="flex items-center justify-between bg-emerald-50 border-t border-emerald-100 px-4 py-3">
                   <div>
-                    <p className="text-xs text-emerald-300">PM Allocation Amount</p>
-                    <p className="text-xl font-bold text-white">UGX {suggestion.suggestedAmount.toLocaleString()}</p>
+                    <p className="text-xs text-emerald-600 font-medium">Allocation Amount</p>
+                    <p className="text-lg font-bold text-emerald-800">UGX {suggestion.suggestedAmount.toLocaleString()}</p>
                   </div>
                   <button
                     onClick={() => {
@@ -917,7 +904,7 @@ export default function AccountantAllocationsPage() {
                       if (cashClose) handleSendAllocationFromOverview(cashClose);
                     }}
                     disabled={sending || !selectedPM}
-                    className="flex items-center gap-2 bg-white text-emerald-700 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors disabled:opacity-50 shadow-sm"
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all duration-150 disabled:opacity-40 shadow-sm shadow-emerald-200"
                   >
                     {sending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     Send
@@ -948,38 +935,33 @@ export default function AccountantAllocationsPage() {
         </div>
       )}
 
-      {/* Cash Closes Overview */}
-      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-        {/* Section header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-5">
-          <div className="absolute inset-0 opacity-[0.08]"
-            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-white tracking-tight">Cash Closes Overview</h2>
-                <p className="text-xs text-blue-200 mt-0.5">Submit pending records to make them available for allocation</p>
-              </div>
+      {/* ── Cash Closes Overview ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-white" />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
-                {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending
-              </span>
-              <span className="text-xs font-medium bg-white/15 border border-white/20 text-blue-100 rounded-full px-3 py-1.5">
-                {allCashCloses.filter(cc => cc.status === 'allocated').length} allocated
-              </span>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Cash Closes Overview</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Submit pending records to make them available for allocation</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+              {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length} pending
+            </span>
+            <span className="text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 rounded-full px-2.5 py-1">
+              {allCashCloses.filter(cc => cc.status === 'allocated').length} allocated
+            </span>
           </div>
         </div>
 
         <div className="p-6">
           {allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length === 0 ? (
             <div className="text-center py-14">
-              <div className="w-16 h-16 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-purple-300" />
+              <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-slate-300" />
               </div>
               <p className="font-semibold text-slate-600">
                 {allCashCloses.length === 0 ? 'No Cash Closes Found' : 'Nothing Pending Submission'}
@@ -995,16 +977,16 @@ export default function AccountantAllocationsPage() {
               {/* Status pipeline */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Pending Submit', value: allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length, color: 'text-violet-700', icon: <Clock className="w-4 h-4 text-violet-500" />, bg: 'bg-violet-50', border: 'border-violet-200' },
-                  { label: 'Submitted', value: allCashCloses.filter(cc => cc.status === 'submitted').length, color: 'text-emerald-700', icon: <CheckCircle className="w-4 h-4 text-emerald-500" />, bg: 'bg-emerald-50', border: 'border-emerald-200' },
-                  { label: 'Completed', value: allCashCloses.filter(cc => cc.status === 'completed').length, color: 'text-blue-700', icon: <TrendingUp className="w-4 h-4 text-blue-500" />, bg: 'bg-blue-50', border: 'border-blue-200' },
-                  { label: 'Allocated', value: allCashCloses.filter(cc => cc.status === 'allocated').length, color: 'text-orange-700', icon: <Send className="w-4 h-4 text-orange-500" />, bg: 'bg-orange-50', border: 'border-orange-200' },
+                  { label: 'Pending Submit', value: allCashCloses.filter(cc => cc.status !== 'allocated' && cc.status !== 'submitted').length, icon: <Clock className="w-4 h-4" />, color: 'text-violet-700', iconColor: 'text-violet-500', bg: 'bg-violet-50', border: 'border-violet-200' },
+                  { label: 'Submitted', value: allCashCloses.filter(cc => cc.status === 'submitted').length, icon: <CheckCircle className="w-4 h-4" />, color: 'text-emerald-700', iconColor: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+                  { label: 'Completed', value: allCashCloses.filter(cc => cc.status === 'completed').length, icon: <TrendingUp className="w-4 h-4" />, color: 'text-blue-700', iconColor: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
+                  { label: 'Allocated', value: allCashCloses.filter(cc => cc.status === 'allocated').length, icon: <Send className="w-4 h-4" />, color: 'text-indigo-700', iconColor: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-200' },
                 ].map((s, i) => (
-                  <div key={i} className={`rounded-xl ${s.bg} border ${s.border} p-3.5 flex items-center gap-3`}>
-                    {s.icon}
+                  <div key={i} className={`rounded-xl ${s.bg} border ${s.border} p-4 flex items-center gap-3`}>
+                    <div className={`${s.iconColor} shrink-0`}>{s.icon}</div>
                     <div>
-                      <p className={`text-xl font-bold ${s.color} leading-none`}>{s.value}</p>
-                      <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                      <p className={`text-2xl font-bold ${s.color} leading-none`}>{s.value}</p>
+                      <p className="text-xs text-slate-500 mt-1">{s.label}</p>
                     </div>
                   </div>
                 ))}
@@ -1051,26 +1033,25 @@ export default function AccountantAllocationsPage() {
 
                   return (
                     <div key={cashClose.id} className={`rounded-xl border bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
-                      isIncomplete ? 'border-amber-200' : 'border-gray-200 hover:border-violet-200'
+                      isIncomplete ? 'border-amber-200' : 'border-slate-200 hover:border-violet-300'
                     }`}>
                       {isIncomplete && (
-                        <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-xs text-amber-800">
+                        <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-100 px-4 py-2.5 text-xs text-amber-800">
                           <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
                           <span><strong>Incomplete record</strong> — some fields are missing or zero. Review this entry.</span>
                         </div>
                       )}
 
-                      {/* Card header */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3 border-b border-gray-50">
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Calendar className="w-4 h-4 text-violet-500 shrink-0" />
+                          <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                           <span className="font-semibold text-slate-800 text-sm">{dateStr}</span>
                           {shiftLabel ? (
-                            <span className="capitalize text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 rounded-md px-2 py-0.5">
+                            <span className="capitalize text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200 rounded-full px-2.5 py-0.5">
                               {shiftLabel} shift
                             </span>
                           ) : (
-                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-md px-2 py-0.5">Shift unknown</span>
+                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">Shift unknown</span>
                           )}
                           {cashClose.branchId && cashClose.branchId !== 'test_branch' && (
                             <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -1080,20 +1061,20 @@ export default function AccountantAllocationsPage() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {cashClose.status ? (
-                            <span className={`text-xs font-semibold rounded-md px-2.5 py-0.5 ${
+                            <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${
                               cashClose.status === 'submitted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                               cashClose.status === 'completed' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                               'bg-slate-50 text-slate-600 border border-slate-200'
                             }`}>{cashClose.status.toUpperCase()}</span>
                           ) : (
-                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-md px-2.5 py-0.5">NO STATUS</span>
+                            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">NO STATUS</span>
                           )}
-                          <span className="text-xs text-slate-300 font-mono">#{cashClose.id.slice(-6)}</span>
+                          <span className="text-xs text-slate-300 font-mono text-[11px]">#{cashClose.id.slice(-6)}</span>
                         </div>
                       </div>
 
                       {/* Meta row */}
-                      <div className="flex flex-wrap gap-4 text-xs text-slate-400 px-4 py-2.5 bg-slate-50 border-b border-gray-100">
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-400 px-4 py-2 bg-slate-50/70 border-y border-slate-100">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3 h-3 shrink-0" />
                           <span className="font-medium text-slate-500">Created:</span>
@@ -1107,38 +1088,38 @@ export default function AccountantAllocationsPage() {
                       </div>
 
                       {/* Financial breakdown */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100">
-                        <div className="bg-white p-3 text-center">
-                          <p className="text-xs text-gray-400 mb-1">Cash in Till</p>
-                          <p className={`text-sm font-bold ${totalCash > 0 ? 'text-slate-800' : 'text-amber-500'}`}>
-                            {totalCash > 0 ? ugx(totalCash) : 'Missing'}
-                          </p>
-                        </div>
-                        <div className="bg-white p-3 text-center">
-                          <p className="text-xs text-red-400 mb-1">Profit 12%</p>
-                          <p className="text-sm font-bold text-red-600">−{ugx(profitDeduction)}</p>
-                        </div>
-                        <div className="bg-white p-3 text-center">
-                          <p className="text-xs text-orange-400 mb-1">Expense Fund</p>
-                          <p className={`text-sm font-bold ${monthlyFund > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
-                            {monthlyFund > 0 ? `−${ugx(monthlyFund)}` : '—'}
-                          </p>
-                        </div>
-                        <div className="bg-white p-3 text-center">
-                          <p className="text-xs text-slate-400 mb-1">Total Deducted</p>
-                          <p className="text-sm font-bold text-slate-700">−{ugx(totalDeductions)}</p>
+                      <div className="mx-4 my-3 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
+                        <div className="grid grid-cols-4 divide-x divide-slate-100">
+                          <div className="p-3 text-center">
+                            <p className="text-[10px] font-semibold text-slate-400 mb-1 uppercase tracking-wider">Cash in Till</p>
+                            <p className={`text-sm font-bold ${totalCash > 0 ? 'text-slate-800' : 'text-amber-500'}`}>
+                              {totalCash > 0 ? ugx(totalCash) : 'Missing'}
+                            </p>
+                          </div>
+                          <div className="p-3 text-center">
+                            <p className="text-[10px] font-semibold text-rose-400 mb-1 uppercase tracking-wider">Profit 12%</p>
+                            <p className="text-sm font-bold text-rose-600">−{ugx(profitDeduction)}</p>
+                          </div>
+                          <div className="p-3 text-center">
+                            <p className="text-[10px] font-semibold text-amber-500 mb-1 uppercase tracking-wider">Exp. Fund</p>
+                            <p className={`text-sm font-bold ${monthlyFund > 0 ? 'text-amber-600' : 'text-slate-300'}`}>
+                              {monthlyFund > 0 ? `−${ugx(monthlyFund)}` : '—'}
+                            </p>
+                          </div>
+                          <div className="p-3 text-center">
+                            <p className="text-[10px] font-semibold text-slate-400 mb-1 uppercase tracking-wider">Deducted</p>
+                            <p className="text-sm font-bold text-slate-700">−{ugx(totalDeductions)}</p>
+                          </div>
                         </div>
                       </div>
 
                       {/* Footer: allocation + actions */}
-                      <div className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 ${
-                        isIncomplete ? 'bg-amber-500' : 'bg-violet-700'
-                      }`}>
-                        <div>
-                          <p className={`text-xs ${isIncomplete ? 'text-amber-100' : 'text-violet-300'}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-4">
+                        <div className={`rounded-xl px-4 py-2.5 ${isIncomplete ? 'bg-amber-50 border border-amber-100' : 'bg-violet-50 border border-violet-100'}`}>
+                          <p className={`text-xs font-medium ${isIncomplete ? 'text-amber-600' : 'text-violet-600'}`}>
                             {isIncomplete ? 'Cannot calculate — data incomplete' : 'Suggested Allocation'}
                           </p>
-                          <p className="text-lg font-bold text-white">
+                          <p className={`text-lg font-bold ${isIncomplete ? 'text-amber-700' : 'text-violet-800'}`}>
                             {isIncomplete ? '—' : ugx(allocationAmount)}
                           </p>
                         </div>
@@ -1147,7 +1128,7 @@ export default function AccountantAllocationsPage() {
                             <button
                               onClick={() => handleSubmitCashClose(cashClose)}
                               disabled={submitting}
-                              className="flex items-center gap-1.5 bg-white/90 hover:bg-white text-violet-700 font-semibold text-xs px-3.5 py-2 rounded-xl transition disabled:opacity-50"
+                              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-xl transition-all disabled:opacity-50"
                             >
                               {submitting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
                               Submit
@@ -1156,7 +1137,7 @@ export default function AccountantAllocationsPage() {
                           <button
                             onClick={() => handleSendAllocationFromOverview(cashClose)}
                             disabled={sending || !selectedPM || cashClose.status !== 'submitted'}
-                            className="flex items-center gap-1.5 bg-white text-violet-700 font-semibold text-xs px-3.5 py-2 rounded-xl hover:bg-violet-50 transition disabled:opacity-40"
+                            className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-all disabled:opacity-40 shadow-sm shadow-violet-200"
                           >
                             {sending ? <RefreshCw className="w-3 h-3 animate-spin" /> :
                               cashClose.status === 'submitted' ? <Send className="w-3 h-3" /> :
@@ -1174,22 +1155,17 @@ export default function AccountantAllocationsPage() {
         </div>
       </div>
 
-
-      {/* Summary Stats */}
-      <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-700 to-blue-700 px-6 py-5">
-          <div className="absolute inset-0 opacity-[0.06]"
-            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
-          <div className="relative flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-white tracking-tight">Processing Statistics</h2>
-              <p className="text-xs text-indigo-200 mt-0.5">
-                {selectedPM ? `Filtered for ${pmUsers.find(pm => pm.uid === selectedPM)?.name}` : 'Aggregate across all cash closes'}
-              </p>
-            </div>
+      {/* ── Summary Stats ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">Processing Statistics</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {selectedPM ? `Filtered for ${pmUsers.find(pm => pm.uid === selectedPM)?.name}` : 'Aggregate across all cash closes'}
+            </p>
           </div>
         </div>
 
@@ -1200,8 +1176,9 @@ export default function AccountantAllocationsPage() {
                 label: selectedPM ? "PM's Submitted" : 'Total Submitted',
                 value: cashCloses.length,
                 sub: 'cash closes',
-                icon: <FileText className="w-5 h-5 text-amber-500" />,
+                icon: <FileText className="w-5 h-5" />,
                 color: 'text-amber-700',
+                iconColor: 'text-amber-500',
                 bg: 'bg-amber-50',
                 border: 'border-amber-200',
               },
@@ -1209,8 +1186,9 @@ export default function AccountantAllocationsPage() {
                 label: 'Total Suggested',
                 value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.suggestedAmount, 0).toLocaleString()}`,
                 sub: 'to be allocated',
-                icon: <Send className="w-5 h-5 text-blue-500" />,
+                icon: <Send className="w-5 h-5" />,
                 color: 'text-blue-700',
+                iconColor: 'text-blue-500',
                 bg: 'bg-blue-50',
                 border: 'border-blue-200',
               },
@@ -1218,8 +1196,9 @@ export default function AccountantAllocationsPage() {
                 label: 'Profit Deductions',
                 value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.profitDeduction, 0).toLocaleString()}`,
                 sub: '12% retained',
-                icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
+                icon: <TrendingUp className="w-5 h-5" />,
                 color: 'text-emerald-700',
+                iconColor: 'text-emerald-500',
                 bg: 'bg-emerald-50',
                 border: 'border-emerald-200',
               },
@@ -1227,48 +1206,39 @@ export default function AccountantAllocationsPage() {
                 label: 'Total Deductions',
                 value: `UGX ${suggestedAllocations.reduce((s, a) => s + a.totalDeductions, 0).toLocaleString()}`,
                 sub: 'profit + expenses',
-                icon: <Calculator className="w-5 h-5 text-indigo-500" />,
+                icon: <Calculator className="w-5 h-5" />,
                 color: 'text-indigo-700',
+                iconColor: 'text-indigo-500',
                 bg: 'bg-indigo-50',
                 border: 'border-indigo-200',
               },
             ].map((stat, i) => (
               <div key={i} className={`rounded-xl ${stat.bg} border ${stat.border} p-4`}>
-                <div className="flex items-center justify-between mb-2">
-                  {stat.icon}
-                </div>
+                <div className={`${stat.iconColor} mb-2.5`}>{stat.icon}</div>
                 <p className={`text-lg font-bold ${stat.color} leading-tight`}>{stat.value}</p>
-                <p className="text-xs font-medium text-gray-600 mt-0.5">{stat.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>
+                <p className="text-xs font-semibold text-slate-600 mt-0.5">{stat.label}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{stat.sub}</p>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Recent Allocations */}
-      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
-
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5">
-          <div className="absolute inset-0 opacity-[0.08]"
-            style={{ backgroundImage: 'repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
-                <Receipt className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-white tracking-tight">Recent Allocations</h2>
-                <p className="text-xs text-blue-100 mt-0.5">Funds dispatched to purchase managers</p>
-              </div>
+      {/* ── Recent Allocations ───────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center shrink-0">
+              <Receipt className="w-4 h-4 text-white" />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
-                {allocatedCashCloses.length} records
-              </span>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Recent Allocations</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Funds dispatched to purchase managers</p>
             </div>
           </div>
+          <span className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
+            {allocatedCashCloses.length} records
+          </span>
         </div>
 
         <div className="p-6">
@@ -1289,7 +1259,6 @@ export default function AccountantAllocationsPage() {
                   {
                     label: 'Total Dispatched',
                     value: allocatedCashCloses.length,
-                    suffix: 'records',
                     icon: <CheckCircle className="w-4 h-4" />,
                     color: 'text-slate-700',
                     iconColor: 'text-slate-500',
@@ -1299,7 +1268,6 @@ export default function AccountantAllocationsPage() {
                   {
                     label: 'Total Amount',
                     value: `UGX ${allocatedCashCloses.reduce((s, cc) => s + (cc.allocationAmount || 0), 0).toLocaleString()}`,
-                    suffix: '',
                     icon: <DollarSign className="w-4 h-4" />,
                     color: 'text-emerald-700',
                     iconColor: 'text-emerald-500',
@@ -1309,7 +1277,6 @@ export default function AccountantAllocationsPage() {
                   {
                     label: 'PMs Covered',
                     value: new Set(allocatedCashCloses.map(cc => cc.allocatedTo)).size,
-                    suffix: 'managers',
                     icon: <User className="w-4 h-4" />,
                     color: 'text-indigo-700',
                     iconColor: 'text-indigo-500',
@@ -1321,7 +1288,7 @@ export default function AccountantAllocationsPage() {
                     <div className={`${kpi.iconColor} shrink-0`}>{kpi.icon}</div>
                     <div>
                       <p className={`text-lg font-bold ${kpi.color} leading-none`}>{kpi.value}</p>
-                      <p className="text-xs text-gray-500 mt-1">{kpi.label}</p>
+                      <p className="text-xs text-slate-500 mt-1">{kpi.label}</p>
                     </div>
                   </div>
                 ))}
@@ -1329,9 +1296,7 @@ export default function AccountantAllocationsPage() {
 
               {/* Timeline list */}
               <div className="relative max-h-[36rem] overflow-y-auto pr-1">
-                {/* Vertical rail */}
                 <div className="absolute left-[18px] top-3 bottom-3 w-px bg-slate-100" />
-
                 <div className="space-y-3">
                   {[...allocatedCashCloses]
                     .sort((a, b) => {
@@ -1352,17 +1317,15 @@ export default function AccountantAllocationsPage() {
 
                       return (
                         <div key={cashClose.id} className="relative pl-10">
-                          {/* Timeline dot */}
                           <div className="absolute left-0 top-4 w-9 h-9 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm z-10">
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                           </div>
 
-                          <div className="rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 overflow-hidden">
-                            {/* Card header */}
-                            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-50">
+                          <div className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-50">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-semibold text-slate-800 text-sm">{dateStr}</span>
-                                <span className="capitalize text-xs font-medium bg-slate-100 text-slate-600 rounded-md px-2 py-0.5">
+                                <span className="capitalize text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2.5 py-0.5">
                                   {cashClose.shifts?.[0]?.shift || cashClose.shiftType || 'Unknown'} shift
                                 </span>
                                 {cashClose.branchId && cashClose.branchId !== 'test_branch' && (
@@ -1375,20 +1338,20 @@ export default function AccountantAllocationsPage() {
                                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
                                   <CheckCircle className="w-3 h-3" /> Allocated
                                 </span>
-                                <span className="text-xs text-slate-300 font-mono">#{cashClose.id.slice(-6)}</span>
+                                <span className="text-xs text-slate-300 font-mono text-[11px]">#{cashClose.id.slice(-6)}</span>
                               </div>
                             </div>
 
                             {/* People row */}
-                            <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+                            <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100">
                               <div className="bg-white px-4 py-2.5">
-                                <p className="text-xs text-gray-400 mb-0.5">Sent to</p>
+                                <p className="text-xs text-slate-400 mb-0.5">Sent to</p>
                                 <p className="text-sm font-semibold text-slate-800 truncate">
                                   {cashClose.allocatedToName || resolveName(cashClose.allocatedTo)}
                                 </p>
                               </div>
                               <div className="bg-white px-4 py-2.5">
-                                <p className="text-xs text-gray-400 mb-0.5">Sent by</p>
+                                <p className="text-xs text-slate-400 mb-0.5">Sent by</p>
                                 <p className="text-sm font-medium text-slate-600 truncate">
                                   {cashClose.allocatedByName || resolveName(cashClose.allocatedBy)}
                                 </p>
@@ -1396,30 +1359,31 @@ export default function AccountantAllocationsPage() {
                             </div>
 
                             {/* Financial strip */}
-                            <div className="grid grid-cols-4 gap-px bg-gray-100">
-                              <div className="bg-white px-3 py-2.5 text-center">
-                                <p className="text-xs text-gray-400 mb-0.5">Cash in Till</p>
-                                <p className="text-xs font-bold text-gray-800">{ugx(cashClose.totalCashInTill || 0)}</p>
-                              </div>
-                              <div className="bg-white px-3 py-2.5 text-center">
-                                <p className="text-xs text-red-400 mb-0.5">Profit 12%</p>
-                                <p className="text-xs font-bold text-red-600">−{ugx(cashClose.profitDeduction || 0)}</p>
-                              </div>
-                              <div className="bg-white px-3 py-2.5 text-center">
-                                <p className="text-xs text-orange-400 mb-0.5">Exp. Fund</p>
-                                <p className="text-xs font-bold text-orange-600">
-                                  {(cashClose.monthlyExpenseFund || 0) > 0 ? `−${ugx(cashClose.monthlyExpenseFund)}` : '—'}
-                                </p>
-                              </div>
-                              <div className="bg-emerald-600 px-3 py-2.5 text-center">
-                                <p className="text-xs text-emerald-200 mb-0.5">Sent</p>
-                                <p className="text-xs font-bold text-white">{ugx(cashClose.allocationAmount || 0)}</p>
+                            <div className="mx-3 my-2.5 rounded-lg border border-slate-100 bg-slate-50 overflow-hidden">
+                              <div className="grid grid-cols-4 divide-x divide-slate-100">
+                                <div className="px-3 py-2 text-center">
+                                  <p className="text-[10px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">Cash in Till</p>
+                                  <p className="text-xs font-bold text-slate-800">{ugx(cashClose.totalCashInTill || 0)}</p>
+                                </div>
+                                <div className="px-3 py-2 text-center">
+                                  <p className="text-[10px] font-semibold text-rose-400 mb-0.5 uppercase tracking-wider">Profit 12%</p>
+                                  <p className="text-xs font-bold text-rose-600">−{ugx(cashClose.profitDeduction || 0)}</p>
+                                </div>
+                                <div className="px-3 py-2 text-center">
+                                  <p className="text-[10px] font-semibold text-amber-500 mb-0.5 uppercase tracking-wider">Exp. Fund</p>
+                                  <p className="text-xs font-bold text-amber-600">
+                                    {(cashClose.monthlyExpenseFund || 0) > 0 ? `−${ugx(cashClose.monthlyExpenseFund)}` : '—'}
+                                  </p>
+                                </div>
+                                <div className="px-3 py-2 text-center bg-emerald-50">
+                                  <p className="text-[10px] font-semibold text-emerald-500 mb-0.5 uppercase tracking-wider">Sent</p>
+                                  <p className="text-xs font-bold text-emerald-700">{ugx(cashClose.allocationAmount || 0)}</p>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Footer timestamp */}
                             {allocatedAt && (
-                              <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border-t border-gray-100">
+                              <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50/60 border-t border-slate-100">
                                 <Clock className="w-3 h-3 text-slate-400 shrink-0" />
                                 <span className="text-xs text-slate-400">Dispatched</span>
                                 <span className={`text-xs font-medium ${allocatedAt.urgencyColor}`}>{allocatedAt.fullDisplay}</span>

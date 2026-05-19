@@ -19,6 +19,7 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { EnhancedReturnNoteService, ReturnNote, RETURN_STATUSES } from '../../../../lib/firebase/enhanced-return-note';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 
 const returnNoteService = new EnhancedReturnNoteService();
 
@@ -136,6 +137,22 @@ export default function PurchasingReturnNotesPage() {
     (item?.supplierName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item?.returnNoteNumber || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const {
+    paginatedItems: pagedReturnNotes,
+    currentPage: rnPage, setCurrentPage: setRnPage,
+    rowsPerPage: rnRowsPerPage, setRowsPerPage: setRnRowsPerPage,
+    totalPages: rnTotalPages, startIndex: rnStart, endIndex: rnEnd,
+    totalItems: rnTotal,
+  } = usePagination(filteredReturnNotes, 10);
+
+  const {
+    paginatedItems: pagedRestockingItems,
+    currentPage: riPage, setCurrentPage: setRiPage,
+    rowsPerPage: riRowsPerPage, setRowsPerPage: setRiRowsPerPage,
+    totalPages: riTotalPages, startIndex: riStart, endIndex: riEnd,
+    totalItems: riTotal,
+  } = usePagination(filteredRestockingItems, 10);
 
   const getStatusColor = (status: string) => {
     const statusConfig = RETURN_STATUSES.find(s => s.value === status);
@@ -371,7 +388,7 @@ export default function PurchasingReturnNotesPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredReturnNotes.map((note) => (
+                      {pagedReturnNotes.map((note) => (
                         <tr key={note.id} className="hover:bg-gray-50">
                           <td className="px-4 sm:px-6 py-3 sm:py-4">
                             <div className="flex items-center min-w-0">
@@ -408,6 +425,16 @@ export default function PurchasingReturnNotesPage() {
                   </table>
                 </div>
               </div>
+              <PaginationBar
+                currentPage={rnPage}
+                totalPages={rnTotalPages}
+                rowsPerPage={rnRowsPerPage}
+                startIndex={rnStart}
+                endIndex={rnEnd}
+                totalItems={rnTotal}
+                onPageChange={setRnPage}
+                onRowsPerPageChange={setRnRowsPerPage}
+              />
             </div>
           )}
 
@@ -431,7 +458,7 @@ export default function PurchasingReturnNotesPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredRestockingItems.map((item, index) => (
+                      {pagedRestockingItems.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-4 sm:px-6 py-3 sm:py-4">
                             <div className="flex items-center min-w-0">
@@ -462,6 +489,16 @@ export default function PurchasingReturnNotesPage() {
                   </table>
                 </div>
               </div>
+              <PaginationBar
+                currentPage={riPage}
+                totalPages={riTotalPages}
+                rowsPerPage={riRowsPerPage}
+                startIndex={riStart}
+                endIndex={riEnd}
+                totalItems={riTotal}
+                onPageChange={setRiPage}
+                onRowsPerPageChange={setRiRowsPerPage}
+              />
             </div>
           )}
 

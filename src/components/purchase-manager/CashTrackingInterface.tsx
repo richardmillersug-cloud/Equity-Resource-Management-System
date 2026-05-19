@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '../ui/Pagination';
 import {
   AlertTriangle,
   Calendar,
@@ -86,6 +87,14 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
 
   // ✅ NEW: User account lookup cache
   const [userAccountCache, setUserAccountCache] = useState<{[uid: string]: {email: string, displayName?: string}}>({});
+
+  const {
+    paginatedItems: pagedCashCloses,
+    currentPage: ccPage, setCurrentPage: setCcPage,
+    rowsPerPage: ccRowsPerPage, setRowsPerPage: setCcRowsPerPage,
+    totalPages: ccTotalPages, startIndex: ccStart, endIndex: ccEnd,
+    totalItems: ccTotal,
+  } = usePagination(filteredData, 10);
 
   // ✅ NEW: Function to lookup user account information
   const lookupUserAccounts = async (cashCloses: any[]): Promise<{[uid: string]: {email: string, displayName?: string}}> => {
@@ -1235,7 +1244,7 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredData.map((close) => (
+                {pagedCashCloses.map((close) => (
                   <tr key={close.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -1459,6 +1468,16 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
                 ))}
               </tbody>
             </table>
+            <PaginationBar
+              currentPage={ccPage}
+              totalPages={ccTotalPages}
+              rowsPerPage={ccRowsPerPage}
+              startIndex={ccStart}
+              endIndex={ccEnd}
+              totalItems={ccTotal}
+              onPageChange={setCcPage}
+              onRowsPerPageChange={setCcRowsPerPage}
+            />
             
             {/* Enhanced Summary Footer */}
             {filteredData.length > 0 && (

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { 
   Calendar, 
   DollarSign, 
@@ -79,6 +80,23 @@ export default function DeductionsPage() {
     if (!showOnlyDailyExpense) return deductions;
     return deductions.filter(d => d.dailyExpenseFund.applied);
   };
+
+  const filteredDeductions = useMemo(
+    () => getFilteredDeductions(),
+    [deductions, showOnlyDailyExpense]
+  );
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedDeductions,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(filteredDeductions, 10);
 
   const calculateTotals = () => {
     const filteredDeductions = getFilteredDeductions();
@@ -389,7 +407,7 @@ export default function DeductionsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredDeductions().map((deduction, index) => (
+                    {paginatedDeductions.map((deduction, index) => (
                       <tr key={deduction.date} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -475,6 +493,16 @@ export default function DeductionsPage() {
                 </table>
               </div>
             )}
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              rowsPerPage={rowsPerPage}
+              startIndex={pageStartIndex}
+              endIndex={pageEndIndex}
+              totalItems={filteredDeductions.length}
+              onPageChange={setCurrentPage}
+              onRowsPerPageChange={setRowsPerPage}
+            />
           </div>
         )}
       </div>

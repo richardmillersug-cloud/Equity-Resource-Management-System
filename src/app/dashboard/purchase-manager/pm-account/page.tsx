@@ -31,6 +31,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase/config';
 import { authService } from '../../../../lib/firebase/auth';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -370,6 +371,20 @@ export default function PMAccountPage() {
     !dateRangeStart || p.date >= dateRangeStart
   );
 
+  // ── Pagination ─────────────────────────────────────────────────────────────
+
+  const {
+    paginatedItems: paginatedLedger,
+    currentPage: ledgerPage,
+    setCurrentPage: setLedgerPage,
+    rowsPerPage: ledgerRowsPerPage,
+    setRowsPerPage: setLedgerRowsPerPage,
+    totalPages: ledgerTotalPages,
+    startIndex: ledgerStart,
+    endIndex: ledgerEnd,
+    totalItems: ledgerTotal,
+  } = usePagination(filtered, 15);
+
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (authLoading || loading) {
@@ -545,7 +560,7 @@ export default function PMAccountPage() {
 
           {/* Ledger table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="w-full text-left">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -572,7 +587,7 @@ export default function PMAccountPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map(entry => (
+                  paginatedLedger.map(entry => (
                     <tr key={`${entry.referenceType}-${entry.id}`} className="hover:bg-gray-50">
                       <td className="px-5 py-3">
                         <div className="text-sm text-gray-900">{fmt(entry.date)}</div>
@@ -628,7 +643,7 @@ export default function PMAccountPage() {
                 <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                   <tr>
                     <td colSpan={3} className="px-5 py-3 text-sm font-semibold text-gray-700">
-                      {filtered.length} transaction{filtered.length !== 1 ? 's' : ''}
+                      {filtered.length} transaction{filtered.length !== 1 ? 's' : ''} total
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="text-xs text-emerald-600 font-medium">
@@ -649,6 +664,17 @@ export default function PMAccountPage() {
               )}
             </table>
           </div>
+          <PaginationBar
+            currentPage={ledgerPage}
+            totalPages={ledgerTotalPages}
+            rowsPerPage={ledgerRowsPerPage}
+            startIndex={ledgerStart}
+            endIndex={ledgerEnd}
+            totalItems={ledgerTotal}
+            onPageChange={setLedgerPage}
+            onRowsPerPageChange={setLedgerRowsPerPage}
+            rowsOptions={[10, 15, 25, 50, 100]}
+          />
         </div>
       </div>
 

@@ -26,6 +26,7 @@ import {
 import { Invoice, subscribeToInvoices, approveInvoice, rejectInvoice, PaymentMethod, InvoicePayment, subscribeToInvoicePayments, makeInvoicePayment, getInvoicePaymentHistory } from '../../../../lib/firebase/purchasing-manager-service';
 import { authService } from '../../../../lib/firebase/auth';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -86,6 +87,14 @@ export default function InvoicesPage() {
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState('');
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+
+  const {
+    paginatedItems: pagedInvoices,
+    currentPage: invPage, setCurrentPage: setInvPage,
+    rowsPerPage: invRowsPerPage, setRowsPerPage: setInvRowsPerPage,
+    totalPages: invTotalPages, startIndex: invStart, endIndex: invEnd,
+    totalItems: invTotal,
+  } = usePagination(filteredInvoices || [], 10);
 
   useEffect(() => {
     // Build filters object
@@ -1017,6 +1026,7 @@ export default function InvoicesPage() {
               <p className="text-gray-500 max-w-md mx-auto">No invoices match your current search criteria. Try adjusting your filters or search terms.</p>
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gradient-to-r from-gray-50 to-purple-50">
@@ -1045,7 +1055,7 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {(filteredInvoices || []).map((invoice, index) => (
+                  {pagedInvoices.map((invoice, index) => (
                     <tr key={invoice.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -1222,6 +1232,17 @@ export default function InvoicesPage() {
                 </tbody>
               </table>
             </div>
+            <PaginationBar
+              currentPage={invPage}
+              totalPages={invTotalPages}
+              rowsPerPage={invRowsPerPage}
+              startIndex={invStart}
+              endIndex={invEnd}
+              totalItems={invTotal}
+              onPageChange={setInvPage}
+              onRowsPerPageChange={setInvRowsPerPage}
+            />
+            </>
           )}
         </div>
 

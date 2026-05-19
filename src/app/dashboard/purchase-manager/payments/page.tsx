@@ -185,19 +185,17 @@ export default function PaymentsPage() {
   };
 
   const handleBounceCheque = async (paymentId: string) => {
-    // Show confirmation dialog
     const confirmed = confirm(
       'Are you sure you want to mark this cheque as bounced?\n\n' +
       'This action will:\n' +
-      '• Mark the payment as failed\n' +
+      '• Mark the payment as failed / red-listed\n' +
       '• Revert invoice amounts if the cheque was previously cleared\n' +
-      '• Update the invoice status accordingly\n\n' +
+      '• Update the invoice balance accordingly\n\n' +
       'This action cannot be undone.'
     );
     
     if (!confirmed) return;
     
-    // Get bounce reason
     const reason = prompt('Enter the reason for bouncing this cheque:') || 'Cheque bounced - no reason provided';
     
     try {
@@ -206,14 +204,45 @@ export default function PaymentsPage() {
       const bouncedBy = currentUser?.uid || 'unknown';
       
       await PurchasingManagerService.bounceChequePayment(paymentId, bouncedBy, reason);
-      await loadChequeData(); // Refresh cheque data
+      await loadChequeData();
       setShowChequeActions(null);
       
-      // Show success message
-      alert('Cheque has been marked as bounced successfully!\nInvoice amounts have been updated accordingly.');
+      alert('Cheque has been marked as bounced. Payment is red-listed and invoice balance updated.');
     } catch (error) {
       console.error('Error bouncing cheque:', error);
       alert(`Failed to bounce cheque: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelCheque = async (paymentId: string) => {
+    const confirmed = confirm(
+      'Are you sure you want to cancel this cheque payment?\n\n' +
+      'This action will:\n' +
+      '• Mark the payment as cancelled / red-listed\n' +
+      '• Void the payment — no funds were received\n' +
+      '• Keep the invoice balance unchanged (cheque was never cleared)\n\n' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    const reason = prompt('Enter the reason for cancelling this cheque:') || 'Cheque cancelled';
+
+    try {
+      setLoading(true);
+      const currentUser = authService.getCurrentUser();
+      const cancelledBy = currentUser?.uid || 'unknown';
+
+      await PurchasingManagerService.cancelChequePayment(paymentId, cancelledBy, reason);
+      await loadChequeData();
+      setShowChequeActions(null);
+
+      alert('Cheque has been cancelled. The payment transaction is red-listed and the invoice balance is unchanged.');
+    } catch (error) {
+      console.error('Error cancelling cheque:', error);
+      alert(`Failed to cancel cheque: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -470,8 +499,9 @@ export default function PaymentsPage() {
                 >
                   <option value="all">All Status</option>
                   <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed/Bounced</option>
+                  <option value="pending">Pending Clearance</option>
+                  <option value="failed">Bounced</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
                 {filterStatus !== 'all' && (
                   <span className="text-xs text-purple-600 font-medium ml-2">
@@ -635,15 +665,22 @@ export default function PaymentsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="hover:bg-gray-50">
+                  {filteredPayments.map((payment) => {
+                    const isVoided = (payment as any).isVoided || payment.paymentStatus === 'cancelled' || (payment.paymentStatus === 'failed' && payment.paymentMethod.type === 'cheque');
+                    return (
+                    <tr key={payment.id} className={`hover:bg-gray-50 ${isVoided ? 'bg-red-50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                      <div className="text-sm font-bold text-blue-900 font-mono bg-blue-50 px-2 py-1 rounded">
-                        {payment.paymentReference}
+                          <div className={`text-sm font-bold font-mono px-2 py-1 rounded flex items-center gap-2 ${isVoided ? 'text-red-700 bg-red-100 line-through' : 'text-blue-900 bg-blue-50'}`}>
+                            {payment.paymentReference}
+                            {isVoided && (
+                              <span className="text-xs font-normal no-underline line-through-none bg-red-200 text-red-800 px-1.5 py-0.5 rounded-full" style={{textDecoration: 'none'}}>
+                                VOID
+                              </span>
+                            )}
                           </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        Paid by: {payment.paidByName} ({payment.paidBy})
+                          <div className="text-sm text-gray-500 mt-1">
+                            Paid by: {payment.paidByName} ({payment.paidBy})
                           </div>
                         </div>
                       </td>
@@ -678,12 +715,17 @@ export default function PaymentsPage() {
                           )}
                           {payment.paymentStatus === 'completed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-//   Cleared
+                              Cleared
                             </span>
                           )}
                           {payment.paymentStatus === 'failed' && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-//   Bounced
+                              Bounced — Not Received
+                            </span>
+                          )}
+                          {payment.paymentStatus === 'cancelled' && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              Cancelled — Not Received
                             </span>
                           )}
                         </div>
@@ -715,31 +757,41 @@ export default function PaymentsPage() {
                       
                       {/* Cheque Actions */}
                       {payment.paymentMethod.type === 'cheque' && payment.paymentStatus === 'pending' && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <button
                             onClick={() => handleClearCheque(payment.id)}
-                            className="text-green-600 hover:text-green-900 flex items-center gap-1 px-2 py-1 rounded text-xs"
+                            className="text-green-600 hover:text-green-900 flex items-center gap-1 px-2 py-1 rounded text-xs border border-green-200 hover:bg-green-50"
                             disabled={loading}
+                            title="Confirm cheque cleared — updates invoice balance"
                           >
                             <CheckCircle className="w-3 h-3" />
-//   Clear
+                            Clear
                           </button>
-                          <button 
-                            onClick={() => {
-                              handleBounceCheque(payment.id);
-                            }}
-                            className="text-red-600 hover:text-red-900 flex items-center gap-1 px-2 py-1 rounded text-xs"
+                          <button
+                            onClick={() => handleBounceCheque(payment.id)}
+                            className="text-orange-600 hover:text-orange-900 flex items-center gap-1 px-2 py-1 rounded text-xs border border-orange-200 hover:bg-orange-50"
                             disabled={loading}
+                            title="Mark cheque as bounced — payment not received, invoice balance unchanged"
                           >
                             <X className="w-3 h-3" />
-//   Bounce
+                            Bounce
+                          </button>
+                          <button
+                            onClick={() => handleCancelCheque(payment.id)}
+                            className="text-red-600 hover:text-red-900 flex items-center gap-1 px-2 py-1 rounded text-xs border border-red-200 hover:bg-red-50"
+                            disabled={loading}
+                            title="Cancel cheque — payment voided, transaction red-listed"
+                          >
+                            <X className="w-3 h-3" />
+                            Cancel
                           </button>
                         </div>
                       )}
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
         </div>
@@ -813,20 +865,30 @@ export default function PaymentsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Payment Status</label>
-                    <div className="mt-1">
+                    <div className="mt-1 flex items-center gap-2">
                       {selectedPayment.paymentStatus === 'pending' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-//   Pending
+                          Pending Clearance
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'completed' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-//   Completed
+                          Cleared / Completed
                         </span>
                       )}
                       {selectedPayment.paymentStatus === 'failed' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Failed/Bounced
+                          Bounced — Not Received
+                        </span>
+                      )}
+                      {selectedPayment.paymentStatus === 'cancelled' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Cancelled — Not Received
+                        </span>
+                      )}
+                      {(selectedPayment as any).isVoided && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-200 text-red-900">
+                          RED-LISTED / VOID
                         </span>
                       )}
                     </div>
@@ -907,10 +969,10 @@ export default function PaymentsPage() {
               {/* Bounce Information */}
               {selectedPayment.paymentStatus === 'failed' && (selectedPayment as any).bounceReason && (
                 <div>
-                  <h3 className="text-lg font-medium text-red-900 mb-4">Bounce Information</h3>
+                  <h3 className="text-lg font-medium text-red-900 mb-4">Bounce Information — Payment Not Received</h3>
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                      <div>
                         <label className="block text-sm font-medium text-red-700">Bounce Reason</label>
                         <p className="mt-1 text-sm text-red-900">{(selectedPayment as any).bounceReason}</p>
                       </div>
@@ -923,6 +985,37 @@ export default function PaymentsPage() {
                         </div>
                       )}
                     </div>
+                    <p className="mt-3 text-xs text-red-700 font-medium">
+                      This transaction is red-listed. The invoice balance has been updated to reflect no payment received.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Cancellation Information */}
+              {selectedPayment.paymentStatus === 'cancelled' && (
+                <div>
+                  <h3 className="text-lg font-medium text-red-900 mb-4">Cancellation Information — Payment Not Received</h3>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(selectedPayment as any).cancellationReason && (
+                        <div>
+                          <label className="block text-sm font-medium text-red-700">Cancellation Reason</label>
+                          <p className="mt-1 text-sm text-red-900">{(selectedPayment as any).cancellationReason}</p>
+                        </div>
+                      )}
+                      {(selectedPayment as any).cancelledAt && (
+                        <div>
+                          <label className="block text-sm font-medium text-red-700">Cancelled Date</label>
+                          <p className="mt-1 text-sm text-red-900">
+                            {new Date((selectedPayment as any).cancelledAt).toLocaleDateString()} at {new Date((selectedPayment as any).cancelledAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-3 text-xs text-red-700 font-medium">
+                      This transaction is red-listed and voided. The invoice balance remains unchanged as the cheque was never cleared.
+                    </p>
                   </div>
                 </div>
               )}

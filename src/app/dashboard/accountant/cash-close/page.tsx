@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { authService } from '@/lib/firebase/auth';
 import { CashCloseService } from '@/lib/firebase/firestore-service';
@@ -90,13 +91,24 @@ export default function CashClosePage() {
   const [toDate, setToDate] = useState<string>('');
   const [shiftFilter, setShiftFilter] = useState<string>('all');
   const [entryTimingFilter, setEntryTimingFilter] = useState<string>('all'); // New filter for entry timing
-  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [summaryMode, setSummaryMode] = useState<'displayed' | 'filtered'>('displayed');
   const [groupByDate, setGroupByDate] = useState<boolean>(false); // New state for date grouping
   
   // Sorting states — default to business date descending
   const [sortColumn, setSortColumn] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedRecords,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(filteredRecords, 10);
 
   // Summary statistics
   const [stats, setStats] = useState({
@@ -113,7 +125,7 @@ export default function CashClosePage() {
     if (summaryMode === 'filtered') {
       return filteredRecords;
     }
-    return rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage);
+    return paginatedRecords;
   };
 
   // Filter logic
@@ -763,8 +775,7 @@ export default function CashClosePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto space-y-5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-8 space-y-8">
 
       {/* Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 shadow-xl">
@@ -1149,7 +1160,7 @@ export default function CashClosePage() {
               </div>
             </div>
             <span className="text-xs font-semibold bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5">
-              {rowsPerPage === -1 ? filteredRecords.length : Math.min(rowsPerPage, filteredRecords.length)} of {filteredRecords.length} shown
+              {filteredRecords.length} records
             </span>
           </div>
         </div>
@@ -1223,16 +1234,6 @@ export default function CashClosePage() {
               </label>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Show</label>
-              <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))}
-                className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
-              >
-                {[5, 10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                <option value={-1}>All</option>
-              </select>
-            </div>
-
             <div className="flex gap-2 ml-auto">
               <button onClick={exportToCSV}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
@@ -1261,7 +1262,7 @@ export default function CashClosePage() {
           <div className="space-y-6">
             {(() => {
               // Group records by business date
-              const groupedRecords = (rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage))
+              const groupedRecords = paginatedRecords
                 .reduce((groups: { [date: string]: CashCloseRecord[] }, record) => {
                   const date = record.date;
                   if (!groups[date]) {
@@ -1392,7 +1393,7 @@ export default function CashClosePage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {(rowsPerPage === -1 ? filteredRecords : filteredRecords.slice(0, rowsPerPage)).map((record) => (
+                {paginatedRecords.map((record) => (
                   <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${record.isLateEntry ? 'border-l-4 border-amber-400' : ''}`}>
                     {/* Business Date — the actual date the cash close is for */}
                     <td className="px-5 py-4 whitespace-nowrap">
@@ -1488,20 +1489,16 @@ export default function CashClosePage() {
         )}
         
         {/* Pagination footer */}
-        {filteredRecords.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-slate-50">
-            <span className="text-xs text-slate-500">
-              {rowsPerPage === -1
-                ? `All ${filteredRecords.length} records shown`
-                : `${Math.min(rowsPerPage, filteredRecords.length)} of ${filteredRecords.length} records`}
-            </span>
-            {filteredRecords.length > rowsPerPage && rowsPerPage !== -1 && (
-              <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1">
-                {filteredRecords.length - rowsPerPage} more — increase "Show" to view all
-              </span>
-            )}
-          </div>
-        )}
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          rowsPerPage={rowsPerPage}
+          startIndex={pageStartIndex}
+          endIndex={pageEndIndex}
+          totalItems={filteredRecords.length}
+          onPageChange={setCurrentPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
       </div>
 
       {/* Cash Close Form */}
@@ -1511,7 +1508,6 @@ export default function CashClosePage() {
         onSubmit={handleCashCloseSubmit}
       />
 
-      </div>
     </div>
   );
 }

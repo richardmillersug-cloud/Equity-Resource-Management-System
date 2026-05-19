@@ -237,15 +237,23 @@ export default function ExpenseTypesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Settings className="w-6 h-6 text-blue-400" />
+            </div>
+          </div>
+          <p className="text-lg font-semibold text-gray-700">Loading Expense Types</p>
+          <p className="text-sm text-gray-400">Fetching expense category data…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30 p-4 sm:p-8 space-y-8">
         
         {/* Modern Hero Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">
@@ -985,7 +993,6 @@ export default function ExpenseTypesPage() {
              </div>
            </div>
          )}
-       </div>
      </div>
    );
  }

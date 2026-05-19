@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 import { QRCodeService } from '../../../../lib/utils/qr-code';
 import { Timestamp } from 'firebase/firestore';
 import {
@@ -53,6 +54,18 @@ export default function InvoicesPage() {
   const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] = useState<Invoice | null>(null);
   const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<Invoice | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  const {
+    paginatedItems: paginatedInvoices,
+    currentPage: invoicePage,
+    setCurrentPage: setInvoicePage,
+    rowsPerPage: invoiceRowsPerPage,
+    setRowsPerPage: setInvoiceRowsPerPage,
+    totalPages: invoiceTotalPages,
+    startIndex: invoiceStart,
+    endIndex: invoiceEnd,
+    totalItems: invoiceTotal,
+  } = usePagination(filteredInvoices, 15);
 
   useEffect(() => {
     loadInvoices();
@@ -718,7 +731,7 @@ export default function InvoicesPage() {
             <>
               {/* Mobile Card View - visible on small screens */}
               <div className="block md:hidden space-y-4">
-                {filteredInvoices.map((invoice) => (
+                {paginatedInvoices.map((invoice) => (
                   <div 
                     key={invoice.id} 
                     className="bg-white rounded-xl shadow-md border border-gray-200 p-4 hover:shadow-lg transition-all duration-300"
@@ -831,7 +844,7 @@ export default function InvoicesPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
-                    {filteredInvoices.map((invoice, index) => (
+                    {paginatedInvoices.map((invoice, index) => (
                       <tr key={invoice.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
                         <td className="px-4 lg:px-6 py-4">
                           <div>
@@ -917,6 +930,19 @@ export default function InvoicesPage() {
                 </table>
               </div>
             </>
+          )}
+          {filteredInvoices.length > 0 && (
+            <PaginationBar
+              currentPage={invoicePage}
+              totalPages={invoiceTotalPages}
+              rowsPerPage={invoiceRowsPerPage}
+              startIndex={invoiceStart}
+              endIndex={invoiceEnd}
+              totalItems={invoiceTotal}
+              onPageChange={setInvoicePage}
+              onRowsPerPageChange={setInvoiceRowsPerPage}
+              rowsOptions={[10, 15, 25, 50, 100]}
+            />
           )}
         </div>
 

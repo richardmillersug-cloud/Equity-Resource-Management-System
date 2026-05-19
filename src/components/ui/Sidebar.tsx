@@ -208,6 +208,13 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/accountant/reports',
     roles: ['Accountant', 'Manager', 'Admin']
   },
+  {
+    id: 'your-account',
+    icon: <Banknote className="w-5 h-5" />,
+    label: 'Your Account',
+    path: '/dashboard/accountant/account',
+    roles: ['Accountant', 'Manager', 'Admin']
+  },
   
   // Purchase Manager specific
   { 
@@ -259,6 +266,13 @@ const navigationItems: NavigationItem[] = [
     icon: <Calculator className="w-5 h-5" />, 
     label: 'Supplier Totals', 
     path: '/dashboard/purchase-manager/supplier-totals',
+    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+  },
+  {
+    id: 'supplier-statements',
+    icon: <FileText className="w-5 h-5" />,
+    label: 'Supplier Statements',
+    path: '/dashboard/purchase-manager/supplier-statements',
     roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
   },
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 import { 
   Calculator, 
   DollarSign, 
@@ -281,6 +282,14 @@ export default function SupplierTotalsPage() {
     return sorted;
   }, [supplierTotals, searchTerm, statusFilter, sortBy, sortOrder]);
 
+  const {
+    paginatedItems: pagedSupplierTotals,
+    currentPage: stPage, setCurrentPage: setStPage,
+    rowsPerPage: stRowsPerPage, setRowsPerPage: setStRowsPerPage,
+    totalPages: stTotalPages, startIndex: stStart, endIndex: stEnd,
+    totalItems: stTotal,
+  } = usePagination(filteredAndSortedSuppliers, 10);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
@@ -490,7 +499,7 @@ export default function SupplierTotalsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredAndSortedSuppliers.map((supplier) => (
+                    {pagedSupplierTotals.map((supplier) => (
                       <Fragment key={supplier.supplierId}>
                         <tr className="hover:bg-gray-50 transition-colors">
                           <td className="py-3 px-4 sm:py-4 sm:px-6">
@@ -603,6 +612,16 @@ export default function SupplierTotalsPage() {
                   </tbody>
                 </table>
               </div>
+              <PaginationBar
+                currentPage={stPage}
+                totalPages={stTotalPages}
+                rowsPerPage={stRowsPerPage}
+                startIndex={stStart}
+                endIndex={stEnd}
+                totalItems={stTotal}
+                onPageChange={setStPage}
+                onRowsPerPageChange={setStRowsPerPage}
+              />
             </div>
           )}
         </div>

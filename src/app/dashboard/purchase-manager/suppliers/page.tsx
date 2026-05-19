@@ -28,6 +28,7 @@ import {
   FileText
 } from 'lucide-react';
 import { getCompanyDisplayName, getCompanySubtitle } from '../../../../config/company';
+import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
 
 interface SupplierStats {
   total: number;
@@ -60,6 +61,14 @@ export default function SuppliersPage() {
   const [submitPending, setSubmitPending] = useState(false);
   const [stats, setStats] = useState<SupplierStats>({ total: 0, active: 0, pending: 0, inactive: 0, thisMonth: 0 });
   const router = useRouter();
+
+  const {
+    paginatedItems: pagedSuppliers,
+    currentPage: supPage, setCurrentPage: setSupPage,
+    rowsPerPage: supRowsPerPage, setRowsPerPage: setSupRowsPerPage,
+    totalPages: supTotalPages, startIndex: supStart, endIndex: supEnd,
+    totalItems: supTotal,
+  } = usePagination(filteredSuppliers, 10);
 
   // Load suppliers from Firebase
   useEffect(() => {
@@ -901,6 +910,7 @@ export default function SuppliersPage() {
               </div>
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
@@ -944,7 +954,7 @@ export default function SuppliersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {filteredSuppliers.map((supplier, index) => (
+                {pagedSuppliers.map((supplier, index) => (
                                       <tr key={supplier.id} className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 transition-all duration-300 group border-l-4 border-transparent hover:border-purple-400">
                     <td className="px-6 py-4">
                       <div>
@@ -1042,6 +1052,17 @@ export default function SuppliersPage() {
                 </tbody>
               </table>
                 </div>
+              <PaginationBar
+                currentPage={supPage}
+                totalPages={supTotalPages}
+                rowsPerPage={supRowsPerPage}
+                startIndex={supStart}
+                endIndex={supEnd}
+                totalItems={supTotal}
+                onPageChange={setSupPage}
+                onRowsPerPageChange={setSupRowsPerPage}
+              />
+            </>
           )}
 
           {!loading && filteredSuppliers.length === 0 && (

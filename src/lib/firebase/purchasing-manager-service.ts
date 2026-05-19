@@ -190,6 +190,14 @@ export interface InvoicePayment {
   bouncedAt?: Date | null;
   bouncedBy?: string | null;
   bounceReason?: string | null;
+
+  // Cancel fields
+  cancelledAt?: Date | null;
+  cancelledBy?: string | null;
+  cancellationReason?: string | null;
+
+  // Voided flag — true when cheque bounced or cancelled while still pending (payment never received)
+  isVoided?: boolean;
 }
 
 export interface Expense {
@@ -1445,12 +1453,13 @@ export class PurchasingManagerService {
     // Check if this cheque was previously cleared (and thus counted in invoice amounts)
     const wasPreviouslyCleared = payment.paymentStatus === 'completed';
     
-    // Update payment status to failed
-    const paymentUpdate = {
+    // Update payment status to failed; mark as voided if it was never cleared
+    const paymentUpdate: Record<string, unknown> = {
       paymentStatus: 'failed' as const,
       bouncedAt: new Date(),
       bouncedBy,
-      bounceReason: reason || 'Cheque bounced'
+      bounceReason: reason || 'Cheque bounced',
+      isVoided: !wasPreviouslyCleared // voided = cheque bounced before clearing (payment never received)
     };
     batch.update(paymentRef, paymentUpdate);
     
@@ -1473,13 +1482,15 @@ export class PurchasingManagerService {
         invoiceUpdate.paidAt = null as any;
       }
     } else {
-      // For pending cheques, just ensure status is correct
+      // For pending cheques: invoice amounts were never touched, just fix remaining and decrement paymentCount
       const currentPaidAmount = invoice.paidAmount || 0;
       const remainingAmount = invoice.amount - currentPaidAmount;
+      const currentPaymentCount = invoice.paymentCount || 0;
       
       invoiceUpdate = {
         status: currentPaidAmount === 0 ? 'approved' : (currentPaidAmount < invoice.amount ? 'partial' : 'paid'),
-        remainingAmount: remainingAmount
+        remainingAmount: remainingAmount,
+        paymentCount: Math.max(0, currentPaymentCount - 1)
       };
     }
     
@@ -1504,6 +1515,83 @@ export class PurchasingManagerService {
       }
     }
     
+    await batch.commit();
+  }
+
+  /**
+   * Cancel a pending cheque payment — the payment was never received.
+   * Marks the transaction as cancelled (red-listed), decrements invoice paymentCount,
+   * and ensures invoice remaining balance is accurate.
+   */
+  static async cancelChequePayment(paymentId: string, cancelledBy: string, reason?: string): Promise<void> {
+    const batch = writeBatch(db);
+
+    const paymentRef = doc(db, 'invoicePayments', paymentId);
+    const paymentSnap = await getDoc(paymentRef);
+
+    if (!paymentSnap.exists()) {
+      throw new Error('Payment not found');
+    }
+
+    const payment = paymentSnap.data() as InvoicePayment;
+
+    if (payment.paymentMethod.type !== 'cheque') {
+      throw new Error('This payment is not a cheque');
+    }
+
+    if (payment.paymentStatus !== 'pending') {
+      throw new Error('Only pending cheques can be cancelled');
+    }
+
+    // Mark payment as cancelled and voided (payment was never received)
+    batch.update(paymentRef, {
+      paymentStatus: 'cancelled' as const,
+      cancelledAt: new Date(),
+      cancelledBy,
+      cancellationReason: reason || 'Cheque cancelled',
+      isVoided: true
+    });
+
+    // Get invoice to fix paymentCount and remainingAmount
+    const invoiceRef = doc(db, 'invoices', payment.invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+
+    if (!invoiceSnap.exists()) {
+      throw new Error('Invoice not found');
+    }
+
+    const invoice = invoiceSnap.data() as Invoice;
+    const currentPaidAmount = invoice.paidAmount || 0;
+    const remainingAmount = invoice.amount - currentPaidAmount;
+    const currentPaymentCount = invoice.paymentCount || 0;
+
+    const invoiceUpdate: Partial<Invoice> = {
+      paymentCount: Math.max(0, currentPaymentCount - 1),
+      remainingAmount: remainingAmount,
+      status: currentPaidAmount === 0 ? 'approved' : (currentPaidAmount < invoice.amount ? 'partial' : 'paid')
+    };
+
+    batch.update(invoiceRef, invoiceUpdate);
+
+    // Update cheque tracker if exists
+    if (payment.paymentMethod.details.chequeNumber) {
+      const chequeQuery = query(
+        collection(db, 'chequeTracker'),
+        where('chequeNumber', '==', payment.paymentMethod.details.chequeNumber),
+        where('invoiceId', '==', payment.invoiceId)
+      );
+
+      const chequeSnap = await getDocs(chequeQuery);
+      if (!chequeSnap.empty) {
+        const chequeDoc = chequeSnap.docs[0];
+        batch.update(chequeDoc.ref, {
+          status: 'cancelled',
+          notes: reason || 'Cheque cancelled',
+          updatedAt: new Date()
+        });
+      }
+    }
+
     await batch.commit();
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { CashCloseService, ExpenseService } from '@/lib/firebase/firestore-service';
 import { SimpleCashCloseService } from '@/lib/firebase/firestore-service-simple';
@@ -75,7 +76,19 @@ export default function ExpensesPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all'); // New filter for data source
   const [monthFilter, setMonthFilter] = useState('all'); // New filter for monthly view
-  
+
+  // Pagination
+  const {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalPages,
+    paginatedItems: paginatedExpenses,
+    startIndex: pageStartIndex,
+    endIndex: pageEndIndex,
+  } = usePagination(filteredExpenses, 10);
+
   // Fund balance states
   const [fundBalances, setFundBalances] = useState<{
     dailyFund: { currentBalance: number; totalAllocated: number } | null;
@@ -1035,7 +1048,7 @@ export default function ExpensesPage() {
               </tr>
             </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {(filteredExpenses || []).map((expense) => (
+                  {paginatedExpenses.map((expense) => (
                     <tr key={expense.id} className="hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-300 group border-l-4 border-transparent hover:border-emerald-400">
                   <td className="px-6 py-4">
                     <div>
@@ -1194,6 +1207,16 @@ export default function ExpensesPage() {
           </table>
         </div>
           )}
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            rowsPerPage={rowsPerPage}
+            startIndex={pageStartIndex}
+            endIndex={pageEndIndex}
+            totalItems={filteredExpenses.length}
+            onPageChange={setCurrentPage}
+            onRowsPerPageChange={setRowsPerPage}
+          />
         </div>
 
         {/* Print Modal */}
