@@ -21,9 +21,10 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  Copy
+  Copy,
+  Trash2
 } from 'lucide-react';
-import { Invoice, subscribeToInvoices, approveInvoice, rejectInvoice, PaymentMethod, InvoicePayment, subscribeToInvoicePayments, makeInvoicePayment, getInvoicePaymentHistory } from '../../../../lib/firebase/purchasing-manager-service';
+import { Invoice, subscribeToInvoices, approveInvoice, rejectInvoice, PaymentMethod, InvoicePayment, subscribeToInvoicePayments, makeInvoicePayment, getInvoicePaymentHistory, deleteInvoiceWithPayments } from '../../../../lib/firebase/purchasing-manager-service';
 import { authService } from '../../../../lib/firebase/auth';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
@@ -87,6 +88,8 @@ export default function InvoicesPage() {
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState('');
   const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const {
     paginatedItems: pagedInvoices,
@@ -170,6 +173,36 @@ export default function InvoicesPage() {
       await rejectInvoice(invoiceId, currentUserId, 'Rejected by purchasing manager');
     } catch (error) {
       console.error('Error rejecting invoice:', error);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    const paymentCount = invoice.paymentCount || 0;
+    const message = paymentCount > 0
+      ? `Delete invoice ${invoice.invoiceNumber} and all ${paymentCount} payment record(s)? This cannot be undone.`
+      : `Delete invoice ${invoice.invoiceNumber}? This cannot be undone.`;
+
+    if (!window.confirm(message)) return;
+
+    setDeleteError('');
+    setDeletingInvoiceId(invoice.id);
+
+    try {
+      const result = await deleteInvoiceWithPayments(invoice.id);
+      if (selectedInvoice?.id === invoice.id) {
+        setSelectedInvoice(null);
+        setShowModal(false);
+        setShowPaymentModal(false);
+        setPaymentHistory([]);
+      }
+      console.log(
+        `Deleted invoice ${invoice.invoiceNumber}: ${result.deletedPayments} payment(s), ${result.deletedCheques} cheque(s)`
+      );
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete invoice');
+    } finally {
+      setDeletingInvoiceId(null);
     }
   };
 
@@ -645,7 +678,7 @@ export default function InvoicesPage() {
   if (loading) {
     return (
       <div className="w-screen h-screen" style={{ padding: '20px' }}>
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
@@ -1225,6 +1258,15 @@ export default function InvoicesPage() {
                               </button>
                             </>
                           )}
+
+                          <button
+                            onClick={() => handleDeleteInvoice(invoice)}
+                            disabled={deletingInvoiceId === invoice.id}
+                            className="p-1 text-red-600 hover:text-red-900 hover:bg-red-50 rounded disabled:opacity-50"
+                            title="Delete invoice and all payments"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1580,8 +1622,20 @@ export default function InvoicesPage() {
                       <Printer className="w-4 h-4" />
                       <span>Print</span>
                     </button>
+
+                    <button
+                      onClick={() => handleDeleteInvoice(selectedInvoice)}
+                      disabled={deletingInvoiceId === selectedInvoice.id}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{deletingInvoiceId === selectedInvoice.id ? 'Deleting…' : 'Delete'}</span>
+                    </button>
                   </div>
                 </div>
+                {deleteError && selectedInvoice && (
+                  <p className="mt-3 text-sm text-red-600">{deleteError}</p>
+                )}
               </div>
             </div>
           </div>

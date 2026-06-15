@@ -338,7 +338,7 @@ export default function RestockOrdersPage() {
 
   return (
     <div className="bg-gradient-to-br from-purple-50 to-indigo-100 p-4 sm:p-6 pb-12">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
 
         {/* Header */}
         <div className="mb-6 sm:mb-8">

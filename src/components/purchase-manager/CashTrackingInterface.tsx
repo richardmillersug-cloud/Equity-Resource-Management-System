@@ -616,7 +616,7 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
 
   if (loading) {
     return (
-      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-8 ${className}`}>
+      <div className={`w-full bg-white rounded-lg shadow-sm border border-gray-200 p-8 ${className}`}>
         <div className="flex items-center justify-center space-x-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <div className="text-lg font-medium text-gray-700">
@@ -631,7 +631,7 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
   }
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
+    <div className={`w-full bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
@@ -1213,8 +1213,8 @@ export default function CashTrackingInterface({ className = '' }: CashTrackingIn
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

@@ -29,6 +29,10 @@ import { useRouter } from 'next/navigation';
 import { InterfaceDatabaseConnector } from '../../../lib/firebase/interface-database-connector';
 import { subscribeToInvoicePayments } from '@/lib/firebase/purchasing-manager-service';
 import {
+  getTotalOutstandingFromPaidAmount,
+  getMonthOutstandingFromPaidAmount,
+} from '@/lib/firebase/invoice-outstanding';
+import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
@@ -238,6 +242,8 @@ interface PurchasingMetrics {
     totalAmount: number;
     paidAmount: number;
     pendingAmount: number;
+    /** Unpaid balance on invoices dated in the current month (invoicePayments-based) */
+    monthlyOutstanding: number;
   };
   cashFlow: {
     allocated: number;
@@ -351,7 +357,7 @@ export default function PurchaseManagerDashboard() {
     allocationAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     paymentsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
     paymentAmountsByPeriod: { daily: 0, weekly: 0, monthly: 0, yearly: 0 },
-    invoiceMetrics: { total: 0, pending: 0, approved: 0, paid: 0, overdue: 0, totalAmount: 0, paidAmount: 0, pendingAmount: 0 },
+    invoiceMetrics: { total: 0, pending: 0, approved: 0, paid: 0, overdue: 0, totalAmount: 0, paidAmount: 0, pendingAmount: 0, monthlyOutstanding: 0 },
     cashFlow: { allocated: 0, used: 0, remaining: 0, utilization: 0, todayAllocated: 0 },
     supplierMetrics: { total: 0, active: 0, topSuppliers: [] },
     paymentAnalytics: { totalPayments: 0, averagePayment: 0, paymentMethods: {}, monthlyTrends: [] },
@@ -941,24 +947,17 @@ export default function PurchaseManagerDashboard() {
     const totalAmount = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
     const paidAmount = payments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
     
-    // Calculate total outstanding as sum of all supplier outstanding balances
-    // This is the correct way: sum of (invoice.amount - paidAmount) per supplier
-    const supplierOutstandingMap = new Map<string, number>();
-    
-    invoices.forEach(invoice => {
-      const invoiceAmount = Number(invoice.amount || invoice.amountInDigits || 0);
-      const invoicePaidAmount = Number(invoice.paidAmount || 0);
-      const remainingAmount = Math.max(0, invoiceAmount - invoicePaidAmount);
-      
-      if (remainingAmount > 0) {
-        const supplierId = invoice.supplierId || invoice.supplier_id || 'unknown';
-        const currentOutstanding = supplierOutstandingMap.get(supplierId) || 0;
-        supplierOutstandingMap.set(supplierId, currentOutstanding + remainingAmount);
-      }
-    });
-    
-    // Sum all supplier outstanding balances
-    const pendingAmount = Array.from(supplierOutstandingMap.values()).reduce((sum, outstanding) => sum + outstanding, 0);
+    // Outstanding from invoice.paidAmount (matches MD reconciliation / supplier-totals)
+    const invoiceRecords = invoices.map((invoice) => ({
+      id: invoice.id,
+      ...(invoice as Record<string, unknown>),
+    }));
+    const pendingAmount = getTotalOutstandingFromPaidAmount(invoiceRecords);
+    const monthlyOutstanding = getMonthOutstandingFromPaidAmount(
+      invoiceRecords,
+      startOfMonth,
+      endOfMonth
+    );
 
     const invoicesByStatus = {
       pending: invoices.filter(inv => inv.status === 'pending').length,
@@ -1191,7 +1190,8 @@ export default function PurchaseManagerDashboard() {
         overdue: invoicesByStatus.overdue,
         totalAmount,
         paidAmount,
-        pendingAmount
+        pendingAmount,
+        monthlyOutstanding,
       },
       cashFlow: {
         allocated: totalAllocated,
@@ -2383,7 +2383,7 @@ export default function PurchaseManagerDashboard() {
       {/* Header */}
    
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="w-full p-6 space-y-6">
         
         {/* ✅ NEW: Professional Header with Force Refresh */}
 
@@ -3547,6 +3547,10 @@ export default function PurchaseManagerDashboard() {
                 <div>
                   <p className="text-gray-600">• <strong>Outstanding:</strong></p>
                   <p className="text-red-600 font-semibold ml-2">{formatCurrency(metrics.invoiceMetrics.pendingAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">• <strong>This Month Outstanding:</strong></p>
+                  <p className="text-amber-600 font-semibold ml-2">{formatCurrency(metrics.invoiceMetrics.monthlyOutstanding)}</p>
                 </div>
               </div>
             </div>

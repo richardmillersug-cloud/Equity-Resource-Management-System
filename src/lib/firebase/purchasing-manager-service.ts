@@ -198,6 +198,9 @@ export interface InvoicePayment {
 
   // Voided flag — true when cheque bounced or cancelled while still pending (payment never received)
   isVoided?: boolean;
+
+  allocationId?: string | null;
+  allocationUsed?: boolean;
 }
 
 export interface Expense {
@@ -1064,6 +1067,81 @@ export class PurchasingManagerService {
   }
 
   /**
+   * Delete an invoice and all related records (payments, cheques, installment plan).
+   * Restores daily allocation balances for payments that used allocations.
+   */
+  static async deleteInvoiceWithPayments(invoiceId: string): Promise<{
+    deletedPayments: number;
+    deletedCheques: number;
+  }> {
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    const invoiceSnap = await getDoc(invoiceRef);
+
+    if (!invoiceSnap.exists()) {
+      throw new Error('Invoice not found');
+    }
+
+    const invoice = invoiceSnap.data() as Invoice;
+
+    const [payments, chequeSnap] = await Promise.all([
+      this.getInvoicePaymentHistory(invoiceId),
+      getDocs(query(collection(db, 'chequeTracker'), where('invoiceId', '==', invoiceId))),
+    ]);
+
+    const { dailyAllocationService } = await import('./daily-allocation-service');
+    for (const payment of payments) {
+      if (payment.allocationId && payment.allocationUsed) {
+        try {
+          await dailyAllocationService.restorePaymentToAllocation(
+            payment.allocationId,
+            payment.amount
+          );
+        } catch (error) {
+          console.error(`Failed to restore allocation ${payment.allocationId}:`, error);
+        }
+      }
+    }
+
+    const batches: ReturnType<typeof writeBatch>[] = [];
+    let currentBatch = writeBatch(db);
+    let opCount = 0;
+    batches.push(currentBatch);
+
+    const queueDelete = (ref: ReturnType<typeof doc>) => {
+      if (opCount >= 500) {
+        currentBatch = writeBatch(db);
+        batches.push(currentBatch);
+        opCount = 0;
+      }
+      currentBatch.delete(ref);
+      opCount++;
+    };
+
+    for (const payment of payments) {
+      queueDelete(doc(db, 'invoicePayments', payment.id));
+    }
+
+    for (const chequeDoc of chequeSnap.docs) {
+      queueDelete(chequeDoc.ref);
+    }
+
+    if (invoice.installmentPlan?.id) {
+      queueDelete(doc(db, 'installmentPlans', invoice.installmentPlan.id));
+    }
+
+    queueDelete(invoiceRef);
+
+    for (const batch of batches) {
+      await batch.commit();
+    }
+
+    return {
+      deletedPayments: payments.length,
+      deletedCheques: chequeSnap.size,
+    };
+  }
+
+  /**
    * Get payment summary for a specific invoice
    */
   static async getInvoicePaymentSummary(invoiceId: string): Promise<PaymentSummary | null> {
@@ -1814,6 +1892,7 @@ export const {
   approveInvoice,
   rejectInvoice,
   makeInvoicePayment,
+  deleteInvoiceWithPayments,
   getInvoicePaymentHistory,
   getInvoicePaymentSummary,
   getPaymentAnalytics,

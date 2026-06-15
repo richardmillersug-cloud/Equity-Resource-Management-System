@@ -222,7 +222,7 @@ export default function ChequesPage() {
 
   return (
     <div className="bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-6 pb-12">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

@@ -425,7 +425,7 @@ export default function SupplierStatementsPage() {
         }
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="mb-6">
           <div className="flex items-center space-x-4 mb-2">

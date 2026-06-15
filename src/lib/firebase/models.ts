@@ -500,6 +500,33 @@ export interface AuditLog {
   userAgent?: string;
 }
 
+export interface UserSession {
+  id: string;
+  userId: string;
+  email: string;
+  role: string;
+  loginTime: Timestamp;
+  lastActivity: Timestamp;
+  logoutTime?: Timestamp | null;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceType?: 'desktop' | 'tablet' | 'mobile' | 'unknown';
+  browser?: string;
+  os?: string;
+  platform?: string;
+  screenResolution?: string;
+  language?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  isActive: boolean;
+  sessionDuration: number; // minutes
+  loginMethod?: 'email_password' | 'sso';
+}
+
 // ==================== FIRESTORE COLLECTION NAMES ====================
 
 export const COLLECTIONS = {
@@ -521,7 +548,8 @@ export const COLLECTIONS = {
   BARCODES: 'barcodes',
   LEAVE_REQUESTS: 'leaveRequests',
   PAYROLL: 'payroll',
-  AUDIT_LOGS: 'auditLogs'
+  AUDIT_LOGS: 'auditLogs',
+  USER_SESSIONS: 'userSessions'
 } as const;
 
 // ==================== FIRESTORE SUBCOLLECTIONS ====================

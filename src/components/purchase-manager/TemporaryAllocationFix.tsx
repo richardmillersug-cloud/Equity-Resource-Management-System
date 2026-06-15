@@ -212,7 +212,7 @@ export default function TemporaryAllocationFix() {
 
   if (indexError) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full p-6">
         <Card className="border-red-200 bg-red-50">
           <CardHeader>
             <CardTitle className="text-red-800 flex items-center">
@@ -278,7 +278,7 @@ export default function TemporaryAllocationFix() {
   const activeAllocations = allocations.filter(a => a.status === 'active_for_use');
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Your Cash Allocations (Temporary Fix)</h1>
         <p className="text-gray-600 mt-2">Manage allocations from Accountants - Queries optimized for missing indexes</p>

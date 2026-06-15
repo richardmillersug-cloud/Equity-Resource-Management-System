@@ -796,7 +796,8 @@ export class AuditService extends FirestoreService<AuditLog> {
     userId: string,
     objectId: string,
     changes?: Record<string, any>,
-    objectRepr?: string
+    objectRepr?: string,
+    meta?: { ipAddress?: string; userAgent?: string }
   ): Promise<void> {
     const auditLog: Omit<AuditLog, 'id'> = {
       tableName,
@@ -805,7 +806,9 @@ export class AuditService extends FirestoreService<AuditLog> {
       timestamp: Timestamp.now(),
       objectId,
       objectRepr,
-      changes
+      changes,
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent : undefined),
     };
 
     await this.create(auditLog);

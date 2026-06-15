@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { authService } from './auth';
+import { isAdminUser } from './admin-access';
 import { logger } from '../utils/logger';
 import { 
   CashAllocation, 
@@ -35,7 +36,8 @@ import {
   AuditLog,
   Branch,
   Delivery,
-  InventoryItem
+  InventoryItem,
+  COLLECTIONS,
 } from './models';
 
 // =====================================================
@@ -1660,6 +1662,192 @@ export class AdminQueries {
 }
 
 // =====================================================
+// 9. SYSTEM ADMIN QUERIES
+// =====================================================
+
+export class SystemAdminQueries {
+  private static requireAdmin(): void {
+    if (!isAdminUser(authService.getCurrentUser()) && !hasPermission('*')) {
+      throw new Error('Unauthorized — Admin only');
+    }
+  }
+
+  static async getDashboardStats() {
+    this.requireAdmin();
+
+    const [employeesSnap, sessionsSnap, auditSnap, branchesSnap] = await Promise.all([
+      getDocs(collection(db, 'employees')),
+      getDocs(query(collection(db, COLLECTIONS.USER_SESSIONS), where('isActive', '==', true))),
+      getDocs(query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(500))),
+      getDocs(collection(db, 'branches')),
+    ]);
+
+    const employees = employeesSnap.docs.map((d) => d.data());
+    const activeEmployees = employees.filter((e) => e.employmentStatus === 'Active').length;
+    const roleCounts: Record<string, number> = {};
+    employees.forEach((e) => {
+      const title = e.roles?.[0]?.jobTitle || 'Unknown';
+      roleCounts[title] = (roleCounts[title] || 0) + 1;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const loginsToday = sessionsSnap.docs.filter((d) => {
+      const login = d.data().loginTime?.toDate?.();
+      return login && login >= today;
+    }).length;
+
+    return {
+      totalEmployees: employees.length,
+      activeEmployees,
+      activeSessions: sessionsSnap.size,
+      loginsToday,
+      auditEventsToday: auditSnap.docs.filter((d) => {
+        const ts = d.data().timestamp?.toDate?.();
+        return ts && ts >= today;
+      }).length,
+      branchCount: branchesSnap.size,
+      roleCounts,
+    };
+  }
+
+  static async getAllRolesWithUsers() {
+    this.requireAdmin();
+    const { SYSTEM_ROLES } = await import('./system-roles');
+    const employeesSnap = await getDocs(collection(db, 'employees'));
+    const employees = employeesSnap.docs.map((d) => ({ id: d.id, ...d.data() } as EmployeeWithId));
+
+    return SYSTEM_ROLES.map((roleDef) => {
+      const assigned = employees.filter((e) =>
+        e.roles?.some((r) => {
+          if (roleDef.jobTitle === 'Admin') {
+            return r.jobTitle === 'Admin' || r.jobTitle === 'System Admin';
+          }
+          return r.jobTitle === roleDef.jobTitle;
+        })
+      );
+      return {
+        ...roleDef,
+        userCount: assigned.length,
+        users: assigned.map((e) => ({
+          id: e.id,
+          name: `${e.firstName} ${e.lastName}`,
+          email: e.email,
+          status: e.employmentStatus,
+          branchId: e.branchId,
+        })),
+      };
+    });
+  }
+
+  static async getAccountabilityLog(limitCount = 200) {
+    this.requireAdmin();
+    const q = query(
+      collection(db, 'auditLogs'),
+      orderBy('timestamp', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    const logs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLog & { id: string }));
+
+    const employeeIds = [...new Set(logs.map((l) => l.userId))];
+    const employeeMap: Record<string, EmployeeWithId> = {};
+    for (const empId of employeeIds) {
+      const empDoc = await getDoc(doc(db, 'employees', empId));
+      if (empDoc.exists()) {
+        employeeMap[empId] = { id: empDoc.id, ...empDoc.data() } as EmployeeWithId;
+      }
+    }
+
+    return logs.map((log) => {
+      const emp = employeeMap[log.userId];
+      return {
+        ...log,
+        employeeName: emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown',
+        employeeEmail: emp?.email,
+        role: emp?.roles?.[0]?.jobTitle,
+      };
+    });
+  }
+
+  static async getLoginSessions(limitCount = 150) {
+    this.requireAdmin();
+    const q = query(
+      collection(db, COLLECTIONS.USER_SESSIONS),
+      orderBy('loginTime', 'desc'),
+      limit(limitCount)
+    );
+    const snapshot = await getDocs(q);
+    const sessions = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const enriched = [];
+    for (const session of sessions) {
+      const empDoc = await getDoc(doc(db, 'employees', session.userId));
+      const emp = empDoc.exists() ? empDoc.data() : null;
+      enriched.push({
+        ...session,
+        employeeName: emp ? `${emp.firstName} ${emp.lastName}` : session.email,
+      });
+    }
+    return enriched;
+  }
+
+  static async getSecurityOverview() {
+    this.requireAdmin();
+
+    const employeesSnapshot = await getDocs(collection(db, 'employees'));
+    const employees = employeesSnapshot.docs.map(
+      (docSnap) => ({ id: docSnap.id, ...docSnap.data() } as EmployeeWithId)
+    );
+
+    const securityOverview = [];
+
+    for (const employee of employees) {
+      const auditQuery = query(
+        collection(db, 'auditLogs'),
+        where('userId', '==', employee.id),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+      const auditSnapshot = await getDocs(auditQuery);
+      const lastActivity = auditSnapshot.docs[0]?.data()?.timestamp || null;
+
+      const actionsQuery = query(
+        collection(db, 'auditLogs'),
+        where('userId', '==', employee.id)
+      );
+      const actionsSnapshot = await getDocs(actionsQuery);
+
+      securityOverview.push({
+        employeeId: employee.id,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        email: employee.email,
+        employmentStatus: employee.employmentStatus,
+        jobTitle: employee.roles?.[0]?.jobTitle || 'Unknown',
+        accountCreated: employee.createdAt,
+        lastActivity,
+        totalActions: actionsSnapshot.size,
+        activityLevel: SystemAdminQueries.calculateActivityLevel(lastActivity),
+      });
+    }
+
+    return securityOverview;
+  }
+
+  private static calculateActivityLevel(lastActivity: Timestamp | null): string {
+    if (!lastActivity) return 'INACTIVE';
+    const now = new Date();
+    const lastActivityDate = lastActivity.toDate();
+    const daysSinceActivity = Math.floor(
+      (now.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (daysSinceActivity > 30) return 'INACTIVE';
+    if (daysSinceActivity > 7) return 'LOW_ACTIVITY';
+    return 'ACTIVE';
+  }
+}
+
+// =====================================================
 // EXPORT ALL QUERY CLASSES
 // =====================================================
 
@@ -1671,5 +1859,6 @@ export const RoleBasedQueries = {
   Auditor: AuditorQueries,
   HR: HRQueries,
   Manager: ManagerQueries,
-  Admin: AdminQueries
+  Admin: AdminQueries,
+  SystemAdmin: SystemAdminQueries,
 }; 

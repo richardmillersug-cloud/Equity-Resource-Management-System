@@ -706,6 +706,37 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "userSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "loginTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "loginTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "loginTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

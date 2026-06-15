@@ -398,6 +398,34 @@ export class DailyAllocationService {
   }
 
   /**
+   * Restore allocation balance when an invoice payment is deleted.
+   */
+  async restorePaymentToAllocation(
+    allocationId: string,
+    paymentAmount: number
+  ): Promise<void> {
+    const allocation = await this.getAllocationById(allocationId);
+    if (!allocation) return;
+
+    const newUsedAmount = Math.max(0, allocation.usedAmount - paymentAmount);
+    const newAvailableBalance = allocation.totalAllocated - newUsedAmount;
+    const newTransactionCount = Math.max(0, allocation.totalTransactions - 1);
+
+    const updates: Record<string, unknown> = {
+      usedAmount: newUsedAmount,
+      availableBalance: newAvailableBalance,
+      totalTransactions: newTransactionCount,
+      updatedAt: Timestamp.now(),
+    };
+
+    if (allocation.status === 'completed' && newAvailableBalance > 0) {
+      updates.status = 'accepted';
+    }
+
+    await updateDoc(doc(db, this.collectionName, allocationId), updates);
+  }
+
+  /**
    * ✅ NEW: Get available balance for a branch/PM
    */
   async getAvailableBalance(branchId: string): Promise<{

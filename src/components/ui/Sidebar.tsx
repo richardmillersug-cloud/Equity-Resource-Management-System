@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { authService, AuthUser } from '../../lib/firebase/auth';
+import { isAdminUser, ADMIN_NAV_ITEM_IDS } from '../../lib/firebase/admin-access';
 import { ReceiverQueries } from '../../lib/firebase/role-based-queries';
 import { 
   LayoutDashboard,
@@ -41,7 +42,10 @@ import {
   LogOut,
   Wallet,
   Database,
-  Send
+  Send,
+  KeyRound,
+  Monitor,
+  ArrowDownUp
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -65,29 +69,11 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  // Dashboard - Available to all roles except purchasing managers (they use PM Dashboard)
-  { 
-    id: 'dashboard', 
-    icon: <LayoutDashboard className="w-5 h-5" />, 
-    label: 'Dashboard', 
-    path: '/dashboard',
-    roles: ['Admin', 'Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Cashier', 'Customer Service', 'Managing Director']
-  },
-  
-  // Analytics Dashboard - For business intelligence and data analysis
-  { 
-    id: 'analytics', 
-    icon: <TrendingUp className="w-5 h-5" />, 
-    label: 'Analytics Dashboard', 
-    path: '/dashboard/analytics',
-    roles: ['Admin', 'Manager', 'Accountant', 'Managing Director']
-  },
-  
   // Managing Director specific
   { 
     id: 'executive-dashboard', 
-    icon: <BarChart3 className="w-5 h-5" />, 
-    label: 'Executive Dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'Dashboard', 
     path: '/dashboard/managing-director',
     roles: ['Managing Director']
   },
@@ -105,49 +91,150 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/managing-director/forecasting',
     roles: ['Managing Director']
   },
-  
-
-
-  
-  // Admin specific
   { 
-    id: 'system-overview', 
-    icon: <Shield className="w-5 h-5" />, 
-    label: 'System Overview', 
+    id: 'outstanding-invoices', 
+    icon: <Receipt className="w-5 h-5" />, 
+    label: 'Outstanding Invoices', 
+    path: '/dashboard/managing-director/outstanding-invoices',
+    roles: ['Managing Director']
+  },
+
+  // Managing Director — Finance & Oversight
+  {
+    id: 'md-group-finance',
+    icon: <span />,
+    label: 'Finance & Oversight',
+    isGroupHeader: true,
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-till-cash-closes',
+    icon: <Wallet className="w-5 h-5" />,
+    label: 'Till Cash Closes',
+    path: '/dashboard/purchase-manager/till-cash-closes',
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-supplier-statements',
+    icon: <FileText className="w-5 h-5" />,
+    label: 'Supplier Statements',
+    path: '/dashboard/purchase-manager/supplier-statements',
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-cheque-tracker',
+    icon: <Banknote className="w-5 h-5" />,
+    label: 'Cheque Tracker',
+    path: '/dashboard/purchase-manager/cheques',
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-group-ledgers',
+    icon: <span />,
+    label: 'Money Usage & Ledgers',
+    isGroupHeader: true,
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-account-ledgers',
+    icon: <Wallet className="w-5 h-5" />,
+    label: 'Account Ledgers',
+    path: '/dashboard/account-ledgers',
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-equity-wallet',
+    icon: <DollarSign className="w-5 h-5" />,
+    label: 'Equity Wallet',
+    path: '/dashboard/accountant/reports',
+    roles: ['Managing Director']
+  },
+  {
+    id: 'md-cash-pay',
+    icon: <ArrowDownUp className="w-5 h-5" />,
+    label: 'Cash Pay',
+    path: '/dashboard/purchase-manager/cash-pay',
+    roles: ['Managing Director']
+  },
+
+  // Dashboard - Available to all roles except purchasing managers (they use PM Dashboard)
+  { 
+    id: 'dashboard', 
+    icon: <LayoutDashboard className="w-5 h-5" />, 
+    label: 'Dashboard', 
+    path: '/dashboard',
+    roles: ['Manager', 'Accountant', 'HR', 'HR Manager', 'Stock Manager', 'Receiver', 'Auditor', 'Supervisor', 'Cashier', 'Customer Service', 'Managing Director']
+  },
+  
+  // Analytics Dashboard - For business intelligence and data analysis
+  { 
+    id: 'analytics', 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    label: 'Analytics Dashboard', 
+    path: '/dashboard/analytics',
+    roles: ['Manager', 'Accountant', 'Managing Director']
+  },
+  
+
+
+  
+  // Admin — business + platform (merged business admin & system admin)
+  {
+    id: 'admin-home',
+    icon: <Shield className="w-5 h-5" />,
+    label: 'Admin Console',
     path: '/dashboard/admin',
-    roles: ['Admin']
+    roles: ['Admin'],
   },
-  { 
-    id: 'allocation-data', 
-    icon: <Database className="w-5 h-5" />, 
-    label: 'Raw Allocation Data', 
-    path: '/dashboard/admin/raw-allocation-data',
-    roles: ['Admin']
+  {
+    id: 'admin-roles',
+    icon: <KeyRound className="w-5 h-5" />,
+    label: 'System Roles',
+    path: '/dashboard/system-admin/roles',
+    roles: ['Admin'],
   },
-  { 
-    id: 'user-management', 
-    icon: <UserCheck className="w-5 h-5" />, 
-    label: 'User Management', 
-    path: '/dashboard/hr/employees',
-    roles: ['Admin']
+  {
+    id: 'admin-accountability',
+    icon: <FileText className="w-5 h-5" />,
+    label: 'Accountability',
+    path: '/dashboard/system-admin/accountability',
+    roles: ['Admin'],
   },
-  
-
-
+  {
+    id: 'admin-sessions',
+    icon: <Monitor className="w-5 h-5" />,
+    label: 'Login Sessions',
+    path: '/dashboard/system-admin/sessions',
+    roles: ['Admin'],
+  },
+  {
+    id: 'admin-users',
+    icon: <Users className="w-5 h-5" />,
+    label: 'User Directory',
+    path: '/dashboard/system-admin/users',
+    roles: ['Admin'],
+  },
+  {
+    id: 'admin-security',
+    icon: <Activity className="w-5 h-5" />,
+    label: 'Security Overview',
+    path: '/dashboard/system-admin/security',
+    roles: ['Admin'],
+  },
   // Manager specific
   { 
     id: 'performance', 
     icon: <TrendingUp className="w-5 h-5" />, 
     label: 'Performance', 
     path: '/dashboard/manager',
-    roles: ['Manager', 'Admin']
+    roles: ['Manager']
   },
   { 
     id: 'branches', 
     icon: <Building2 className="w-5 h-5" />, 
     label: 'Branch Management', 
     path: '/dashboard/settings',
-    roles: ['Manager', 'Admin']
+    roles: ['Manager']
   },
   
   // Accountant specific
@@ -157,63 +244,70 @@ const navigationItems: NavigationItem[] = [
     icon: <Send className="w-5 h-5" />, 
     label: 'PM Allocations', 
     path: '/dashboard/accountant/allocations',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'cash-close', 
     icon: <DollarSign className="w-5 h-5" />, 
     label: 'Daily Cash Close', 
     path: '/dashboard/accountant/cash-close',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'profit-analysis', 
     icon: <TrendingUp className="w-5 h-5" />, 
     label: 'Profit Analysis', 
     path: '/dashboard/accountant/profits',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'expenses', 
     icon: <Receipt className="w-5 h-5" />, 
     label: 'Expenses', 
     path: '/dashboard/accountant/expenses',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'expense-payments', 
     icon: <CreditCard className="w-5 h-5" />, 
     label: 'Expense Payments', 
     path: '/dashboard/accountant/expenses/payments',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'expense-types', 
     icon: <Settings className="w-5 h-5" />, 
     label: 'Expense Types', 
     path: '/dashboard/accountant/expense-types',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'fund-balances', 
     icon: <DollarSign className="w-5 h-5" />, 
     label: 'Fund Balances', 
     path: '/dashboard/accountant/fund-balances',
-    roles: ['Accountant', 'Admin']
+    roles: ['Accountant']
   },
   { 
     id: 'equity-wallet', 
     icon: <Wallet className="w-5 h-5" />, 
     label: 'Equity Wallet', 
     path: '/dashboard/accountant/reports',
-    roles: ['Accountant', 'Manager', 'Admin']
+    roles: ['Accountant', 'Manager']
+  },
+  {
+    id: 'accountant-cash-pay',
+    icon: <ArrowDownUp className="w-5 h-5" />,
+    label: 'Cash Pay',
+    path: '/dashboard/purchase-manager/cash-pay',
+    roles: ['Accountant', 'Manager']
   },
   {
     id: 'your-account',
     icon: <Banknote className="w-5 h-5" />,
     label: 'Your Account',
     path: '/dashboard/accountant/account',
-    roles: ['Accountant', 'Manager', 'Admin']
+    roles: ['Accountant', 'Manager']
   },
   
   // Purchase Manager specific
@@ -222,7 +316,7 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'PM Dashboard', 
     path: '/dashboard/purchase-manager',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
 
   // Group: Procurement
@@ -231,49 +325,49 @@ const navigationItems: NavigationItem[] = [
     icon: <span />,
     label: 'Procurement',
     isGroupHeader: true,
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'restock-orders', 
     icon: <Package className="w-5 h-5" />, 
     label: 'Restock Orders', 
     path: '/dashboard/purchase-manager/restock-orders',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'invoices', 
     icon: <FileText className="w-5 h-5" />, 
     label: 'Invoices', 
     path: '/dashboard/purchase-manager/invoices',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'pm-return-notes', 
     icon: <RefreshCw className="w-5 h-5" />, 
     label: 'Return Notes & Restocking', 
     path: '/dashboard/purchase-manager/return-notes',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'suppliers', 
     icon: <Building2 className="w-5 h-5" />, 
     label: 'Suppliers', 
     path: '/dashboard/purchase-manager/suppliers',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   {
     id: 'supplier-totals', 
     icon: <Calculator className="w-5 h-5" />, 
     label: 'Supplier Totals', 
     path: '/dashboard/purchase-manager/supplier-totals',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   {
     id: 'supplier-statements',
     icon: <FileText className="w-5 h-5" />,
     label: 'Supplier Statements',
     path: '/dashboard/purchase-manager/supplier-statements',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
 
   // Group: Finance & Cash
@@ -282,56 +376,63 @@ const navigationItems: NavigationItem[] = [
     icon: <span />,
     label: 'Finance & Cash',
     isGroupHeader: true,
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'pm-account', 
     icon: <Wallet className="w-5 h-5" />, 
     label: 'PM Account', 
     path: '/dashboard/purchase-manager/pm-account',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'daily-allocation', 
     icon: <Calendar className="w-5 h-5" />, 
     label: 'Daily Fund Allocation', 
     path: '/dashboard/purchase-manager/daily-allocation',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'payments',
     icon: <CreditCard className="w-5 h-5" />,
     label: 'Payments',
     path: '/dashboard/purchase-manager/payments',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
+  },
+  {
+    id: 'cash-pay',
+    icon: <ArrowDownUp className="w-5 h-5" />,
+    label: 'Cash Pay',
+    path: '/dashboard/purchase-manager/cash-pay',
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'pm-cheques', 
     icon: <Banknote className="w-5 h-5" />, 
     label: 'Cheque Tracker', 
     path: '/dashboard/purchase-manager/cheques',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'pm-expenses', 
     icon: <Receipt className="w-5 h-5" />, 
     label: 'PM Expenses', 
     path: '/dashboard/purchase-manager/expenses',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'pm-allocations', 
     icon: <Send className="w-5 h-5" />, 
     label: 'Cash Close Records', 
     path: '/dashboard/purchase-manager/allocations',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
   { 
     id: 'till-cash-closes', 
     icon: <Wallet className="w-5 h-5" />, 
     label: 'Till Cash Closes', 
     path: '/dashboard/purchase-manager/till-cash-closes',
-    roles: ['Purchase Manager', 'Purchasing Manager', 'Admin']
+    roles: ['Purchase Manager', 'Purchasing Manager']
   },
 
   
@@ -341,13 +442,13 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'HR Dashboard', 
     path: '/dashboard/hr',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    roles: ['HR', 'HR Manager', 'Manager']
   },
   { 
     id: 'employees', 
     icon: <Users className="w-5 h-5" />, 
     label: 'Employees', 
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+    roles: ['HR', 'HR Manager', 'Manager'],
     submenu: [
       {
         id: 'view-employees',
@@ -368,34 +469,34 @@ const navigationItems: NavigationItem[] = [
     icon: <span className="w-5 h-5 flex items-center justify-center text-lg">🕐</span>, 
     label: 'Attendance Tracking', 
     path: '/dashboard/hr/attendance-tracking',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    roles: ['HR', 'HR Manager', 'Manager', 'Supervisor']
   },
   { 
     id: 'attendance', 
     icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📋</span>, 
     label: 'Attendance Reports', 
     path: '/dashboard/hr/attendance',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    roles: ['HR', 'HR Manager', 'Manager', 'Supervisor']
   },
   { 
     id: 'leave-requests', 
     icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📄</span>, 
     label: 'Leave Requests', 
     path: '/dashboard/hr/leave-requests',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    roles: ['HR', 'HR Manager', 'Manager', 'Supervisor']
   },
   { 
     id: 'leave-calendar', 
     icon: <span className="w-5 h-5 flex items-center justify-center text-lg">📅</span>, 
     label: 'Leave Calendar', 
     path: '/dashboard/hr/leave',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin', 'Supervisor']
+    roles: ['HR', 'HR Manager', 'Manager', 'Supervisor']
   },
   { 
     id: 'payroll', 
     icon: <Banknote className="w-5 h-5" />, 
     label: 'Payroll', 
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin'],
+    roles: ['HR', 'HR Manager', 'Manager'],
     submenu: [
       {
         id: 'payroll-processing',
@@ -416,14 +517,14 @@ const navigationItems: NavigationItem[] = [
     icon: <QrCode className="w-5 h-5" />, 
     label: 'ID Cards & Barcodes', 
     path: '/dashboard/hr/barcodes',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    roles: ['HR', 'HR Manager', 'Manager']
   },
   { 
     id: 'employee-documents', 
     icon: <FileText className="w-5 h-5" />, 
     label: 'Documents', 
     path: '/dashboard/hr/employee-documents',
-    roles: ['HR', 'HR Manager', 'Manager', 'Admin']
+    roles: ['HR', 'HR Manager', 'Manager']
   },
   
   // Stock Manager specific
@@ -432,7 +533,7 @@ const navigationItems: NavigationItem[] = [
     icon: <Package className="w-5 h-5" />, 
     label: 'Inventory', 
     path: '/dashboard/stock-manager',
-    roles: ['Stock Manager', 'Admin']
+    roles: ['Stock Manager']
   },
 
   // Receiver specific - arranged in order
@@ -441,77 +542,77 @@ const navigationItems: NavigationItem[] = [
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'Receiver Dashboard', 
     path: '/dashboard/receiver',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'restocking', 
     icon: <Package className="w-5 h-5" />, 
     label: 'Restocking', 
     path: '/dashboard/receiver/restocking',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   {
     id: 'restock-verification',
     icon: <Package className="w-5 h-5" />,
     label: 'Stock Received',
     path: '/dashboard/receiver/restock-verification',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'deliveries', 
     icon: <Truck className="w-5 h-5" />, 
     label: 'Suppliers Expected', 
     path: '/dashboard/receiver/deliveries',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'suppliers', 
     icon: <Factory className="w-5 h-5" />, 
     label: 'Suppliers', 
     path: '/dashboard/receiver/suppliers',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'invoices', 
     icon: <Receipt className="w-5 h-5" />, 
     label: 'Invoice', 
     path: '/dashboard/receiver/invoices',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'return-notes-management', 
     icon: <ClipboardList className="w-5 h-5" />, 
     label: 'Return Notes Management', 
     path: '/dashboard/receiver/returns',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'return-notes-tracking', 
     icon: <RefreshCw className="w-5 h-5" />, 
     label: 'Return Notes Tracking', 
     path: '/dashboard/receiver/returns/tracking',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'damages', 
     icon: <AlertTriangle className="w-5 h-5" />, 
     label: 'Damages', 
     path: '/dashboard/receiver/damages',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'barcode', 
     icon: <QrCode className="w-5 h-5" />, 
     label: 'Barcode', 
     path: '/dashboard/receiver/barcode',
-    roles: ['Receiver', 'Admin']
+    roles: ['Receiver']
   },
   { 
     id: 'damage-reports', 
     icon: <AlertTriangle className="w-5 h-5" />, 
     label: 'Damage Reports', 
     path: '/dashboard/receiver/damages',
-    roles: ['Stock Manager', 'Manager', 'Admin']
+    roles: ['Stock Manager', 'Manager']
   },
   
   // Auditor specific
@@ -520,7 +621,7 @@ const navigationItems: NavigationItem[] = [
     icon: <QrCode className="w-5 h-5" />, 
     label: 'Audit Reports', 
     path: '/dashboard/auditor',
-    roles: ['Auditor', 'Admin']
+    roles: ['Auditor']
   },
   
   // Customer Service specific
@@ -529,7 +630,7 @@ const navigationItems: NavigationItem[] = [
     icon: <Users className="w-5 h-5" />, 
     label: 'Customer Service', 
     path: '/dashboard/receiver/returns',
-    roles: ['Customer Service', 'Manager', 'Admin']
+    roles: ['Customer Service', 'Manager']
   },
   
   // Cashier specific
@@ -538,7 +639,7 @@ const navigationItems: NavigationItem[] = [
     icon: <CreditCard className="w-5 h-5" />, 
     label: 'Cashier Operations', 
     path: '/dashboard/purchase-manager/payments',
-    roles: ['Cashier', 'Manager', 'Admin']
+    roles: ['Cashier', 'Manager']
   },
   
   // Employee Self-Service (for all employee roles)
@@ -563,10 +664,10 @@ const navigationItems: NavigationItem[] = [
     icon: <RefreshCw className="w-5 h-5" />, 
     label: 'Offline Test', 
     path: '/dashboard/offline-test',
-    roles: ['Admin']
+    roles: []
   },
   
-  // Settings - Available to all roles
+  // Settings - Available to all roles except Admin (platform-only account)
   { 
     id: 'settings', 
     icon: <Settings className="w-5 h-5" />, 
@@ -847,13 +948,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
   };
 
   const getFilteredNavigationItems = (): NavigationItem[] => {
+    if (isAdminUser(currentUser)) {
+      const allowed = new Set<string>(ADMIN_NAV_ITEM_IDS);
+      return navigationItems.filter((item) => allowed.has(item.id));
+    }
+
     const userRole = getUserRole();
-    return navigationItems.filter(item => 
-      item.roles.includes(userRole) || 
-      item.roles.includes('*') ||
-      item.id === 'settings' // Always show settings
-    )
-    .filter(item => item.id !== 'dashboard');
+
+    return navigationItems
+      .filter(
+        (item) =>
+          item.roles.includes(userRole) ||
+          item.roles.includes('*') ||
+          item.id === 'settings'
+      )
+      .filter((item) => item.id !== 'dashboard');
   };
 
   const handleItemClick = (item: NavigationItem) => {
@@ -962,8 +1071,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       {/* Role Badge */}
       {isExpanded && (
         <div className="px-6 mb-4">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">
+          <div
+            className={`rounded-lg px-3 py-2 border ${
+              isAdminUser(currentUser)
+                ? 'bg-indigo-50 border-indigo-200'
+                : 'bg-emerald-50 border-emerald-200'
+            }`}
+          >
+            <p
+              className={`text-xs font-medium uppercase tracking-wide ${
+                isAdminUser(currentUser) ? 'text-indigo-700' : 'text-emerald-700'
+              }`}
+            >
               {getUserRole()}
             </p>
           </div>

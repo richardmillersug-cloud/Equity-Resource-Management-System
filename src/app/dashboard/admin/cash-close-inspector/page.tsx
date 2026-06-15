@@ -109,7 +109,7 @@ export default function CashCloseInspectorPage() {
   );
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="w-full p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Cash Close Inspector</h1>
         <p className="text-gray-600">Inspect all fields in your cashCloses collection</p>

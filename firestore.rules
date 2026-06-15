@@ -33,9 +33,17 @@ service cloud.firestore {
       return isAuthenticated() && userRole != null && userRole in roles;
     }
     
-    // Check if user is admin
+    // Unified administrator (Admin; legacy System Admin title still accepted)
     function isAdmin() {
-      return hasRole('Admin');
+      return hasAnyRole(['Admin', 'System Admin']);
+    }
+
+    function isSystemAdmin() {
+      return hasRole('System Admin');
+    }
+
+    function isAdminOrSystemAdmin() {
+      return isAdmin();
     }
     
     // Check if user owns the document (userId field matches auth.uid)
@@ -85,9 +93,9 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if isAuthenticated() && (
         employeeId == request.auth.uid || // Own record
-        hasAnyRole(['Admin', 'HR', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver']) // Enhanced access
+        hasAnyRole(['Admin', 'System Admin', 'HR', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver']) // Enhanced access
       );
-      allow create: if hasAnyRole(['Admin', 'HR']);
+      allow create: if hasAnyRole(['Admin', 'System Admin', 'HR']);
       allow update: if isAuthenticated() && (
         employeeId == request.auth.uid || // Can update own record
         hasAnyRole(['Admin', 'HR']) // HR/Admin can update all
@@ -161,7 +169,13 @@ service cloud.firestore {
       allow create: if hasAnyRole(['Receiver', 'Admin', 'Purchasing Manager', 'Purchase Manager']);
       allow update: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager', 'Accountant', 'Receiver']) || 
         resource.data.receiverId == request.auth.uid;
-      allow delete: if hasRole('Admin');
+      allow delete: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
+    }
+    
+    match /invoicePayments/{paymentId} {
+      allow read: if hasAnyRole(['Admin', 'Accountant', 'Manager', 'Purchasing Manager', 'Purchase Manager']);
+      allow create, update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']);
+      allow delete: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
     }
     
     // =====================================================
@@ -302,7 +316,7 @@ service cloud.firestore {
       allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) && 
         (request.resource.data.keys().hasAll(['status', 'chequeNumber']) || 
          resource.data.issuedBy == request.auth.uid);
-      allow delete: if hasRole('Admin');
+      allow delete: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
     }
     
     // =====================================================
@@ -315,7 +329,7 @@ service cloud.firestore {
       allow update: if hasAnyRole(['Admin', 'Accountant', 'Purchasing Manager', 'Purchase Manager']) && 
         (request.resource.data.keys().hasAll(['totalAmount', 'paidAmount']) || 
          resource.data.createdBy == request.auth.uid);
-      allow delete: if hasRole('Admin');
+      allow delete: if hasAnyRole(['Admin', 'Purchasing Manager', 'Purchase Manager']);
     }
     
     // =====================================================
@@ -369,10 +383,24 @@ service cloud.firestore {
     // =====================================================
     
     match /auditLogs/{logId} {
-      allow read: if hasAnyRole(['Admin', 'Manager', 'HR', 'Auditor']);
+      allow read: if hasAnyRole(['Admin', 'System Admin', 'Manager', 'HR', 'Auditor']);
       allow create: if isAuthenticated(); // System can create audit logs
       allow update: if false; // Audit logs are immutable
-      allow delete: if hasRole('Admin'); // Only admin can delete (for cleanup)
+      allow delete: if isAdminOrSystemAdmin(); // Cleanup by business or system admin
+    }
+
+    // =====================================================
+    // USER SESSIONS (login tracking)
+    // =====================================================
+
+    match /userSessions/{sessionId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isSystemAdmin()
+      );
+      allow delete: if isSystemAdmin();
     }
     
     // =====================================================
@@ -382,7 +410,7 @@ service cloud.firestore {
     match /payroll/{payrollId} {
       allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow create: if hasAnyRole(['Admin', 'HR']);
+      allow create: if hasAnyRole(['Admin', 'System Admin', 'HR']);
       allow update: if hasAnyRole(['Admin', 'HR']);
       allow delete: if hasRole('Admin');
     }
@@ -394,7 +422,7 @@ service cloud.firestore {
     match /barcodes/{barcodeId} {
       allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow create: if hasAnyRole(['Admin', 'HR']);
+      allow create: if hasAnyRole(['Admin', 'System Admin', 'HR']);
       allow update: if hasAnyRole(['Admin', 'HR']);
       allow delete: if hasRole('Admin');
     }

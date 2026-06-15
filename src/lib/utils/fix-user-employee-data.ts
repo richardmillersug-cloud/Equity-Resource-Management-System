@@ -68,23 +68,30 @@ export class UserEmployeeDataFixer {
   /**
    * Quick fix for admin users - creates admin employee profile
    */
-  static async createAdminProfile(): Promise<void> {
+  /** Unified Admin (business + platform). */
+  static async createAdminProfile(firstName = 'System', lastName = 'Administrator'): Promise<void> {
     const adminRole: JobRole = {
       jobRoleId: 'admin',
       jobTitle: 'Admin',
-      baseSalary: 2000000,
-      description: 'System Administrator with full access',
-      assignedDate: Timestamp.now()
+      baseSalary: 2500000,
+      description:
+        'Full administrator: business operations, security, sessions, roles, and accountability',
+      assignedDate: Timestamp.now(),
     };
 
     await this.createEmployeeProfileForCurrentUser({
-      firstName: 'System',
-      lastName: 'Administrator',
-      employeeNIN: '80001019700001', // Dummy NIN for admin
-      branchId: 'kyengera',
+      firstName,
+      lastName,
+      employeeNIN: '80001019700001',
+      branchId: 'main',
       roles: [adminRole],
-      employeeSalary: 2000000
+      employeeSalary: 2500000,
     });
+  }
+
+  /** @deprecated Use createAdminProfile — merges former System Admin into Admin. */
+  static async createSystemAdminProfile(firstName = 'System', lastName = 'Administrator'): Promise<void> {
+    return this.createAdminProfile(firstName, lastName);
   }
 
   /**
@@ -134,6 +141,30 @@ export class UserEmployeeDataFixer {
   /**
    * Checks if current user has employee data
    */
+  /** Upgrades legacy "System Admin" job title to unified "Admin". */
+  static async mergeLegacySystemAdminToAdmin(): Promise<void> {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser?.employee) {
+      throw new Error('No employee profile found');
+    }
+    const roles = currentUser.employee.roles.map((r) =>
+      r.jobTitle === 'System Admin'
+        ? {
+            ...r,
+            jobRoleId: 'admin',
+            jobTitle: 'Admin',
+            description: 'Full administrator (business + platform)',
+          }
+        : r
+    );
+    await setDoc(
+      doc(db, 'employees', currentUser.uid),
+      { roles, updatedAt: Timestamp.now() },
+      { merge: true }
+    );
+    window.location.reload();
+  }
+
   static async checkEmployeeDataExists(): Promise<boolean> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -147,6 +178,9 @@ export class UserEmployeeDataFixer {
 // Quick console commands for manual fixing
 (window as any).fixUserData = {
   createAdmin: () => UserEmployeeDataFixer.createAdminProfile(),
+  createSystemAdmin: (firstName?: string, lastName?: string) =>
+    UserEmployeeDataFixer.createAdminProfile(firstName, lastName),
+  mergeLegacySystemAdmin: () => UserEmployeeDataFixer.mergeLegacySystemAdminToAdmin(),
   createAccountant: (firstName: string, lastName: string, nin: string) => 
     UserEmployeeDataFixer.createAccountantProfile(firstName, lastName, nin),
   createPurchasingManager: (firstName: string, lastName: string, nin: string) => 

@@ -5,10 +5,9 @@ import CashTrackingInterface from '../../../../components/purchase-manager/CashT
 
 export default function TillCashClosesPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full min-h-full bg-gray-50 p-4 sm:p-6">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Till Cash Closes - Network Data Per Shift</h1>
           <p className="text-gray-600 mt-2">Monitor till cash flow data with detailed network payment breakdown by shift (☀️ Day / 🌙 Night)</p>
           <div className="mt-3 flex items-center space-x-4 text-sm">
@@ -25,8 +24,7 @@ export default function TillCashClosesPage() {
         </div>
         
         {/* Cash Tracking Interface */}
-        <CashTrackingInterface />
-      </div>
+        <CashTrackingInterface className="w-full" />
     </div>
   );
 }

@@ -211,7 +211,7 @@ export default function PendingEditsManagement() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -231,7 +231,7 @@ export default function PendingEditsManagement() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-violet-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="w-full space-y-8">
         
         {/* Header */}
         <div className="relative overflow-hidden bg-white rounded-3xl shadow-xl border border-white/20 backdrop-blur-sm">

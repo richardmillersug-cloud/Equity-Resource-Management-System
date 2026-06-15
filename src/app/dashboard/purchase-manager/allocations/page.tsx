@@ -720,7 +720,7 @@ export default function PMAllocationsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full p-6">
         <div className="flex items-center justify-center p-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
           <div className="ml-4 text-lg text-gray-600">Loading cash close records...</div>
@@ -730,7 +730,7 @@ export default function PMAllocationsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">

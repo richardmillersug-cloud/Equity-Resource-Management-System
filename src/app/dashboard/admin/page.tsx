@@ -142,68 +142,62 @@ export default function AdminDashboard() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
+          <a href="/dashboard/system-admin/roles" className="p-4 bg-white rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all block">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Shield className="h-5 w-5 text-indigo-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">Manage Users</h3>
-                <p className="text-sm text-gray-500">Add, edit, or deactivate users</p>
+                <h3 className="font-medium text-gray-900">System Roles</h3>
+                <p className="text-sm text-gray-500">Roles and permissions</p>
               </div>
             </div>
-          </button>
+          </a>
 
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-green-300 hover:shadow-md transition-all">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Settings className="h-5 w-5 text-green-600" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">System Settings</h3>
-                <p className="text-sm text-gray-500">Configure system parameters</p>
-              </div>
-            </div>
-          </button>
-
-          <button className="p-4 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
+          <a href="/dashboard/system-admin/accountability" className="p-4 bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all block">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <Shield className="h-5 w-5 text-purple-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">Security Audit</h3>
-                <p className="text-sm text-gray-500">Review security logs</p>
-              </div>
-            </div>
-          </button>
-
-          <a
-            href="/dashboard/admin/cash-close-inspector"
-            className="p-4 bg-white rounded-lg border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all block"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Database className="h-5 w-5 text-orange-600" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">Cash Close Inspector</h3>
-                <p className="text-sm text-gray-500">View all cash close fields</p>
+                <h3 className="font-medium text-gray-900">Accountability</h3>
+                <p className="text-sm text-gray-500">Audit trail</p>
               </div>
             </div>
           </a>
 
-          <a
-            href="/dashboard/admin/migrate-cash-close-fields"
-            className="p-4 bg-white rounded-lg border border-gray-200 hover:border-red-300 hover:shadow-md transition-all block"
-          >
+          <a href="/dashboard/system-admin/sessions" className="p-4 bg-white rounded-lg border border-gray-200 hover:border-cyan-300 hover:shadow-md transition-all block">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <Settings className="h-5 w-5 text-red-600" />
+              <div className="p-2 bg-cyan-100 rounded-lg">
+                <Activity className="h-5 w-5 text-cyan-600" />
               </div>
               <div className="text-left">
-                <h3 className="font-medium text-gray-900">Field Migration</h3>
-                <p className="text-sm text-gray-500">Migrate cash close fields</p>
+                <h3 className="font-medium text-gray-900">Login Sessions</h3>
+                <p className="text-sm text-gray-500">Devices and locations</p>
+              </div>
+            </div>
+          </a>
+
+          <a href="/dashboard/system-admin/security" className="p-4 bg-white rounded-lg border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all block">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Activity className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-gray-900">Security Overview</h3>
+                <p className="text-sm text-gray-500">Access monitoring</p>
+              </div>
+            </div>
+          </a>
+
+          <a href="/dashboard/system-admin/users" className="p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all block">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-medium text-gray-900">User Directory</h3>
+                <p className="text-sm text-gray-500">All accounts and activity</p>
               </div>
             </div>
           </a>

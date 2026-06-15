@@ -14,6 +14,7 @@ import { auth, db } from './config';
 import { Employee, JobRole } from './models';
 import { firestoreServices } from './firestore-service';
 import { businessRules } from './business-rules';
+import { recordLoginSession, sessionService } from './session-service';
 
 export interface AuthUser {
   uid: string;
@@ -210,6 +211,8 @@ class FirebaseAuthService {
         `User signed in: ${loginData.email}`
       );
 
+      await recordLoginSession();
+
       return authUser;
     } catch (error: unknown) {
       console.error('Signin error:', error);
@@ -222,6 +225,8 @@ class FirebaseAuthService {
     try {
       const currentUserId = this.currentUser?.uid;
       
+      await sessionService.endSession();
+
       // Log the signout action BEFORE signing out (while user still has permissions)
       if (currentUserId) {
         try {
@@ -336,10 +341,10 @@ class FirebaseAuthService {
   /** Landing route after login/signup: accountants use analytics as home. */
   getDefaultDashboardPath(user: AuthUser): string {
     if (!user.employee) return '/dashboard';
-    const isAccountant = user.employee.roles.some(
-      (r) => r.jobTitle.toLowerCase() === 'accountant'
-    );
-    return isAccountant ? '/dashboard/analytics' : '/dashboard';
+    const primaryRole = user.employee.roles[0]?.jobTitle?.toLowerCase();
+    if (primaryRole === 'system admin') return '/dashboard/admin';
+    if (primaryRole === 'accountant') return '/dashboard/analytics';
+    return '/dashboard';
   }
 
   // Get user permissions
@@ -350,6 +355,7 @@ class FirebaseAuthService {
     this.currentUser.employee.roles.forEach(role => {
       // Add basic permissions based on role
       switch (role.jobTitle.toLowerCase()) {
+        case 'system admin':
         case 'admin':
           permissions.add('all');
           break;

@@ -102,7 +102,7 @@ export default function DashboardPage() {
 
         // Route to role-specific dashboard
         const roleRoutes: Record<string, string> = {
-      
+          'System Admin': '/dashboard/admin',
           'Admin': '/dashboard/admin',
           'Managing Director': '/dashboard/managing-director',
           'Manager': '/dashboard/manager',
@@ -532,9 +532,9 @@ export default function DashboardPage() {
             <button
               onClick={handleCreateAdminProfile}
               disabled={loading}
-              className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+              className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
             >
-              {loading ? 'Creating...' : '👑 Create Admin Profile'}
+              {loading ? 'Creating...' : '👑 Create Admin Profile (business + platform)'}
             </button>
             
             <button

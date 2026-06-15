@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { authService, AuthUser } from '../../../lib/firebase/auth';
+import { isAdminUser, ADMIN_BASE_PATH } from '../../../lib/firebase/admin-access';
 import { useTheme } from '../../../contexts/ThemeContext';
 import ThemeToggle from '../../../components/ui/ThemeToggle';
 import { 
@@ -51,6 +53,7 @@ interface PreferenceSettings {
 }
 
 export default function ProfileSettingsPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
@@ -89,6 +92,10 @@ export default function ProfileSettingsPage() {
 
   useEffect(() => {
     const user = authService.getCurrentUser();
+    if (isAdminUser(user)) {
+      router.replace(ADMIN_BASE_PATH);
+      return;
+    }
     setCurrentUser(user);
     
     if (user) {

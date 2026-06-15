@@ -334,7 +334,7 @@ export default function PurchaseManagerDailyAllocationPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full p-6">
         <div className="flex items-center justify-center p-8">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
           <div className="ml-4 text-lg text-gray-600">Loading allocations...</div>
@@ -344,7 +344,7 @@ export default function PurchaseManagerDailyAllocationPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">

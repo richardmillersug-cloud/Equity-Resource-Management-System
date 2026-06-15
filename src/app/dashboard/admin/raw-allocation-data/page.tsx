@@ -78,7 +78,7 @@ export default function RawAllocationDataPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full p-6">
         <div className="flex items-center justify-center p-8">
           <HydrationSafeLoader />
           <div className="ml-4 text-lg text-gray-600">Loading raw allocation data...</div>
@@ -88,7 +88,7 @@ export default function RawAllocationDataPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="w-full p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
