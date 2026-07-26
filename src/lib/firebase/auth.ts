@@ -8,13 +8,21 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   UserCredential,
+  getAuth,
 } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from './config';
+import { app, auth, db } from './config';
 import { Employee, JobRole } from './models';
 import { firestoreServices } from './firestore-service';
 import { businessRules } from './business-rules';
 import { recordLoginSession, sessionService } from './session-service';
+import { resolveDashboardPathFromRoles } from './dashboard-routes';
+import {
+  getEmploymentAuthErrorCode,
+  getEmploymentLoginBlockMessage,
+  isEmployeeAllowedToLogin,
+} from './employment-access';
 
 export interface AuthUser {
   uid: string;
@@ -48,20 +56,64 @@ export interface AuthError {
 class FirebaseAuthService {
   private currentUser: AuthUser | null = null;
   private authStateListeners: ((user: AuthUser | null) => void)[] = [];
+  /** Set when Inactive/Terminated users are blocked so the login UI can show a message */
+  private lastAccessDenial: AuthError | null = null;
 
   constructor() {
     // Listen for auth state changes
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         const authUser = await this.createAuthUser(user);
+
+        // Inactive / Terminated accounts cannot keep a portal session
+        if (authUser.employee && !isEmployeeAllowedToLogin(authUser.employee)) {
+          const status = authUser.employee.employmentStatus;
+          this.setAccessDenial(status);
+          this.currentUser = null;
+          this.authStateListeners.forEach((listener) => listener(null));
+          await this.forceSignOutQuiet();
+          return;
+        }
+
+        this.clearAccessDenial();
         this.currentUser = authUser;
       } else {
         this.currentUser = null;
       }
-      
+
       // Notify all listeners
-      this.authStateListeners.forEach(listener => listener(this.currentUser));
+      this.authStateListeners.forEach((listener) => listener(this.currentUser));
     });
+  }
+
+  private setAccessDenial(status?: Employee['employmentStatus'] | string | null) {
+    this.lastAccessDenial = {
+      code: getEmploymentAuthErrorCode(status),
+      message: getEmploymentLoginBlockMessage(status),
+    };
+  }
+
+  private clearAccessDenial() {
+    this.lastAccessDenial = null;
+  }
+
+  getLastAccessDenial(): AuthError | null {
+    return this.lastAccessDenial;
+  }
+
+  /** Sign out without throwing — used when rejecting Inactive/Terminated logins */
+  private async forceSignOutQuiet(): Promise<void> {
+    try {
+      await sessionService.endSession();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Failed to sign out blocked user:', err);
+    }
+    this.currentUser = null;
   }
 
   // Create AuthUser object with employee data
@@ -89,10 +141,11 @@ class FirebaseAuthService {
   // Sign up new user
   async signUp(signUpData: SignUpData): Promise<{ user: AuthUser; employee: Employee }> {
     try {
-      // Calculate base salary from roles
-      const baseSalary = signUpData.roles.length > 0 
-        ? Math.max(...signUpData.roles.map(role => role.baseSalary))
-        : 600000; // Default minimum salary
+      // Calculate base salary from roles (optional — default 0 when unset)
+      const roleSalaries = signUpData.roles
+        .map((role) => Number(role.baseSalary) || 0)
+        .filter((salary) => salary >= 0);
+      const baseSalary = roleSalaries.length > 0 ? Math.max(...roleSalaries) : 0;
 
       // Validate employee data first
       const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -179,8 +232,138 @@ class FirebaseAuthService {
     }
   }
 
+  /**
+   * Create an account without replacing the current Admin/MD session.
+   * Uses a temporary secondary Firebase Auth app instance.
+   */
+  async createManagedAccount(
+    signUpData: SignUpData,
+    createdBy: { uid: string; name?: string }
+  ): Promise<{ uid: string; email: string }> {
+    const roleSalaries = signUpData.roles
+      .map((role) => Number(role.baseSalary) || 0)
+      .filter((salary) => salary >= 0);
+    const baseSalary = roleSalaries.length > 0 ? Math.max(...roleSalaries) : 0;
+
+    const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+      firstName: signUpData.firstName,
+      lastName: signUpData.lastName,
+      employeeNIN: signUpData.employeeNIN,
+      email: signUpData.email,
+      phone: signUpData.phone,
+      address: '',
+      hireDate: new Date() as any,
+      employeeSalary: baseSalary,
+      employmentStatus: 'Active',
+      branchId: signUpData.branchId,
+      roles: signUpData.roles,
+    };
+
+    const secondaryName = `managed-account-${Date.now()}`;
+    const secondaryApp = initializeApp(app.options, secondaryName);
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+      try {
+        const existingBranch = await firestoreServices.branch.getById(signUpData.branchId);
+        if (!existingBranch) {
+          const defaultBranches = {
+            kyengera: {
+              branchName: 'Kyengera Branch',
+              address: 'Kyengera Town',
+              phoneNumber: '+256 700 123 450',
+              email: 'kyengera@retailsystem.com',
+            },
+            main: {
+              branchName: 'Main Branch',
+              address: 'Kampala Central',
+              phoneNumber: '+256 700 123 456',
+              email: 'main@retailsystem.com',
+            },
+            ntinda: {
+              branchName: 'Ntinda Branch',
+              address: 'Ntinda Shopping Center',
+              phoneNumber: '+256 700 123 457',
+              email: 'ntinda@retailsystem.com',
+            },
+            entebbe: {
+              branchName: 'Entebbe Branch',
+              address: 'Entebbe Road',
+              phoneNumber: '+256 700 123 458',
+              email: 'entebbe@retailsystem.com',
+            },
+            jinja: {
+              branchName: 'Jinja Branch',
+              address: 'Jinja Main Street',
+              phoneNumber: '+256 700 123 459',
+              email: 'jinja@retailsystem.com',
+            },
+          };
+          const branchData = defaultBranches[signUpData.branchId as keyof typeof defaultBranches];
+          if (branchData) {
+            await firestoreServices.branch.create(branchData);
+          }
+        }
+      } catch (branchErr) {
+        console.warn('Branch ensure failed during managed account create:', branchErr);
+      }
+
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        signUpData.email,
+        signUpData.password
+      );
+
+      await updateProfile(userCredential.user, {
+        displayName: `${signUpData.firstName} ${signUpData.lastName}`,
+      });
+
+      await setDoc(doc(db, 'employees', userCredential.user.uid), {
+        ...employeeData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        registeredBy: createdBy.uid,
+        registeredByRole: createdBy.name || 'Admin',
+      });
+
+      try {
+        await sendEmailVerification(userCredential.user);
+      } catch (verifyErr) {
+        console.warn('Email verification send failed:', verifyErr);
+      }
+
+      await firestoreServices.audit.logAction(
+        'employees',
+        'CREATE',
+        createdBy.uid,
+        userCredential.user.uid,
+        {
+          action: 'managed_account_create',
+          email: signUpData.email,
+          createdBy: createdBy.uid,
+        },
+        `Account created by ${createdBy.name || createdBy.uid}: ${signUpData.email}`
+      );
+
+      await signOut(secondaryAuth);
+
+      return { uid: userCredential.user.uid, email: signUpData.email };
+    } catch (error: unknown) {
+      console.error('Managed account create error:', error);
+      throw this.handleAuthError(error);
+    } finally {
+      try {
+        await deleteApp(secondaryApp);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   // Sign in existing user
   async signIn(loginData: LoginData): Promise<AuthUser> {
+    this.clearAccessDenial();
+
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -190,16 +373,28 @@ class FirebaseAuthService {
 
       const authUser = await this.createAuthUser(userCredential.user);
 
-      // Check if user has employee record
+      // Check if user has employee record — do not publish session yet
       if (!authUser.employee) {
+        await this.forceSignOutQuiet();
         throw new Error('Employee record not found. Please contact your administrator.');
       }
 
-      // Check if employee is active
-      if (authUser.employee.employmentStatus !== 'Active') {
-        await this.signOut();
-        throw new Error('Your account is not active. Please contact your administrator.');
+      // Inactive / Terminated cannot log in
+      if (!isEmployeeAllowedToLogin(authUser.employee)) {
+        const status = authUser.employee.employmentStatus;
+        this.setAccessDenial(status);
+        await this.forceSignOutQuiet();
+        this.authStateListeners.forEach((listener) => listener(null));
+        const blockedError: AuthError = {
+          code: getEmploymentAuthErrorCode(status),
+          message: getEmploymentLoginBlockMessage(status),
+        };
+        throw blockedError;
       }
+
+      // Only now publish an authenticated session
+      this.clearAccessDenial();
+      this.currentUser = authUser;
 
       // Log the signin action
       await firestoreServices.audit.logAction(
@@ -213,9 +408,26 @@ class FirebaseAuthService {
 
       await recordLoginSession();
 
+      // Notify listeners with fully loaded employee profile
+      this.authStateListeners.forEach((listener) => listener(this.currentUser));
+
       return authUser;
     } catch (error: unknown) {
       console.error('Signin error:', error);
+      // Preserve structured employment-access errors for the login UI
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof (error as AuthError).code === 'string' &&
+        ((error as AuthError).code.startsWith('auth/account-') ||
+          (error as AuthError).code.startsWith('auth/'))
+      ) {
+        // Re-throw Firebase auth errors and our account-* errors as AuthError shape
+        if ((error as AuthError).code.startsWith('auth/account-')) {
+          throw error as AuthError;
+        }
+      }
       throw this.handleAuthError(error);
     }
   }
@@ -338,13 +550,10 @@ class FirebaseAuthService {
     return roles.some(role => this.hasRole(role));
   }
 
-  /** Landing route after login/signup: accountants use analytics as home. */
+  /** Landing route after login/signup. */
   getDefaultDashboardPath(user: AuthUser): string {
     if (!user.employee) return '/dashboard';
-    const primaryRole = user.employee.roles[0]?.jobTitle?.toLowerCase();
-    if (primaryRole === 'system admin') return '/dashboard/admin';
-    if (primaryRole === 'accountant') return '/dashboard/analytics';
-    return '/dashboard';
+    return resolveDashboardPathFromRoles(user.employee.roles);
   }
 
   // Get user permissions
@@ -383,7 +592,13 @@ class FirebaseAuthService {
   // Listen for auth state changes
   onAuthStateChange(callback: (user: AuthUser | null) => void): () => void {
     this.authStateListeners.push(callback);
-    
+
+    // Sync immediately when a session is already loaded (e.g. after client navigations).
+    // Do not emit null here — that can race before Firebase Auth finishes initializing.
+    if (this.currentUser) {
+      callback(this.currentUser);
+    }
+
     // Return unsubscribe function
     return () => {
       const index = this.authStateListeners.indexOf(callback);

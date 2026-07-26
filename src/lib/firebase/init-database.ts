@@ -41,7 +41,10 @@ export async function quickDatabaseSetup(): Promise<void> {
     
     // Initialize with minimal data for testing
     await DatabaseInitialization.initializeAllCollections();
-    await InterfaceDatabaseConnector.createSampleDataForTesting();
+    // NOTE: Do NOT create sample cash close / interface records automatically.
+    // This was the source of "system-generated" cash closes (e.g. test_emp_001).
+    // If you need sample interface data in dev, call InterfaceDatabaseConnector.createSampleDataForTesting()
+    // manually from the console with explicit intent.
     
     console.log('⚡ Quick database setup completed!');
     
@@ -57,6 +60,15 @@ export async function quickDatabaseSetup(): Promise<void> {
 
 // Auto-initialize when loaded in browser
 if (typeof window !== 'undefined') {
+  // Expose console helpers only when explicitly enabled in non-production builds.
+  const enableDevDbTools =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEV_DB_TOOLS === 'true';
+
+  if (!enableDevDbTools) {
+    // Avoid attaching global debug helpers in normal runtime.
+    // (This file may still be imported manually in dev when the flag is enabled.)
+  } else {
   console.log('🗄️ Database system loading...');
   
   // Add global functions for manual control
@@ -78,4 +90,5 @@ if (typeof window !== 'undefined') {
   // Auto-run quick setup on first load (optional)
   // Uncomment the next line to auto-initialize on page load
   // quickDatabaseSetup().catch(console.error);
+  }
 } 

@@ -3,8 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { isAdminUser, isAdminBlockedPath, ADMIN_BASE_PATH } from '../../lib/firebase/admin-access';
+import {
+  isStaffPortalUser,
+  STAFF_PORTAL_PATH,
+} from '../../lib/firebase/staff-portal-roles';
+import { StaffSidebar } from '../../components/staff/StaffSidebar';
+import { staffBrandStyle, EQUITY_BRAND } from '../../components/staff/brand';
 import { Sidebar } from '../../components/ui/Sidebar';
 import { authService, AuthUser } from '../../lib/firebase/auth';
+import {
+  getEmploymentLoginBlockMessage,
+  isEmployeeAllowedToLogin,
+} from '../../lib/firebase/employment-access';
+import { firestoreServices } from '../../lib/firebase/firestore-service';
 import { notificationService } from '../../lib/firebase/notification-service';
 import { LogOut, User, ChevronDown, Bell, Settings } from 'lucide-react';
 import { QuickThemeToggle } from '../../components/ui/ThemeToggle';
@@ -23,11 +34,20 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = isAdminUser(currentUser);
+  const isStaff = isStaffPortalUser(currentUser?.employee?.roles);
 
   useEffect(() => {
     if (!currentUser || !isAdminUser(currentUser) || !pathname) return;
     if (isAdminBlockedPath(pathname)) {
       router.replace(ADMIN_BASE_PATH);
+    }
+  }, [currentUser, pathname, router]);
+
+  // Staff portal roles may only use /dashboard/staff
+  useEffect(() => {
+    if (!currentUser || !isStaffPortalUser(currentUser.employee?.roles) || !pathname) return;
+    if (!pathname.startsWith(STAFF_PORTAL_PATH)) {
+      router.replace(STAFF_PORTAL_PATH);
     }
   }, [currentUser, pathname, router]);
 
@@ -41,14 +61,56 @@ export default function DashboardLayout({
     const unsubscribe = authService.onAuthStateChange((user) => {
       setCurrentUser(user);
       setLoading(false);
-      
+
       if (!user) {
         router.push('/auth/login');
+        return;
+      }
+
+      if (user.employee && !isEmployeeAllowedToLogin(user.employee)) {
+        const status = user.employee.employmentStatus || 'Inactive';
+        void authService.signOut().finally(() => {
+          router.replace(
+            `/auth/login?status=${encodeURIComponent(status)}&blocked=${encodeURIComponent(
+              getEmploymentLoginBlockMessage(status)
+            )}`
+          );
+        });
       }
     });
 
     return unsubscribe;
   }, [router]);
+
+  // Kick out Inactive / Terminated users who still have a cached session
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    let cancelled = false;
+
+    const verifyStatus = async () => {
+      try {
+        const employee = await firestoreServices.employee.getById(currentUser.uid);
+        if (cancelled) return;
+
+        if (employee && !isEmployeeAllowedToLogin(employee)) {
+          await authService.signOut();
+          router.replace(
+            `/auth/login?status=${encodeURIComponent(employee.employmentStatus)}&blocked=${encodeURIComponent(
+              getEmploymentLoginBlockMessage(employee.employmentStatus)
+            )}`
+          );
+        }
+      } catch (err) {
+        console.error('Failed to verify employment status:', err);
+      }
+    };
+
+    void verifyStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.uid, router]);
 
   useEffect(() => {
     if (currentUser?.uid && !isAdminUser(currentUser)) {
@@ -145,6 +207,26 @@ export default function DashboardLayout({
           <p className="text-gray-600 mt-4">Redirecting to Admin console…</p>
         </div>
         </div>
+    );
+  }
+
+  // Staff portal shell — Equity Shoppers brand colors from logo
+  if (isStaff) {
+    return (
+      <div
+        className="flex h-dvh min-h-0 flex-col overflow-hidden dark:bg-[#0A0A0A] lg:flex-row"
+        style={{
+          ...staffBrandStyle,
+          background: `linear-gradient(160deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 42%, ${EQUITY_BRAND.orangeSoft} 72%, ${EQUITY_BRAND.greenSoft} 100%)`,
+        }}
+      >
+        <StaffSidebar user={currentUser} onSignOut={handleSignOut} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden dark:bg-[#0A0A0A]/90">
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+            <div className="mx-auto flex h-full w-full max-w-7xl flex-col">{children}</div>
+          </main>
+        </div>
+      </div>
     );
   }
 

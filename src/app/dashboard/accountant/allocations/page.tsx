@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
+import { isSystemTestCashClose } from '@/lib/firebase/test-record-filters';
 import { 
   DollarSign, 
   Send, 
@@ -150,10 +151,9 @@ export default function AccountantAllocationsPage() {
         const cashClosesSnapshot = await getDocs(cashClosesQuery);
 
         // Process cash closes data - only those with status = "submitted"
-        const submittedCashCloses = cashClosesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const submittedCashCloses = cashClosesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(cc => !isSystemTestCashClose(cc));
 
         setCashCloses(submittedCashCloses);
         
@@ -329,10 +329,9 @@ export default function AccountantAllocationsPage() {
         );
         const allCashClosesSnapshot = await getDocs(allCashClosesQuery);
 
-        const allCashClosesData = allCashClosesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const allCashClosesData = allCashClosesSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(cc => !isSystemTestCashClose(cc));
 
         setAllCashCloses(allCashClosesData);
 

@@ -16,6 +16,8 @@ export const ADMIN_NAV_ITEM_IDS = [
   'admin-accountability',
   'admin-sessions',
   'admin-users',
+  'admin-create-account',
+  'admin-registered-employees',
   'admin-security',
 ] as const;
 
@@ -27,6 +29,18 @@ export function isAdminUser(user: AuthUser | null | undefined): boolean {
   });
 }
 
+export function isManagingDirectorUser(user: AuthUser | null | undefined): boolean {
+  if (!user?.employee?.roles?.length) return false;
+  return user.employee.roles.some(
+    (r) => r.jobTitle.toLowerCase() === 'managing director'
+  );
+}
+
+/** Only Admin (super admin) and Managing Director may create system accounts. */
+export function canCreateSystemAccounts(user: AuthUser | null | undefined): boolean {
+  return isAdminUser(user) || isManagingDirectorUser(user);
+}
+
 /** @deprecated Use isAdminUser */
 export const isSystemAdminUser = isAdminUser;
 
@@ -34,6 +48,7 @@ export const isSystemAdminUser = isAdminUser;
 export const ADMIN_ALLOWED_PATH_PREFIXES = [
   ADMIN_BASE_PATH,
   ADMIN_PLATFORM_PATH,
+  '/dashboard/purchase-manager/registered-employees',
 ] as const;
 
 export function isAdminAllowedPath(pathname: string): boolean {

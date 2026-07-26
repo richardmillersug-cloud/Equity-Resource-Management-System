@@ -93,14 +93,39 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if isAuthenticated() && (
         employeeId == request.auth.uid || // Own record
-        hasAnyRole(['Admin', 'System Admin', 'HR', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver']) // Enhanced access
+        hasAnyRole(['Admin', 'System Admin', 'HR', 'Manager', 'Accountant', 'Purchasing Manager', 'Purchase Manager', 'Receiver', 'Managing Director']) // Enhanced access
       );
-      allow create: if hasAnyRole(['Admin', 'System Admin', 'HR']);
+      allow create: if hasAnyRole(['Admin', 'System Admin', 'HR', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']);
       allow update: if isAuthenticated() && (
         employeeId == request.auth.uid || // Can update own record
-        hasAnyRole(['Admin', 'HR']) // HR/Admin can update all
+        hasAnyRole(['Admin', 'HR', 'Managing Director']) || // HR/Admin/MD can update all
+        // Purchase Manager may manage staff default shift, section, and employment status
+        (
+          hasAnyRole(['Purchasing Manager', 'Purchase Manager']) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'assignedShift',
+              'shiftAssignedAt',
+              'shiftAssignedBy',
+              'workingSection',
+              'employmentStatus',
+              'updatedAt'
+            ])
+        )
       );
       allow delete: if hasRole('Admin');
+    }
+
+    // =====================================================
+    // STAFF SHIFT ASSIGNMENTS (per-day Day/Night by PM)
+    // =====================================================
+    match /staffShiftAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        hasAnyRole(['Admin', 'System Admin', 'HR', 'Purchasing Manager', 'Purchase Manager', 'Manager'])
+      );
+      allow create, update: if hasAnyRole(['Admin', 'HR', 'Purchasing Manager', 'Purchase Manager']);
+      allow delete: if hasAnyRole(['Admin', 'HR', 'Purchasing Manager', 'Purchase Manager']);
     }
     
     // =====================================================
@@ -144,7 +169,7 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if hasAnyRole(['Admin', 'Accountant', 'HR', 'Purchasing Manager', 'Purchase Manager']) || 
         resource.data.employeeId == request.auth.uid;
-      allow delete: if hasRole('Admin');
+      allow delete: if hasAnyRole(['Admin', 'Accountant']);
     }
     
     // =====================================================
@@ -354,11 +379,13 @@ service cloud.firestore {
     // =====================================================
     
     match /attendance/{attendanceId} {
-      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
+      // Staff portal roles can read/create/update their own attendance (check-in / check-out)
+      allow read: if hasAnyRole(['Admin', 'HR', 'HR Manager', 'Manager', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
-      allow create: if hasAnyRole(['HR', 'Supervisor', 'Admin']) || 
+      allow create: if hasAnyRole(['HR', 'HR Manager', 'Supervisor', 'Admin']) || 
         (isAuthenticated() && request.resource.data.employeeId == request.auth.uid);
-      allow update: if hasAnyRole(['Admin', 'HR']);
+      allow update: if hasAnyRole(['Admin', 'HR', 'HR Manager']) ||
+        (isAuthenticated() && resource.data.employeeId == request.auth.uid);
       allow delete: if hasRole('Admin');
     }
     
@@ -367,13 +394,13 @@ service cloud.firestore {
     // =====================================================
     
     match /leaveRequests/{requestId} {
-      allow read: if hasAnyRole(['Admin', 'HR', 'Manager']) || 
+      allow read: if hasAnyRole(['Admin', 'HR', 'HR Manager', 'Manager', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid);
       allow create: if isAuthenticated() && (
         request.resource.data.employeeId == request.auth.uid ||
-        hasAnyRole(['Admin', 'HR'])
+        hasAnyRole(['Admin', 'HR', 'HR Manager'])
       );
-      allow update: if hasAnyRole(['Admin', 'HR']) || 
+      allow update: if hasAnyRole(['Admin', 'HR', 'HR Manager', 'Purchasing Manager', 'Purchase Manager', 'Managing Director']) || 
         (isAuthenticated() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending');
       allow delete: if hasRole('Admin');
     }

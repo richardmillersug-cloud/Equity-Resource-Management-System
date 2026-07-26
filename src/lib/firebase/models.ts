@@ -32,6 +32,14 @@ export interface Employee {
   passportPhoto?: string; // URL to passport-sized photo
   passportPhotoFilename?: string; // Original filename
   passportPhotoUploadedAt?: Timestamp; // Upload timestamp
+  /** Set when Purchase Manager registers staff-portal accounts */
+  registeredBy?: string;
+  registeredByName?: string;
+  registeredByRole?: string;
+  /** Day/Night default when no per-day assignment exists */
+  assignedShift?: 'day' | 'night';
+  shiftAssignedAt?: Timestamp;
+  shiftAssignedBy?: string;
   // Auth handled by Firebase Auth, no password field needed
   roles: JobRole[]; // Embedded job roles
   createdAt: Timestamp;
@@ -433,12 +441,37 @@ export interface Attendance {
   checkInTime?: Timestamp;
   checkOutTime?: Timestamp;
   status: 'Present' | 'Absent' | 'Late' | 'Half Day';
+  /** Shift worked this day — day or night (can change day to day) */
+  shift?: 'day' | 'night';
   hoursWorked?: number;
   overtimeHours?: number;
   barcodeScanned?: string;
   shiftStartTotalScans?: number;
   shiftEndTotalScans?: number;
   totalScansDuringShift?: number;
+  /** Check-in network / location verification */
+  checkInIp?: string;
+  checkInLatitude?: number;
+  checkInLongitude?: number;
+  checkInAccuracyMeters?: number;
+  checkInDistanceMeters?: number;
+  checkInOnPremises?: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/** PM assigns Day or Night per employee per calendar day */
+export interface StaffShiftAssignment {
+  id: string;
+  employeeId: string;
+  /** Calendar date at local midnight */
+  shiftDate: Timestamp;
+  /** yyyy-mm-dd for easy queries */
+  shiftDateKey: string;
+  shift: 'day' | 'night';
+  assignedBy: string;
+  assignedByName?: string;
+  notes?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -545,6 +578,7 @@ export const COLLECTIONS = {
   RETURN_NOTES: 'returnNotes',
   DAMAGES: 'damages',
   ATTENDANCE: 'attendance',
+  STAFF_SHIFT_ASSIGNMENTS: 'staffShiftAssignments',
   BARCODES: 'barcodes',
   LEAVE_REQUESTS: 'leaveRequests',
   PAYROLL: 'payroll',

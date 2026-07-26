@@ -23,6 +23,7 @@ import {
   Upload,
   AlertTriangle,
   UserCheck,
+  UserPlus,
   ClipboardList,
   QrCode,
   Factory,
@@ -215,6 +216,20 @@ const navigationItems: NavigationItem[] = [
     roles: ['Admin'],
   },
   {
+    id: 'admin-create-account',
+    icon: <UserPlus className="w-5 h-5" />,
+    label: 'Create Account',
+    path: '/dashboard/admin/create-account',
+    roles: ['Admin', 'Managing Director'],
+  },
+  {
+    id: 'admin-registered-employees',
+    icon: <Users className="w-5 h-5" />,
+    label: 'Registered Employees',
+    path: '/dashboard/purchase-manager/registered-employees',
+    roles: ['Admin', 'Managing Director'],
+  },
+  {
     id: 'admin-security',
     icon: <Activity className="w-5 h-5" />,
     label: 'Security Overview',
@@ -310,13 +325,27 @@ const navigationItems: NavigationItem[] = [
     roles: ['Accountant', 'Manager']
   },
   
-  // Purchase Manager specific
+  // Purchase Manager specific — Dashboard first
   { 
     id: 'pm-dashboard', 
     icon: <LayoutDashboard className="w-5 h-5" />, 
     label: 'PM Dashboard', 
     path: '/dashboard/purchase-manager',
     roles: ['Purchase Manager', 'Purchasing Manager']
+  },
+  {
+    id: 'pm-register-employee',
+    icon: <UserPlus className="w-5 h-5" />,
+    label: 'Register Staff',
+    path: '/dashboard/purchase-manager/register-employee',
+    roles: ['Purchase Manager', 'Purchasing Manager']
+  },
+  {
+    id: 'pm-registered-employees',
+    icon: <Users className="w-5 h-5" />,
+    label: 'Registered Employees',
+    path: '/dashboard/purchase-manager/registered-employees',
+    roles: ['Purchase Manager', 'Purchasing Manager'],
   },
 
   // Group: Procurement

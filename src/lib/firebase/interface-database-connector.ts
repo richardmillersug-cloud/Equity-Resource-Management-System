@@ -1095,6 +1095,12 @@ export class InterfaceDatabaseConnector {
 
   static setupConsoleShortcuts() {
     if (typeof window !== 'undefined') {
+      const enableDevDbTools =
+        process.env.NODE_ENV !== 'production' &&
+        process.env.NEXT_PUBLIC_ENABLE_DEV_DB_TOOLS === 'true';
+
+      if (!enableDevDbTools) return;
+
       (window as any).dbConnector = {
         // Purchasing Manager shortcuts
         cashClose: {

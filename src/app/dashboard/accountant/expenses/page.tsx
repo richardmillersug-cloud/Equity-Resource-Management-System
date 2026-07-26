@@ -22,7 +22,6 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
-  Building,
   Receipt,
   RefreshCw,
   Filter,
@@ -34,6 +33,31 @@ import ExpenseReceiptView from '@/components/ui/ExpenseReceiptView';
 import { ExpensePaymentService, PaymentMethod } from '@/lib/firebase/expense-payment-service';
 import { FundingSourceDisplay, FundingSourceSelector } from '@/components/ui/FundingSourceDisplay';
 import { FundingSourceService } from '@/lib/firebase/funding-source-service';
+
+function computeExpensePaymentStatus(
+  paidAmount: number,
+  totalAmount: number,
+  stored?: string
+): string {
+  if (stored) return stored;
+  if (paidAmount === 0) return 'UNPAID';
+  if (paidAmount >= totalAmount) return 'FULLY_PAID';
+  return 'PARTIALLY_PAID';
+}
+
+function deriveExpenseDisplayStatus(
+  baseStatus: string | undefined,
+  paidAmount: number,
+  totalAmount: number,
+  paymentStatus?: string
+): string {
+  const resolvedPaymentStatus = computeExpensePaymentStatus(paidAmount, totalAmount, paymentStatus);
+  const resolvedBaseStatus = baseStatus || 'pending';
+  if (resolvedBaseStatus === 'pending' && resolvedPaymentStatus === 'FULLY_PAID') {
+    return 'approved';
+  }
+  return resolvedBaseStatus;
+}
 
 // Enhanced expense interface to combine expenses from both sources
 interface CombinedExpense {
@@ -109,6 +133,10 @@ export default function ExpensesPage() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Delete state
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Print handler
   const handlePrintExpense = (expense: CombinedExpense) => {
@@ -241,6 +269,76 @@ export default function ExpensesPage() {
     setPaymentError(null);
   };
 
+  const isSyntheticExpenseId = (id: string) =>
+    id.startsWith('table_') || id.startsWith('collection_') || id.startsWith('cashclose:');
+
+  const removeLinkedCashCloseExpense = async (cashCloseId: string, tillExpenseId: string) => {
+    const cashCloseService = new CashCloseService();
+    await cashCloseService.removeTillExpense(cashCloseId, tillExpenseId);
+  };
+
+  const deleteLinkedExpenseDocs = async (cashCloseId: string, tillExpenseId: string) => {
+    const expenseService = new ExpenseService();
+    const relatedExpenses = await expenseService.getAll([
+      { field: 'cashCloseId', operator: '==', value: cashCloseId },
+      { field: 'tillExpenseId', operator: '==', value: tillExpenseId },
+    ] as any);
+
+    for (const related of relatedExpenses) {
+      await ExpensePaymentService.deleteExpenseWithPayments(related.id);
+    }
+  };
+
+  const handleDeleteExpense = async (expense: CombinedExpense) => {
+    const paymentWarning =
+      expense.paidAmount > 0
+        ? `\n\nThis expense has ${formatCurrency(expense.paidAmount)} in recorded payments. Deleting will remove payment records and restore fund balances.`
+        : '';
+
+    const confirmed = window.confirm(
+      `Delete "${expense.description}" (${formatCurrency(expense.amount)})? This action cannot be undone.${paymentWarning}`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingExpenseId(expense.id);
+      setDeleteError(null);
+
+      if (expense.source === 'cash_close') {
+        const raw = expense.originalData;
+        const cashCloseId = raw?.cashClose?.id;
+        const tillExpenseId = raw?.expense?.id;
+
+        if (!cashCloseId || tillExpenseId === undefined || tillExpenseId === null) {
+          throw new Error('Cannot delete: missing cash close reference for this till expense.');
+        }
+
+        await removeLinkedCashCloseExpense(cashCloseId, String(tillExpenseId));
+        await deleteLinkedExpenseDocs(cashCloseId, String(tillExpenseId));
+      } else {
+        if (isSyntheticExpenseId(expense.id)) {
+          throw new Error('Cannot delete: this expense has no valid database ID.');
+        }
+
+        const raw = expense.originalData;
+        if (raw?.cashCloseId && raw?.tillExpenseId) {
+          await removeLinkedCashCloseExpense(raw.cashCloseId, String(raw.tillExpenseId));
+        }
+
+        await ExpensePaymentService.deleteExpenseWithPayments(expense.id);
+      }
+
+      await loadExpenses();
+      await loadFundBalances();
+    } catch (err) {
+      console.error('Failed to delete expense:', err);
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete expense');
+    } finally {
+      setDeletingExpenseId(null);
+    }
+  };
+
   useEffect(() => {
     loadExpenses();
     loadFundBalances();
@@ -358,8 +456,17 @@ export default function ExpensesPage() {
             expenseDate: expense.expenseDate?.toDate ? expense.expenseDate.toDate() : new Date(expense.expenseDate),
             category: expense.category || 'General',
             expenseType: expense.expenseType || expense.type || 'General Expense',
-            status: expense.status || 'pending',
-            paymentStatus: expense.paymentStatus || (expense.paidAmount === 0 ? 'UNPAID' : expense.paidAmount >= expense.amount ? 'FULLY_PAID' : 'PARTIALLY_PAID'),
+            status: deriveExpenseDisplayStatus(
+              expense.status,
+              expense.paidAmount || 0,
+              expense.amount || 0,
+              expense.paymentStatus
+            ),
+            paymentStatus: computeExpensePaymentStatus(
+              expense.paidAmount || 0,
+              expense.amount || 0,
+              expense.paymentStatus
+            ),
             priority: expense.priority || 'medium',
             vendor: expense.vendor || 'Unknown Vendor',
             receiptNumber: expense.receiptNumber || `TBL-${expense.id}`,
@@ -414,8 +521,10 @@ export default function ExpensesPage() {
             cashClose.shifts?.forEach((shift: any, shiftIndex: number) => {
               shift.tills?.forEach((till: any, tillIndex: number) => {
                 till.expenseDetails?.forEach((expense: any, expenseIndex: number) => {
+                  const expenseKey = `${cashClose.id || closeIndex}:${expense?.id || expenseIndex}`;
                   const combinedExpense: CombinedExpense = {
-                    id: `cash_${closeIndex}_${shiftIndex}_${tillIndex}_${expenseIndex}`,
+                    // Stable id so we can dedupe against expenses_collection
+                    id: `cashclose:${expenseKey}`,
                     description: expense.description || `Till ${till.tillNumber || tillIndex + 1} Expense`,
                     amount: expense.amount || 0,
                     paidAmount: expense.paidAmount || expense.amount || 0, // Till expenses are typically paid immediately
@@ -425,8 +534,17 @@ export default function ExpensesPage() {
                                  cashCloseDate,
                     category: expense.category || 'Till Operations',
                     expenseType: expense.expenseType || expense.type || 'Till Expense',
-                    status: 'approved' as const, // Till expenses are typically approved
-                    paymentStatus: 'FULLY_PAID' as const,
+                    status: deriveExpenseDisplayStatus(
+                      expense.status,
+                      expense.paidAmount || expense.amount || 0,
+                      expense.amount || 0,
+                      expense.paymentStatus
+                    ),
+                    paymentStatus: computeExpensePaymentStatus(
+                      expense.paidAmount || expense.amount || 0,
+                      expense.amount || 0,
+                      expense.paymentStatus
+                    ),
                     priority: 'medium' as const,
                     vendor: expense.vendor || 'Till Transaction',
                     receiptNumber: expense.receiptNumber || `TILL-${till.tillNumber || tillIndex + 1}-${expenseIndex + 1}`,
@@ -474,8 +592,17 @@ export default function ExpensesPage() {
                          new Date(expense.expenseDate || expense.date),
             category: expense.category || expense.expenseType || 'General',
             expenseType: expense.expenseType || expense.type || expense.category || 'Collection Expense',
-            status: expense.status || 'pending',
-            paymentStatus: expense.paymentStatus || (expense.paidAmount === 0 ? 'UNPAID' : expense.paidAmount >= (expense.amount || expense.totalAmount || 0) ? 'FULLY_PAID' : 'PARTIALLY_PAID'),
+            status: deriveExpenseDisplayStatus(
+              expense.status,
+              expense.paidAmount || 0,
+              expense.amount || expense.totalAmount || 0,
+              expense.paymentStatus
+            ),
+            paymentStatus: computeExpensePaymentStatus(
+              expense.paidAmount || 0,
+              expense.amount || expense.totalAmount || 0,
+              expense.paymentStatus
+            ),
             priority: expense.priority || 'medium',
             vendor: expense.vendor || expense.supplierName || 'Unknown Vendor',
             receiptNumber: expense.receiptNumber || expense.referenceNumber || `COL-${expense.id}`,
@@ -505,6 +632,42 @@ export default function ExpensesPage() {
       // NO MORE MOCK DATA - Show empty state if no real data is available
       if (combinedExpenses.length === 0) {
         console.log('📋 No real expense data found - showing empty state');
+      }
+
+      // Deduplicate: if a till-expense exists as a real expense doc, hide the embedded cash_close copy.
+      // Key is (cashCloseId, tillExpenseId) when available.
+      try {
+        const collectionTillKeys = new Set<string>();
+        for (const exp of combinedExpenses) {
+          if (exp.source !== 'expenses_collection') continue;
+          const raw = exp.originalData;
+          const cashCloseId = raw?.cashCloseId;
+          const tillExpenseId = raw?.tillExpenseId;
+          if (cashCloseId && tillExpenseId) {
+            collectionTillKeys.add(`${cashCloseId}:${tillExpenseId}`);
+          }
+        }
+
+        if (collectionTillKeys.size > 0) {
+          const before = combinedExpenses.length;
+          const filtered = combinedExpenses.filter(exp => {
+            if (exp.source !== 'cash_close') return true;
+            const raw = exp.originalData;
+            const cashCloseId = raw?.cashClose?.id;
+            const tillExpenseId = raw?.expense?.id;
+            if (cashCloseId && tillExpenseId) {
+              return !collectionTillKeys.has(`${cashCloseId}:${tillExpenseId}`);
+            }
+            return true;
+          });
+
+          if (filtered.length !== before) {
+            combinedExpenses.length = 0;
+            combinedExpenses.push(...filtered);
+          }
+        }
+      } catch (dedupErr) {
+        console.warn('Failed to deduplicate embedded cash close expenses:', dedupErr);
       }
 
       // Sort by expense date (newest first)
@@ -566,16 +729,6 @@ export default function ExpensesPage() {
       case 'cash_close': return 'text-green-600 bg-green-100';
       // Removed mock data support
       default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getSourceIcon = (source: string) => {
-    switch (source) {
-      case 'expenses_table': return Receipt;
-      case 'expenses_collection': return DollarSign;
-      case 'cash_close': return Building;
-      // Removed mock data support
-      default: return Receipt;
     }
   };
 
@@ -669,11 +822,11 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="w-full min-h-screen p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="w-full min-h-full p-4 sm:p-6">
+      <div className="w-full space-y-6">
         
         {/* Global Success/Error Messages */}
-        {(paymentSuccess || paymentError) && !showPaymentModal && (
+        {(paymentSuccess || paymentError || deleteError) && !showPaymentModal && (
           <div className={`rounded-2xl shadow-lg border p-4 mb-6 ${
             paymentSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
           }`}>
@@ -687,18 +840,19 @@ export default function ExpensesPage() {
                 <h3 className={`font-medium ${
                   paymentSuccess ? 'text-green-800' : 'text-red-800'
                 }`}>
-                  {paymentSuccess ? 'Payment Successful!' : 'Payment Not Allowed'}
+                  {paymentSuccess ? 'Payment Successful!' : deleteError ? 'Delete Failed' : 'Payment Not Allowed'}
                 </h3>
                 <p className={`text-sm ${
                   paymentSuccess ? 'text-green-700' : 'text-red-700'
                 }`}>
-                  {paymentSuccess || paymentError}
+                  {paymentSuccess || deleteError || paymentError}
                 </p>
               </div>
               <button
                 onClick={() => {
                   setPaymentSuccess(null);
                   setPaymentError(null);
+                  setDeleteError(null);
                 }}
                 className={`text-gray-400 hover:text-gray-600 transition-colors ${
                   paymentSuccess ? 'hover:text-green-600' : 'hover:text-red-600'
@@ -998,8 +1152,8 @@ export default function ExpensesPage() {
         </div>
 
         {/* Modern Expenses List */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm">
-          <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm w-full">
+          <div className="px-4 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
                 <Receipt className="w-4 h-4 text-white" />
@@ -1017,151 +1171,100 @@ export default function ExpensesPage() {
               <p className="text-gray-500 max-w-md mx-auto">No expenses match your current search criteria. Try adjusting your filters or search terms.</p>
             </div>
           ) : (
-        <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
+        <div className="overflow-x-auto w-full">
+              <table className="w-full table-fixed divide-y divide-gray-100 text-sm">
                 <thead className="bg-gradient-to-r from-gray-50 to-emerald-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Expense Details
+                <th className="w-[24%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Expense
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount & Payment
+                <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Expense Type
+                <th className="w-[18%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category & Priority
+                <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date / Source
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vendor & Date
-                </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Source
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {paginatedExpenses.map((expense) => (
-                    <tr key={expense.id} className="hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-300 group border-l-4 border-transparent hover:border-emerald-400">
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
+                    <tr key={expense.id} className="hover:bg-emerald-50/50 transition-colors group">
+                  <td className="px-3 py-2 align-top">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={expense.description}>
                         {expense.description}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {expense.receiptNumber}
+                      <div className="text-xs text-gray-500 truncate" title={expense.vendor}>
+                        {expense.vendor}
                       </div>
-                            {expense.tags && expense.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {expense.tags.slice(0, 2).map(tag => (
-                            <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
+                      {expense.receiptNumber && (
+                        <div className="text-xs text-gray-400 truncate">{expense.receiptNumber}</div>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatCurrency(expense.amount)}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Paid: {formatCurrency(expense.paidAmount)}
-                      </div>
-                      {expense.remainingBalance !== 0 && (
-                        <div className={`text-sm ${expense.remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          Balance: {formatCurrency(Math.abs(expense.remainingBalance))}
-                        </div>
-                      )}
+                  <td className="px-3 py-2 align-top whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900 tabular-nums">
+                      {formatCurrency(expense.amount)}
                     </div>
+                    <div className="text-xs text-gray-500 tabular-nums">
+                      Paid: {formatCurrency(expense.paidAmount)}
+                    </div>
+                    {expense.remainingBalance !== 0 && (
+                      <div className={`text-xs tabular-nums ${expense.remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        Bal: {formatCurrency(Math.abs(expense.remainingBalance))}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(expense.status)}`}>
+                  <td className="px-3 py-2 align-top">
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColor(expense.status)}`}>
                         {expense.status}
                       </span>
-                      <div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(expense.paymentStatus)}`}>
-                          {expense.paymentStatus.replace('_', ' ')}
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getPaymentStatusColor(expense.paymentStatus)}`}>
+                        {expense.paymentStatus.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <div className="min-w-0 space-y-1">
+                      <div className="text-xs text-gray-900 truncate" title={expense.category}>
+                        {expense.expenseType || 'General'} · {expense.category}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getPriorityColor(expense.priority)}`}>
+                          {expense.priority}
                         </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
-                        {expense.expenseType || 'General'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-2">
-                      <div className="text-sm text-gray-900">{expense.category}</div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(expense.priority)}`}>
-                        {expense.priority}
-                      </span>
-                      {expense.fundingSource ? (
-                        <div>
-                          <FundingSourceDisplay 
-                            fundingSource={expense.fundingSource} 
-                            size="sm"
-                          />
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            📋 No Funding Assigned
+                        {expense.fundingSource ? (
+                          <FundingSourceDisplay fundingSource={expense.fundingSource} size="sm" />
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
+                            Unfunded
                           </span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{expense.vendor}</div>
-                      <div className="text-sm text-gray-500">
-                        {expense.expenseDate.toLocaleDateString()}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Due: {expense.dueDate instanceof Date ? expense.dueDate.toLocaleDateString() : expense.dueDate ? new Date(expense.dueDate).toLocaleDateString() : 'No due date'}
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      {(() => {
-                        const SourceIcon = getSourceIcon(expense.source);
-                        return (
-                          <div className="flex items-center">
-                            <SourceIcon className="h-4 w-4 mr-2 text-gray-400" />
-                            <div>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSourceColor(expense.source)}`}>
-                                {expense.source === 'expenses_table' ? 'Table' : 
-                                 expense.source === 'expenses_collection' ? 'Collection' :
-                                 expense.source === 'cash_close' ? 'Till' : 'Mock'}
-                              </span>
-                              {expense.sourceDetails && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {expense.sourceDetails}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
+                  <td className="px-3 py-2 align-top">
+                    <div className="text-xs text-gray-900 whitespace-nowrap">
+                      {expense.expenseDate.toLocaleDateString()}
                     </div>
+                    <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${getSourceColor(expense.source)}`}>
+                      {expense.source === 'expenses_table' ? 'Table' :
+                       expense.source === 'expenses_collection' ? 'Collection' :
+                       expense.source === 'cash_close' ? 'Till' : 'Other'}
+                    </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
+                  <td className="px-3 py-2 align-top">
+                    <div className="flex items-center gap-1">
                       {/* Payment button with proper validation */}
                       {(() => {
                         const actualRemainingBalance = Math.max(0, expense.amount - expense.paidAmount);
@@ -1196,8 +1299,17 @@ export default function ExpensesPage() {
                       <button className="text-blue-600 hover:text-blue-900 transition-colors" title="Edit">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button className="text-red-600 hover:text-red-900 transition-colors" title="Delete">
-                        <Trash2 className="w-4 h-4" />
+                      <button
+                        onClick={() => handleDeleteExpense(expense)}
+                        disabled={deletingExpenseId === expense.id}
+                        className={`transition-colors ${
+                          deletingExpenseId === expense.id
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-red-600 hover:text-red-900'
+                        }`}
+                        title="Delete"
+                      >
+                        <Trash2 className={`w-4 h-4 ${deletingExpenseId === expense.id ? 'animate-pulse' : ''}`} />
                       </button>
                     </div>
                   </td>

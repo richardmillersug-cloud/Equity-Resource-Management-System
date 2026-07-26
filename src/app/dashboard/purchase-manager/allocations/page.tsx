@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
+import { isSystemTestCashClose } from '@/lib/firebase/test-record-filters';
 import { 
   Receipt,
   AlertCircle,
@@ -199,9 +200,10 @@ export default function PMAllocationsPage() {
       const cashClosesData: CashClose[] = [];
 
       cashClosesSnapshot.docs.forEach(doc => {
-          const data = doc.data();
+        const data = doc.data();
+        if (isSystemTestCashClose(data)) return;
         cashClosesData.push({
-              id: doc.id,
+          id: doc.id,
           ...data
         });
       });
