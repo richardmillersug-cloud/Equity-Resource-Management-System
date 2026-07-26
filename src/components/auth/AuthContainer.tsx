@@ -2,113 +2,210 @@
 
 import React, { useState, useEffect } from 'react';
 import { authService, AuthUser } from '@/lib/firebase/auth';
+import {
+  getEmploymentBlockReason,
+  getEmploymentLoginBlockMessage,
+  isEmployeeAllowedToLogin,
+  resolveEmploymentBlockFromError,
+  employmentStatusFromAuthCode,
+} from '@/lib/firebase/employment-access';
 import LoginForm from './LoginForm';
-import SignupForm from './SignupForm';
 import { Loader2 } from 'lucide-react';
+import { EQUITY_BRAND } from '@/components/staff/brand';
 
 interface AuthContainerProps {
   onAuthSuccess?: (user: AuthUser) => void;
   defaultMode?: 'login' | 'signup';
+  loginError?: string | null;
 }
 
-export default function AuthContainer({ onAuthSuccess, defaultMode = 'login' }: AuthContainerProps) {
-  const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
+export default function AuthContainer({
+  onAuthSuccess,
+  defaultMode = 'login',
+  loginError = null,
+}: AuthContainerProps) {
+  // Public signup is disabled — ignore defaultMode signup
+  void defaultMode;
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [accessBlockError, setAccessBlockError] = useState<string | null>(loginError);
+  const [accessBlockStatus, setAccessBlockStatus] = useState<
+    'Terminated' | 'Inactive' | 'Other' | null
+  >(loginError ? resolveEmploymentBlockFromError({ message: loginError }) : null);
+
+  const applyAccessDenial = (code?: string, message?: string, statusHint?: string | null) => {
+    const fromCode = employmentStatusFromAuthCode(code);
+    const fromMessage = resolveEmploymentBlockFromError({ code, message });
+    const status =
+      (statusHint === 'Terminated' || statusHint === 'Inactive' ? statusHint : null) ||
+      fromCode ||
+      fromMessage;
+
+    setCurrentUser(null);
+    setAccessBlockStatus(status);
+    setAccessBlockError(
+      message || getEmploymentLoginBlockMessage(status === 'Other' ? null : status)
+    );
+  };
 
   useEffect(() => {
-    // Mark component as mounted to prevent hydration mismatch
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
+    if (loginError) {
+      applyAccessDenial(undefined, loginError);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginError]);
+
+  useEffect(() => {
     if (!isMounted) return;
 
-    // Check if user is already authenticated
-    const checkAuthState = () => {
-      const user = authService.getCurrentUser();
-      setCurrentUser(user);
-      setIsCheckingAuth(false);
-      
-      if (user && onAuthSuccess) {
-        onAuthSuccess(user);
+    const acceptUser = (user: AuthUser | null) => {
+      const denial = authService.getLastAccessDenial();
+      if (denial) {
+        applyAccessDenial(denial.code, denial.message);
+        setIsCheckingAuth(false);
+        setCurrentUser(null);
+        return;
       }
+
+      if (user?.employee && !isEmployeeAllowedToLogin(user.employee)) {
+        const status = user.employee.employmentStatus;
+        applyAccessDenial(
+          undefined,
+          getEmploymentLoginBlockMessage(status),
+          getEmploymentBlockReason(status)
+        );
+        setIsCheckingAuth(false);
+        void authService.signOut();
+        return;
+      }
+
+      // Never treat a blocked account as a successful session
+      if (user && user.employee && isEmployeeAllowedToLogin(user.employee)) {
+        setCurrentUser(user);
+        setIsCheckingAuth(false);
+        setAccessBlockError(null);
+        setAccessBlockStatus(null);
+        onAuthSuccess?.(user);
+        return;
+      }
+
+      if (user && !user.employee) {
+        // Profile still loading or missing — keep login visible, don't blank the page
+        setCurrentUser(null);
+        setIsCheckingAuth(false);
+        return;
+      }
+
+      setCurrentUser(null);
+      setIsCheckingAuth(false);
     };
 
-    // Listen for auth state changes
-    const unsubscribe = authService.onAuthStateChange((user) => {
-      setCurrentUser(user);
-      setIsCheckingAuth(false);
-      
-      if (user && onAuthSuccess) {
-        onAuthSuccess(user);
-      }
-    });
+    acceptUser(authService.getCurrentUser());
 
-    checkAuthState();
+    const unsubscribe = authService.onAuthStateChange((user) => {
+      acceptUser(user);
+    });
 
     return unsubscribe;
   }, [onAuthSuccess, isMounted]);
 
-  const handleAuthSuccess = () => {
-    const user = authService.getCurrentUser();
-    if (user && onAuthSuccess) {
-      onAuthSuccess(user);
+  const handleAuthSuccess = (user?: AuthUser) => {
+    const denial = authService.getLastAccessDenial();
+    if (denial) {
+      applyAccessDenial(denial.code, denial.message);
+      return;
+    }
+
+    const resolved = user || authService.getCurrentUser();
+    if (!resolved) return;
+
+    if (resolved.employee && !isEmployeeAllowedToLogin(resolved.employee)) {
+      applyAccessDenial(
+        undefined,
+        getEmploymentLoginBlockMessage(resolved.employee.employmentStatus),
+        getEmploymentBlockReason(resolved.employee.employmentStatus)
+      );
+      void authService.signOut();
+      return;
+    }
+
+    if (resolved.employee && isEmployeeAllowedToLogin(resolved.employee)) {
+      onAuthSuccess?.(resolved);
     }
   };
 
-  const handleSwitchToSignup = () => {
-    setMode('signup');
-  };
-
-  const handleSwitchToLogin = () => {
-    setMode('login');
-  };
-
-  // Don't render loading state during SSR to prevent hydration mismatch
   if (!isMounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div
+        className="flex min-h-screen items-center justify-center dark:from-slate-950 dark:to-slate-900"
+        style={{
+          background: `linear-gradient(160deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 45%, ${EQUITY_BRAND.purpleSoft} 75%, ${EQUITY_BRAND.greenSoft} 100%)`,
+        }}
+      >
         <div className="text-center">
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-slate-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show loading spinner while checking auth state
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{
+          background: `linear-gradient(160deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 45%, ${EQUITY_BRAND.purpleSoft} 75%, ${EQUITY_BRAND.greenSoft} 100%)`,
+        }}
+      >
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Checking authentication...</p>
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin" style={{ color: EQUITY_BRAND.purple }} />
+          <p className="text-gray-600 dark:text-slate-400">Checking authentication...</p>
         </div>
       </div>
     );
   }
 
-  // If user is already authenticated, don't show auth forms
-  if (currentUser) {
-    return null;
+  // Only hide the form for fully allowed Active sessions
+  if (
+    currentUser?.employee &&
+    isEmployeeAllowedToLogin(currentUser.employee) &&
+    !accessBlockStatus
+  ) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{
+          background: `linear-gradient(160deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 45%, ${EQUITY_BRAND.purpleSoft} 75%, ${EQUITY_BRAND.greenSoft} 100%)`,
+        }}
+      >
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin" style={{ color: EQUITY_BRAND.purple }} />
+          <p className="text-gray-600 dark:text-slate-400">Redirecting…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div
+      className="flex min-h-screen items-center justify-center p-4 dark:bg-slate-950"
+      style={{
+        background: `linear-gradient(160deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 45%, ${EQUITY_BRAND.purpleSoft} 75%, ${EQUITY_BRAND.greenSoft} 100%)`,
+      }}
+    >
       <div className="w-full max-w-4xl">
-        {mode === 'login' ? (
-          <LoginForm
-            onSuccess={handleAuthSuccess}
-            onSwitchToSignup={handleSwitchToSignup}
-          />
-        ) : (
-          <SignupForm
-            onSuccess={handleAuthSuccess}
-            onSwitchToLogin={handleSwitchToLogin}
-          />
-        )}
+        <LoginForm
+          key={accessBlockStatus || accessBlockError || 'login'}
+          onSuccess={handleAuthSuccess}
+          initialError={accessBlockError}
+          initialBlockStatus={accessBlockStatus}
+        />
       </div>
     </div>
   );
-} 
+}

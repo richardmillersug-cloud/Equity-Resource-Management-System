@@ -3,6 +3,8 @@ export interface PhotoProcessingOptions {
   maxHeight: number;
   quality: number;
   format: 'jpeg' | 'png';
+  /** Target max output size in bytes after compression */
+  maxOutputBytes: number;
 }
 
 export interface PhotoUploadResult {
@@ -10,6 +12,19 @@ export interface PhotoUploadResult {
   photoUrl?: string;
   filename?: string;
   error?: string;
+  originalSize?: number;
+  compressedSize?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface CompressedPhotoResult {
+  file: File;
+  previewUrl: string;
+  originalSize: number;
+  compressedSize: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -17,12 +32,13 @@ export interface PhotoUploadResult {
  */
 export class PhotoService {
   
-  // Standard passport photo dimensions (in pixels at 300 DPI)
+  // Standard passport photo dimensions (in pixels at 300 DPI) and size budget
   private static readonly PASSPORT_PHOTO_OPTIONS: PhotoProcessingOptions = {
     maxWidth: 413,   // 3.5cm at 300 DPI
     maxHeight: 531,  // 4.5cm at 300 DPI
-    quality: 0.9,
-    format: 'jpeg'
+    quality: 0.85,
+    format: 'jpeg',
+    maxOutputBytes: 150 * 1024, // 150KB
   };
 
   /**
@@ -30,20 +46,20 @@ export class PhotoService {
    */
   static validateImageFile(file: File): { valid: boolean; error?: string } {
     // Check file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       return {
         valid: false,
-        error: 'Please select a valid image file (JPEG, JPG, or PNG)'
+        error: 'Please select a valid image file (JPEG, JPG, PNG, or WebP)'
       };
     }
 
-    // Check file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Check file size (max 10MB before compression)
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: 'Image file must be smaller than 5MB'
+        error: 'Image file must be smaller than 10MB'
       };
     }
 
@@ -51,78 +67,88 @@ export class PhotoService {
   }
 
   /**
-   * Processes and resizes image to passport photo dimensions
+   * Compress and crop an image to passport size, returning a File + preview URL.
+   */
+  static async compressPassportPhoto(file: File): Promise<CompressedPhotoResult> {
+    const { maxWidth, maxHeight, maxOutputBytes } = this.PASSPORT_PHOTO_OPTIONS;
+    const blob = await this.processPassportPhoto(file);
+    const compressedFile = new File(
+      [blob],
+      file.name.replace(/\.\w+$/, '') + '_passport.jpg',
+      { type: 'image/jpeg', lastModified: Date.now() }
+    );
+
+    return {
+      file: compressedFile,
+      previewUrl: URL.createObjectURL(compressedFile),
+      originalSize: file.size,
+      compressedSize: compressedFile.size,
+      width: maxWidth,
+      height: maxHeight,
+    };
+  }
+
+  /**
+   * Processes and resizes image to exact passport photo dimensions with compression
    */
   static async processPassportPhoto(file: File): Promise<Blob> {
+    const { maxWidth, maxHeight, quality, maxOutputBytes } = this.PASSPORT_PHOTO_OPTIONS;
+
+    const img = await this.loadImage(file);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to create canvas context');
+    }
+
+    canvas.width = maxWidth;
+    canvas.height = maxHeight;
+
+    // Cover-fit center crop so output is exactly passport size
+    const scale = Math.max(maxWidth / img.width, maxHeight / img.height);
+    const drawWidth = img.width * scale;
+    const drawHeight = img.height * scale;
+    const offsetX = (maxWidth - drawWidth) / 2;
+    const offsetY = (maxHeight - drawHeight) / 2;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, maxWidth, maxHeight);
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+    URL.revokeObjectURL(img.src);
+
+    // Iteratively reduce JPEG quality until under size budget
+    let currentQuality = quality;
+    let blob = await this.canvasToBlob(canvas, currentQuality);
+
+    while (blob.size > maxOutputBytes && currentQuality > 0.4) {
+      currentQuality = Math.max(0.4, currentQuality - 0.1);
+      blob = await this.canvasToBlob(canvas, currentQuality);
+    }
+
+    return blob;
+  }
+
+  private static loadImage(file: File): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
       const img = new Image();
-
-      img.onload = () => {
-        try {
-          const { maxWidth, maxHeight, quality } = this.PASSPORT_PHOTO_OPTIONS;
-          
-          // Calculate dimensions maintaining aspect ratio
-          let { width, height } = this.calculateDimensions(
-            img.width, 
-            img.height, 
-            maxWidth, 
-            maxHeight
-          );
-
-          // Set canvas dimensions
-          canvas.width = width;
-          canvas.height = height;
-
-          // Draw and resize image
-          ctx!.drawImage(img, 0, 0, width, height);
-
-          // Convert to blob
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Failed to process image'));
-            }
-          }, 'image/jpeg', quality);
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      img.onerror = () => {
-        reject(new Error('Failed to load image'));
-      };
-
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load image'));
       img.src = URL.createObjectURL(file);
     });
   }
 
-  /**
-   * Calculate dimensions maintaining aspect ratio within constraints
-   */
-  private static calculateDimensions(
-    originalWidth: number, 
-    originalHeight: number, 
-    maxWidth: number, 
-    maxHeight: number
-  ): { width: number; height: number } {
-    let width = originalWidth;
-    let height = originalHeight;
-
-    // Scale down if too large
-    if (width > maxWidth) {
-      height = (height * maxWidth) / width;
-      width = maxWidth;
-    }
-
-    if (height > maxHeight) {
-      width = (width * maxHeight) / height;
-      height = maxHeight;
-    }
-
-    return { width: Math.round(width), height: Math.round(height) };
+  private static canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to compress image'));
+        },
+        'image/jpeg',
+        quality
+      );
+    });
   }
 
   /**
@@ -156,12 +182,15 @@ export class PhotoService {
       const processedFilename = `passport_${employeeId}_${timestamp}_${filename}`;
 
       // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       return {
         success: true,
         photoUrl: dataUrl, // In production: download URL from Firebase Storage
-        filename: processedFilename
+        filename: processedFilename,
+        compressedSize: blob.size,
+        width: this.PASSPORT_PHOTO_OPTIONS.maxWidth,
+        height: this.PASSPORT_PHOTO_OPTIONS.maxHeight,
       };
     } catch (error) {
       return {
@@ -188,7 +217,8 @@ export class PhotoService {
     }
 
     try {
-      // Process image
+      const originalSize = file.size;
+      // Process image (crop + compress to required passport size)
       const processedBlob = await this.processPassportPhoto(file);
       
       // Upload to storage
@@ -198,13 +228,26 @@ export class PhotoService {
         file.name
       );
 
-      return uploadResult;
+      return {
+        ...uploadResult,
+        originalSize,
+        compressedSize: processedBlob.size,
+      };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Photo processing failed'
       };
     }
+  }
+
+  /**
+   * Format bytes for UI display
+   */
+  static formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
   /**
@@ -223,4 +266,4 @@ export class PhotoService {
 }
 
 // Export singleton instance
-export const photoService = PhotoService; 
+export const photoService = PhotoService;

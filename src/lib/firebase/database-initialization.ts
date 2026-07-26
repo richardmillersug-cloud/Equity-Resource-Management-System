@@ -1864,23 +1864,29 @@ export class DatabaseInitialization {
 // =====================================================
 
 if (typeof window !== 'undefined') {
-  (window as any).dbInit = {
-    initialize: () => DatabaseInitialization.initializeAllCollections(),
-    status: () => DatabaseInitialization.getDatabaseStatus(),
-    clear: () => DatabaseInitialization.clearAllCollections(),
-    purchasingManager: () => DatabaseInitialization.initializePurchasingManagerCollections(),
-    receiver: () => DatabaseInitialization.initializeReceiverCollections(),
-    shared: () => DatabaseInitialization.initializeSharedCollections(),
-    fundBalances: () => DatabaseInitialization.initializeFundBalancesCollection()
-  };
-  
-  console.log('🗄️  Database Initialization loaded!');
-  console.log('Available commands:');
-  console.log('- dbInit.initialize() - Initialize all collections with dummy data');
-  console.log('- dbInit.status() - Check database status and collection counts');
-  console.log('- dbInit.clear() - Clear all collections (DESTRUCTIVE)');
-  console.log('- dbInit.purchasingManager() - Initialize purchasing manager collections only');
-  console.log('- dbInit.receiver() - Initialize receiver collections only');
-  console.log('- dbInit.shared() - Initialize shared collections only');
-  console.log('- dbInit.fundBalances() - Initialize fund balances for expense payments');
+  const enableDevDbTools =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEV_DB_TOOLS === 'true';
+
+  if (enableDevDbTools) {
+    (window as any).dbInit = {
+      initialize: () => DatabaseInitialization.initializeAllCollections(),
+      status: () => DatabaseInitialization.getDatabaseStatus(),
+      clear: () => DatabaseInitialization.clearAllCollections(),
+      purchasingManager: () => DatabaseInitialization.initializePurchasingManagerCollections(),
+      receiver: () => DatabaseInitialization.initializeReceiverCollections(),
+      shared: () => DatabaseInitialization.initializeSharedCollections(),
+      fundBalances: () => DatabaseInitialization.initializeFundBalancesCollection()
+    };
+    
+    console.log('🗄️  Database Initialization loaded!');
+    console.log('Available commands:');
+    console.log('- dbInit.initialize() - Initialize all collections with dummy data');
+    console.log('- dbInit.status() - Check database status and collection counts');
+    console.log('- dbInit.clear() - Clear all collections (DESTRUCTIVE)');
+    console.log('- dbInit.purchasingManager() - Initialize purchasing manager collections only');
+    console.log('- dbInit.receiver() - Initialize receiver collections only');
+    console.log('- dbInit.shared() - Initialize shared collections only');
+    console.log('- dbInit.fundBalances() - Initialize fund balances for expense payments');
+  }
 }

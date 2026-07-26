@@ -188,12 +188,22 @@ export class ExpensePaymentService {
     
     // Update expense with new payment information
     const expenseRef = doc(db, 'expenses', expenseId);
-    batch.update(expenseRef, {
+    const expenseUpdate: Record<string, unknown> = {
       paidAmount: newPaidAmount,
       remainingBalance: Math.max(0, totalAmount - newPaidAmount),
       paymentStatus,
       updatedAt: Timestamp.fromDate(now)
-    });
+    };
+
+    // Fully paid expenses should not remain in pending approval state
+    if (
+      (paymentStatus === 'FULLY_PAID' || paymentStatus === 'OVERPAID') &&
+      (!expense.status || expense.status === 'pending')
+    ) {
+      expenseUpdate.status = 'approved';
+    }
+
+    batch.update(expenseRef, expenseUpdate);
 
     // Clean payment method details to remove undefined values
     const cleanDetails: any = {};
@@ -316,6 +326,67 @@ export class ExpensePaymentService {
 
     console.log(`✅ Expense payment processed: ${paymentReference} for ${paymentAmount} from ${fundingSource}`);
     return paymentRef.id;
+  }
+
+  /**
+   * Delete an expense and all related payment records.
+   * Restores fund balances for payments that used a funding source.
+   */
+  static async deleteExpenseWithPayments(expenseId: string): Promise<{
+    deletedPayments: number;
+  }> {
+    const expenseRef = doc(db, 'expenses', expenseId);
+    const expenseSnap = await getDoc(expenseRef);
+
+    if (!expenseSnap.exists()) {
+      throw new Error('Expense not found');
+    }
+
+    const expense = expenseSnap.data();
+    const payments = await this.getExpensePaymentHistory(expenseId);
+    const branchId = expense.branchId || 'kyengera';
+
+    for (const payment of payments) {
+      if (payment.fundingSource && payment.amount > 0) {
+        try {
+          await fundingSourceService.updateFundBalance(
+            branchId,
+            payment.fundingSource,
+            payment.amount,
+            'deallocate'
+          );
+        } catch (error) {
+          console.error(`Failed to restore fund balance for payment ${payment.id}:`, error);
+        }
+      }
+    }
+
+    const batches: ReturnType<typeof writeBatch>[] = [];
+    let currentBatch = writeBatch(db);
+    let opCount = 0;
+    batches.push(currentBatch);
+
+    const queueDelete = (ref: ReturnType<typeof doc>) => {
+      if (opCount >= 500) {
+        currentBatch = writeBatch(db);
+        batches.push(currentBatch);
+        opCount = 0;
+      }
+      currentBatch.delete(ref);
+      opCount++;
+    };
+
+    for (const payment of payments) {
+      queueDelete(doc(db, 'expensePayments', payment.id));
+    }
+
+    queueDelete(expenseRef);
+
+    for (const batch of batches) {
+      await batch.commit();
+    }
+
+    return { deletedPayments: payments.length };
   }
 
   /**

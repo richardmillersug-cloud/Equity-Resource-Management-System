@@ -28,6 +28,7 @@
     "deploy": "firebase deploy",
     "deploy:hosting": "firebase deploy --only hosting",
     "firebase:emulate": "firebase emulators:start",
+    "cleanup:test-records:client": "node scripts/cleanup-test-records-client.js",
     "precommit": "yarn lint && yarn type-check && yarn test"
   },
   "dependencies": {
@@ -72,6 +73,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9",
     "eslint-config-next": "^16.1.4",
+    "firebase-admin": "^14.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "tailwindcss": "^4",

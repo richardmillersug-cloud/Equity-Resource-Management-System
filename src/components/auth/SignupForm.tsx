@@ -10,11 +10,19 @@ import {
 } from 'lucide-react';
 
 interface SignupFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (user?: import('@/lib/firebase/auth').AuthUser) => void;
   onSwitchToLogin?: () => void;
+  /** When true, only Admin/MD create accounts and stay signed in */
+  managedCreation?: boolean;
+  createdBy?: { uid: string; name?: string } | null;
 }
 
-export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
+export default function SignupForm({
+  onSuccess,
+  onSwitchToLogin,
+  managedCreation = false,
+  createdBy = null,
+}: SignupFormProps) {
   const [formData, setFormData] = useState<SignUpData>({
     email: '',
     password: '',
@@ -147,7 +155,7 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
     
     // Validate that roles have proper structure
     for (const role of formData.roles) {
-      if (!role.jobRoleId || !role.jobTitle || !role.baseSalary) {
+      if (!role.jobRoleId || !role.jobTitle || role.baseSalary == null || role.baseSalary < 0) {
         return 'Invalid role data. Please refresh and try again.';
       }
     }
@@ -168,11 +176,21 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
     setError(null);
 
     try {
-      await authService.signUp(formData);
+      if (managedCreation) {
+        if (!createdBy?.uid) {
+          throw { message: 'You must be signed in as Admin or Managing Director to create accounts.' };
+        }
+        await authService.createManagedAccount(formData, createdBy);
+      } else {
+        await authService.signUp(formData);
+      }
       setSuccess(true);
+      if (managedCreation) {
+        onSuccess?.();
+      }
     } catch (err: any) {
       const authError = err as AuthError;
-      setError(authError.message);
+      setError(authError.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
@@ -188,16 +206,41 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Account Created!</h2>
             <p className="text-gray-600 mt-2">
-              Your account has been created successfully. Please check your email to verify your account.
+              {managedCreation
+                ? 'The account was created successfully. They can sign in with the email and password you set.'
+                : 'Your account has been created successfully. Please check your email to verify your account.'}
             </p>
           </div>
-          
-          <button
-            onClick={onSwitchToLogin}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Go to Login
-          </button>
+
+          {managedCreation ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSuccess(false);
+                setConfirmPassword('');
+                setFormData({
+                  email: '',
+                  password: '',
+                  firstName: '',
+                  lastName: '',
+                  employeeNIN: '',
+                  phone: '',
+                  branchId: 'kyengera',
+                  roles: [],
+                });
+              }}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Create another account
+            </button>
+          ) : (
+            <button
+              onClick={onSwitchToLogin}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Go to Login
+            </button>
+          )}
         </div>
       </div>
     );
@@ -206,12 +249,18 @@ export default function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormPro
   return (
     <div className="w-full max-w-2xl mx-auto">
       <div className="bg-white rounded-2xl shadow-xl p-8">
-        <div className="flex justify-center mb-6">
-          <img src="/equity-logo.png" alt="Equity Logo" className="h-16 w-auto object-contain" />
-        </div>
+        {!managedCreation && (
+          <div className="flex justify-center mb-6">
+            <img src="/equity-logo.png" alt="Equity Logo" className="h-16 w-auto object-contain" />
+          </div>
+        )}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join the retail management system</p>
+          <p className="text-gray-600">
+            {managedCreation
+              ? 'Register a user for the retail management system'
+              : 'Join the retail management system'}
+          </p>
         </div>
 
         {error && (

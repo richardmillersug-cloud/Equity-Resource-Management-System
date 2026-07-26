@@ -456,9 +456,9 @@ export class FirebaseBusinessRules {
       errors.push('Employee must be assigned to a valid branch');
     }
 
-    // Rule 8.4: Salary must be positive
-    if (employee.employeeSalary <= 0) {
-      errors.push('Employee salary must be positive');
+    // Rule 8.4: Salary is optional but cannot be negative
+    if (employee.employeeSalary < 0) {
+      errors.push('Employee salary cannot be negative');
     }
 
     // Validate email format

@@ -54,14 +54,14 @@ interface Branch {
   branchName: string;
 }
 
+// Staff portal roles (Manager, Assistant Manager, Stock Manager, Supervisor, Attendant)
+// are created by Purchase Manager only — see /dashboard/purchase-manager/register-employee
 const jobRoles = [
-  
   { id: 'admin', title: 'Admin', defaultSalary: 1500000 },
   { id: 'hr', title: 'HR Manager', defaultSalary: 1300000 },
   { id: 'accountant', title: 'Accountant', defaultSalary: 1200000 },
   { id: 'purchasing-manager', title: 'Purchasing Manager', defaultSalary: 1100000 },
-  { id: 'stock-manager', title: 'Stock Manager', defaultSalary: 1000000 },
-  { id: 'receiver', title: 'Receiver', defaultSalary: 800000 }
+  { id: 'receiver', title: 'Receiver', defaultSalary: 800000 },
 ];
 
 const supermarketSections = [
@@ -94,6 +94,10 @@ export default function AddEmployeePage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoCompressionInfo, setPhotoCompressionInfo] = useState<{
+    originalSize: number;
+    compressedSize: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // optional docs state
@@ -183,25 +187,40 @@ export default function AddEmployeePage() {
     }
   };
 
-  // Photo upload handlers
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo upload handlers — compress to passport size on select
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setPhotoError(null);
+    setPhotoCompressionInfo(null);
 
-    // Validate file
     const validation = photoService.validateImageFile(file);
     if (!validation.valid) {
       setPhotoError(validation.error || 'Invalid file');
       return;
     }
 
-    setSelectedPhoto(file);
-    
-    // Create preview
-    const previewUrl = photoService.createPreviewUrl(file);
-    setPhotoPreview(previewUrl);
+    try {
+      setPhotoUploading(true);
+      if (photoPreview) {
+        photoService.revokePreviewUrl(photoPreview);
+      }
+
+      const compressed = await photoService.compressPassportPhoto(file);
+      setSelectedPhoto(compressed.file);
+      setPhotoPreview(compressed.previewUrl);
+      setPhotoCompressionInfo({
+        originalSize: compressed.originalSize,
+        compressedSize: compressed.compressedSize,
+      });
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Failed to compress photo');
+      setSelectedPhoto(null);
+      setPhotoPreview(null);
+    } finally {
+      setPhotoUploading(false);
+    }
   };
 
   const handlePhotoRemove = () => {
@@ -211,6 +230,7 @@ export default function AddEmployeePage() {
     setSelectedPhoto(null);
     setPhotoPreview(null);
     setPhotoError(null);
+    setPhotoCompressionInfo(null);
     setFormData(prev => ({ 
       ...prev, 
       passportPhoto: '', 
@@ -245,9 +265,10 @@ export default function AddEmployeePage() {
     if (!formData.hireDate) newErrors.hireDate = 'Hire date is required';
     if (!formData.branchId) newErrors.branchId = 'Branch is required';
     if (!formData.jobTitle) newErrors.jobTitle = 'Job title is required';
-    if (!formData.baseSalary) newErrors.baseSalary = 'Base salary is required';
-    else if (isNaN(Number(formData.baseSalary)) || Number(formData.baseSalary) <= 0) {
-      newErrors.baseSalary = 'Base salary must be a valid positive number';
+    if (formData.baseSalary) {
+      if (isNaN(Number(formData.baseSalary)) || Number(formData.baseSalary) < 0) {
+        newErrors.baseSalary = 'Base salary must be a valid non-negative number';
+      }
     }
     
     // Working section validation removed as Customer Service role is no longer available
@@ -301,7 +322,7 @@ export default function AddEmployeePage() {
         roles: [{
           jobRoleId: formData.jobTitle.toLowerCase().replace(/\s+/g, '-'),
           jobTitle: formData.jobTitle,
-          baseSalary: Number(formData.baseSalary),
+          baseSalary: formData.baseSalary ? Number(formData.baseSalary) : 0,
           description: `${formData.jobTitle} role`,
           assignedDate: new Date()
         }]
@@ -580,7 +601,7 @@ export default function AddEmployeePage() {
                       Employee Photo
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      Upload a passport-sized photo. Recommended size: 3.5cm × 4.5cm (JPEG/PNG, max 5MB)
+                      Photos are auto-compressed to passport size (413×531 px, under 150KB). JPEG/PNG/WebP, max 10MB.
                     </p>
                     
                     <input
@@ -625,10 +646,12 @@ export default function AddEmployeePage() {
                         <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0 mt-0.5" />
                         <div className="ml-2">
                           <p className="text-sm text-green-700">
-                            Photo selected: {selectedPhoto.name}
+                            Photo compressed to passport size (413×531)
                           </p>
                           <p className="text-xs text-green-600">
-                            {(selectedPhoto.size / 1024 / 1024).toFixed(2)} MB
+                            {photoCompressionInfo
+                              ? `${photoService.formatBytes(photoCompressionInfo.originalSize)} → ${photoService.formatBytes(photoCompressionInfo.compressedSize)}`
+                              : photoService.formatBytes(selectedPhoto.size)}
                           </p>
                         </div>
                       </div>
@@ -715,7 +738,7 @@ export default function AddEmployeePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Base Salary (UGX) *
+                Base Salary (UGX) <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
                 type="number"
@@ -725,7 +748,7 @@ export default function AddEmployeePage() {
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   errors.baseSalary ? 'border-red-300' : 'border-gray-300'
                 }`}
-                placeholder="Enter base salary"
+                placeholder="Leave blank if not set"
                 min="0"
               />
               {errors.baseSalary && <p className="text-red-500 text-xs mt-1">{errors.baseSalary}</p>}

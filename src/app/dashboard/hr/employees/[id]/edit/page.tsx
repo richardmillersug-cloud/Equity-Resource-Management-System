@@ -59,7 +59,7 @@ interface FormData {
 }
 
 const jobTitles = [
-      'Admin', 'Manager', 'Assistant Manager', 'Team Lead',
+  'Admin', 'Manager', 'Assistant Manager', 'Attendant', 'Team Lead',
   'HR Manager', 'HR Assistant', 'Recruiter',
   'Accountant', 'Financial Analyst', 'Bookkeeper',
   'Purchasing Manager', 'Stock Manager', 'Receiver',
@@ -150,7 +150,7 @@ export default function EmployeeEditPage() {
     if (!formData.employeeNIN.trim()) errors.employeeNIN = 'Employee NIN is required';
     if (!formData.branchId.trim()) errors.branchId = 'Branch ID is required';
     if (!formData.hireDate) errors.hireDate = 'Hire date is required';
-    if (formData.employeeSalary <= 0) errors.employeeSalary = 'Salary must be greater than 0';
+    if (formData.employeeSalary < 0) errors.employeeSalary = 'Salary cannot be negative';
     
     // Email validation
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -493,16 +493,16 @@ export default function EmployeeEditPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Base Salary (UGX) <span className="text-red-500">*</span>
+                    Base Salary (UGX) <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
                   <input
                     type="number"
-                    value={formData.employeeSalary}
-                    onChange={(e) => handleInputChange('employeeSalary', parseInt(e.target.value) || 0)}
+                    value={formData.employeeSalary || ''}
+                    onChange={(e) => handleInputChange('employeeSalary', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       validationErrors.employeeSalary ? 'border-red-300' : 'border-gray-300'
                     }`}
-                    placeholder="Enter salary amount"
+                    placeholder="Leave blank if not set"
                     min="0"
                   />
                   {validationErrors.employeeSalary && (

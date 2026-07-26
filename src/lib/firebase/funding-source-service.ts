@@ -295,11 +295,22 @@ export class FundingSourceService {
     operation: 'allocate' | 'deallocate'
   ): Promise<void> {
     try {
-      const { dailyFund, grossProfit } = await this.getFundBalances(branchId);
-      const target = fundType === 'DAILY_EXPENSE_FUND' ? dailyFund : grossProfit;
+      // The UI/service expects a month-scoped balance row. If a branch has no row
+      // for the current month (or has only other-month rows), try to initialize it.
+      const resolveTarget = async (): Promise<FundBalance | null> => {
+        const { dailyFund, grossProfit } = await this.getFundBalances(branchId);
+        return fundType === 'DAILY_EXPENSE_FUND' ? dailyFund : grossProfit;
+      };
+
+      let target = await resolveTarget();
+      if (!target?.id) {
+        await this.initializeFundBalances(branchId);
+        target = await resolveTarget();
+      }
+
       if (!target?.id) {
         console.error(`Fund balance not found for ${fundType} in branch ${branchId}`);
-        return;
+        throw new Error(`Fund balance not found for ${fundType} in branch ${branchId}`);
       }
 
       const fundSnap = await getDoc(doc(db, this.balancesCollection, target.id));

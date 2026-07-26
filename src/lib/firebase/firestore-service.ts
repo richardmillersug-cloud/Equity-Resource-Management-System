@@ -20,9 +20,11 @@ import {
   DocumentReference,
   serverTimestamp,
   CollectionReference,
+  setDoc,
 } from 'firebase/firestore';
 
 import { db } from './config';
+import { toShiftDateKey } from './staff-shifts';
 import {
   Branch,
   Employee,
@@ -39,6 +41,7 @@ import {
   ReturnNote,
   Damage,
   Attendance,
+  StaffShiftAssignment,
   Barcode,
   LeaveRequest,
   Payroll,
@@ -299,6 +302,13 @@ export class EmployeeService extends FirestoreService<Employee> {
     ]);
   }
 
+  /** Staff accounts created by a Purchase Manager (registeredBy field). */
+  async getRegisteredBy(pmUserId: string): Promise<Employee[]> {
+    return this.getAll([
+      { field: 'registeredBy', operator: '==', value: pmUserId }
+    ]);
+  }
+
   async getEmployeesByRole(jobTitle: string): Promise<Employee[]> {
     return this.getAll([
       { field: 'roles', operator: 'array-contains', value: { jobTitle } }
@@ -307,6 +317,52 @@ export class EmployeeService extends FirestoreService<Employee> {
 
   async updateEmployeeRoles(employeeId: string, roles: JobRole[]): Promise<void> {
     await this.update(employeeId, { roles });
+  }
+
+  /** Purchase Manager assigns Day or Night shift to registered staff */
+  async assignShift(
+    employeeId: string,
+    shift: 'day' | 'night',
+    assignedBy: string
+  ): Promise<void> {
+    await this.update(employeeId, {
+      assignedShift: shift,
+      shiftAssignedAt: Timestamp.now(),
+      shiftAssignedBy: assignedBy,
+    });
+  }
+
+  /** Purchase Manager updates shift, working section, and/or employment status */
+  async updateStaffAssignment(
+    employeeId: string,
+    data: {
+      assignedShift?: 'day' | 'night';
+      workingSection?: string;
+      employmentStatus?: 'Active' | 'Inactive' | 'Terminated';
+    },
+    assignedBy: string
+  ): Promise<void> {
+    const payload: Partial<Employee> = {};
+    if (data.assignedShift) {
+      payload.assignedShift = data.assignedShift;
+      payload.shiftAssignedAt = Timestamp.now();
+      payload.shiftAssignedBy = assignedBy;
+    }
+    if (data.workingSection !== undefined) {
+      payload.workingSection = data.workingSection;
+    }
+    if (data.employmentStatus) {
+      payload.employmentStatus = data.employmentStatus;
+    }
+    await this.update(employeeId, payload);
+  }
+
+  /** Purchase Manager activates or terminates registered staff */
+  async setEmploymentStatus(
+    employeeId: string,
+    status: 'Active' | 'Inactive' | 'Terminated'
+  ): Promise<void> {
+    await this.update(employeeId, { employmentStatus: status });
   }
 }
 
@@ -459,26 +515,67 @@ export class AttendanceService extends FirestoreService<Attendance> {
     super(COLLECTIONS.ATTENDANCE);
   }
 
-  async checkIn(employeeId: string, barcodeScanned?: string): Promise<string> {
+  /** Load by employeeId only (no composite index), then filter dates in memory. */
+  private async getRecordsForEmployee(employeeId: string): Promise<Attendance[]> {
+    return this.getAll([
+      { field: 'employeeId', operator: '==', value: employeeId }
+    ]);
+  }
+
+  private isSameCalendarDay(dateValue: Timestamp | undefined, day: Date): boolean {
+    if (!dateValue) return false;
+    const d = dateValue.toDate();
+    return (
+      d.getFullYear() === day.getFullYear() &&
+      d.getMonth() === day.getMonth() &&
+      d.getDate() === day.getDate()
+    );
+  }
+
+  private getTodayRecord(records: Attendance[], today: Date): Attendance | undefined {
+    return records.find((r) => this.isSameCalendarDay(r.attendanceDate, today));
+  }
+
+  async checkIn(
+    employeeId: string,
+    options?: {
+      barcodeScanned?: string;
+      shift?: 'day' | 'night';
+      ipAddress?: string;
+      latitude?: number;
+      longitude?: number;
+      accuracyMeters?: number;
+      distanceMeters?: number;
+      onPremises?: boolean;
+    }
+  ): Promise<string> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Check if already checked in today
-    const existingAttendance = await this.getAll([
-      { field: 'employeeId', operator: '==', value: employeeId },
-      { field: 'attendanceDate', operator: '>=', value: Timestamp.fromDate(today) }
-    ]);
 
-    if (existingAttendance.length > 0) {
+    const records = await this.getRecordsForEmployee(employeeId);
+    if (this.getTodayRecord(records, today)) {
       throw new Error('Already checked in today');
     }
+
+    const shift = options?.shift === 'night' ? 'night' : options?.shift === 'day' ? 'day' : undefined;
 
     const attendance: Omit<Attendance, 'id' | 'createdAt' | 'updatedAt'> = {
       employeeId,
       attendanceDate: Timestamp.fromDate(today),
       checkInTime: Timestamp.now(),
       status: 'Present',
-      barcodeScanned
+      barcodeScanned: options?.barcodeScanned,
+      ...(shift ? { shift } : {}),
+      ...(options?.ipAddress ? { checkInIp: options.ipAddress } : {}),
+      ...(options?.latitude != null ? { checkInLatitude: options.latitude } : {}),
+      ...(options?.longitude != null ? { checkInLongitude: options.longitude } : {}),
+      ...(options?.accuracyMeters != null
+        ? { checkInAccuracyMeters: Math.round(options.accuracyMeters * 10) / 10 }
+        : {}),
+      ...(options?.distanceMeters != null
+        ? { checkInDistanceMeters: options.distanceMeters }
+        : {}),
+      ...(options?.onPremises != null ? { checkInOnPremises: options.onPremises } : {}),
     };
 
     return this.create(attendance);
@@ -487,24 +584,21 @@ export class AttendanceService extends FirestoreService<Attendance> {
   async checkOut(employeeId: string): Promise<void> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const attendance = await this.getAll([
-      { field: 'employeeId', operator: '==', value: employeeId },
-      { field: 'attendanceDate', operator: '>=', value: Timestamp.fromDate(today) }
-    ]);
 
-    if (attendance.length === 0) {
+    const records = await this.getRecordsForEmployee(employeeId);
+    const record = this.getTodayRecord(records, today);
+
+    if (!record) {
       throw new Error('No check-in record found for today');
     }
 
-    const record = attendance[0];
     if (record.checkOutTime) {
       throw new Error('Already checked out today');
     }
 
     const checkOutTime = Timestamp.now();
-    const hoursWorked = record.checkInTime 
-      ? (checkOutTime.seconds - record.checkInTime.seconds) / 3600 
+    const hoursWorked = record.checkInTime
+      ? (checkOutTime.seconds - record.checkInTime.seconds) / 3600
       : 0;
 
     await this.update(record.id, {
@@ -514,15 +608,104 @@ export class AttendanceService extends FirestoreService<Attendance> {
   }
 
   async getEmployeeAttendance(
-    employeeId: string, 
-    startDate: Date, 
+    employeeId: string,
+    startDate: Date,
     endDate: Date
   ): Promise<Attendance[]> {
-    return this.getAll([
-      { field: 'employeeId', operator: '==', value: employeeId },
-      { field: 'attendanceDate', operator: '>=', value: Timestamp.fromDate(startDate) },
-      { field: 'attendanceDate', operator: '<=', value: Timestamp.fromDate(endDate) }
-    ], { orderBy: 'attendanceDate', orderDirection: 'desc' });
+    const startMs = new Date(startDate).setHours(0, 0, 0, 0);
+    const endMs = new Date(endDate).setHours(23, 59, 59, 999);
+
+    const records = await this.getRecordsForEmployee(employeeId);
+
+    return records
+      .filter((r) => {
+        const ms = r.attendanceDate?.toMillis?.() ?? 0;
+        return ms >= startMs && ms <= endMs;
+      })
+      .sort((a, b) => {
+        const aTime = a.attendanceDate?.toMillis?.() ?? 0;
+        const bTime = b.attendanceDate?.toMillis?.() ?? 0;
+        return bTime - aTime;
+      });
+  }
+}
+
+export class StaffShiftAssignmentService extends FirestoreService<StaffShiftAssignment> {
+  constructor() {
+    super(COLLECTIONS.STAFF_SHIFT_ASSIGNMENTS);
+  }
+
+  static dateKey(date: Date): string {
+    return toShiftDateKey(date);
+  }
+
+  static assignmentId(employeeId: string, date: Date): string {
+    return `${employeeId}_${this.dateKey(date)}`;
+  }
+
+  /** Upsert Day/Night for one employee on one calendar day */
+  async assignForDate(input: {
+    employeeId: string;
+    date: Date;
+    shift: 'day' | 'night';
+    assignedBy: string;
+    assignedByName?: string;
+    notes?: string;
+  }): Promise<string> {
+    const day = new Date(input.date);
+    day.setHours(0, 0, 0, 0);
+    const id = StaffShiftAssignmentService.assignmentId(input.employeeId, day);
+    const shiftDateKey = StaffShiftAssignmentService.dateKey(day);
+    const docRef = doc(db, this.collectionName, id);
+    const existing = await getDoc(docRef);
+    const now = Timestamp.now();
+
+    const payload = this.cleanData({
+      employeeId: input.employeeId,
+      shiftDate: Timestamp.fromDate(day),
+      shiftDateKey,
+      shift: input.shift,
+      assignedBy: input.assignedBy,
+      assignedByName: input.assignedByName,
+      notes: input.notes,
+      updatedAt: now,
+      ...(existing.exists() ? {} : { createdAt: now }),
+    });
+
+    await setDoc(docRef, payload, { merge: true });
+    return id;
+  }
+
+  async getForEmployeeDate(employeeId: string, date: Date): Promise<StaffShiftAssignment | null> {
+    const id = StaffShiftAssignmentService.assignmentId(employeeId, date);
+    return this.getById(id);
+  }
+
+  async getForEmployeeRange(
+    employeeId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<StaffShiftAssignment[]> {
+    const startKey = StaffShiftAssignmentService.dateKey(startDate);
+    const endKey = StaffShiftAssignmentService.dateKey(endDate);
+    const all = await this.getAll([{ field: 'employeeId', operator: '==', value: employeeId }]);
+    return all
+      .filter((a) => a.shiftDateKey >= startKey && a.shiftDateKey <= endKey)
+      .sort((a, b) => a.shiftDateKey.localeCompare(b.shiftDateKey));
+  }
+
+  /** Map of yyyy-mm-dd → shift for quick lookups */
+  async getShiftMapForRange(
+    employeeId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Map<string, 'day' | 'night'>> {
+    const rows = await this.getForEmployeeRange(employeeId, startDate, endDate);
+    const map = new Map<string, 'day' | 'night'>();
+    for (const row of rows) {
+      map.set(row.shiftDateKey, row.shift === 'night' ? 'night' : 'day');
+    }
+    return map;
   }
 }
 
@@ -569,6 +752,48 @@ export class CashCloseService extends FirestoreService<CashClose> {
     };
 
     return this.update(id, enhancedUpdates);
+  }
+
+  /**
+   * Remove a till expense from an embedded cash close document.
+   */
+  async removeTillExpense(
+    cashCloseId: string,
+    tillExpenseId: string
+  ): Promise<boolean> {
+    const cashClose = await this.getById(cashCloseId);
+    if (!cashClose?.shifts) {
+      return false;
+    }
+
+    let removed = false;
+    const updatedShifts = cashClose.shifts.map(shift => ({
+      ...shift,
+      tills: shift.tills.map(till => {
+        const expenseDetails = (till.expenseDetails || []).filter(expense => {
+          const matches = String(expense.id) === String(tillExpenseId);
+          if (matches) removed = true;
+          return !matches;
+        });
+
+        if (expenseDetails.length === (till.expenseDetails || []).length) {
+          return till;
+        }
+
+        return {
+          ...till,
+          expenseDetails,
+          expenses: expenseDetails.reduce((sum, exp) => sum + (exp.amount || 0), 0),
+        };
+      }),
+    }));
+
+    if (!removed) {
+      return false;
+    }
+
+    await this.updateCashClose(cashCloseId, { shifts: updatedShifts });
+    return true;
   }
 
   async approveCashClose(id: string, approvedBy: string): Promise<void> {
@@ -639,57 +864,94 @@ export class CashCloseService extends FirestoreService<CashClose> {
 
   private async createExpenseRecords(cashCloseData: Partial<CashClose>, cashCloseId: string): Promise<void> {
     const expenseService = new ExpenseService();
+
+    // Idempotency guard: skip any expenses already created for this cash close.
+    // This prevents duplicate expense docs if the user double-submits or if the
+    // submit flow retries after a transient failure.
+    const existingForClose = await expenseService.getAll([
+      { field: 'cashCloseId', operator: '==', value: cashCloseId }
+    ] as any);
+
+    const existingKeys = new Set<string>(
+      existingForClose
+        .map((e: any) => `${e.cashCloseId || ''}:${e.tillExpenseId || ''}`)
+        .filter(k => !k.endsWith(':')) // keep only those with a tillExpenseId
+    );
+
     const expensePromises: Promise<string>[] = [];
+    let skipped = 0;
 
     for (const shift of cashCloseData.shifts || []) {
-      for (const till of shift.tills) {
-        for (const tillExpense of till.expenseDetails) {
+      for (const till of shift.tills || []) {
+        for (const tillExpense of till.expenseDetails || []) {
+          const tillExpenseId = (tillExpense as any)?.id;
+          const dedupKey = `${cashCloseId}:${tillExpenseId || ''}`;
+
+          if (tillExpenseId && existingKeys.has(dedupKey)) {
+            skipped++;
+            continue;
+          }
+
+          const amount = (tillExpense as any)?.amount ?? 0;
+          const paidAmount = (tillExpense as any)?.paidAmount ?? 0;
+
           // Convert TillExpense to main Expense format
           const expenseRecord = {
-            employeeId: tillExpense.employeeId,
-            name: tillExpense.description,
-            expenseDate: Timestamp.fromDate(tillExpense.expenseDate),
-            expenseTime: Timestamp.fromDate(tillExpense.expenseTime),
-            amount: tillExpense.amount,
-            note: tillExpense.notes || undefined,
-            expenseType: tillExpense.expenseType,
-            paidAmount: tillExpense.paidAmount,
-            status: tillExpense.status === 'approved' ? 'approved' as const : 
-                   tillExpense.status === 'rejected' ? 'rejected' as const :
-                   tillExpense.status === 'processing' ? 'paid' as const : 'pending' as const,
-            approvedBy: tillExpense.approvedBy,
-            
+            employeeId: (tillExpense as any)?.employeeId,
+            // Use "description" to match UI expectations (some screens read expense.description)
+            description: (tillExpense as any)?.description,
+            expenseDate: (tillExpense as any)?.expenseDate ? Timestamp.fromDate((tillExpense as any).expenseDate) : undefined,
+            expenseTime: (tillExpense as any)?.expenseTime ? Timestamp.fromDate((tillExpense as any).expenseTime) : undefined,
+            amount,
+            paidAmount,
+            remainingBalance: Math.max(0, amount - paidAmount),
+            paymentStatus:
+              (tillExpense as any)?.paymentStatus ||
+              (paidAmount <= 0 ? 'UNPAID' : paidAmount >= amount ? 'FULLY_PAID' : 'PARTIALLY_PAID'),
+            // Keep workflow status aligned with tillExpense, but avoid unsupported "paid" status
+            status:
+              (tillExpense as any)?.status === 'approved' ? ('approved' as const) :
+              (tillExpense as any)?.status === 'rejected' ? ('rejected' as const) :
+              (tillExpense as any)?.status === 'processing' ? ('processing' as const) :
+              ('pending' as const),
+            approvedBy: (tillExpense as any)?.approvedBy,
+            note: (tillExpense as any)?.notes || undefined,
+            expenseType: (tillExpense as any)?.expenseType,
+
             // Enhanced fields from cash close integration
-            tillExpenseId: tillExpense.id,
-            cashCloseId: cashCloseId,
-            tillNumber: tillExpense.tillNumber,
-            shiftType: tillExpense.shiftType,
-            category: tillExpense.category,
-            vendor: tillExpense.vendor,
-            receiptNumber: tillExpense.receiptNumber,
-            dueDate: tillExpense.dueDate,
-            tags: tillExpense.tags,
-            department: tillExpense.department,
-            projectCode: tillExpense.projectCode,
-            priority: tillExpense.priority,
-            paymentStatus: tillExpense.paymentStatus,
-            approvalRequired: tillExpense.approvalRequired,
-            remainingBalance: tillExpense.remainingBalance,
-            fundingSource: tillExpense.fundingSource
+            tillExpenseId,
+            cashCloseId,
+            tillNumber: (tillExpense as any)?.tillNumber,
+            shiftType: (tillExpense as any)?.shiftType,
+            category: (tillExpense as any)?.category,
+            vendor: (tillExpense as any)?.vendor,
+            receiptNumber: (tillExpense as any)?.receiptNumber,
+            dueDate: (tillExpense as any)?.dueDate,
+            tags: (tillExpense as any)?.tags,
+            department: (tillExpense as any)?.department,
+            projectCode: (tillExpense as any)?.projectCode,
+            priority: (tillExpense as any)?.priority,
+            approvalRequired: (tillExpense as any)?.approvalRequired,
+            fundingSource: (tillExpense as any)?.fundingSource
           };
 
-          // Clean expense record and create
           const cleanedExpenseRecord = this.cleanCashCloseData(expenseRecord);
           const promise = expenseService.create(cleanedExpenseRecord);
           expensePromises.push(promise);
+
+          if (tillExpenseId) {
+            existingKeys.add(dedupKey);
+          }
         }
       }
     }
 
-    // Wait for all expense records to be created
     try {
       await Promise.all(expensePromises);
-      console.log(`Successfully created ${expensePromises.length} expense records for cash close ${cashCloseId}`);
+      console.log(
+        `Successfully created ${expensePromises.length} expense records for cash close ${cashCloseId}` +
+        (skipped > 0 ? ` (skipped ${skipped} already-existing)` : '')
+      );
     } catch (error) {
       console.error('Error creating expense records:', error);
       throw new Error('Failed to create expense records. Cash close was saved but expenses were not processed.');
@@ -921,7 +1183,13 @@ export class LeaveRequestService extends FirestoreService<LeaveRequest> {
       filters.push({ field: 'status', operator: '==', value: status });
     }
 
-    return this.getAll(filters, { orderBy: 'startDate', orderDirection: 'desc' });
+    // Sort client-side so a missing orderBy composite index does not block the staff portal
+    const records = await this.getAll(filters);
+    return records.sort((a, b) => {
+      const aTime = a.startDate?.toMillis?.() ?? 0;
+      const bTime = b.startDate?.toMillis?.() ?? 0;
+      return bTime - aTime;
+    });
   }
 
   async getPendingLeaveRequests(): Promise<LeaveRequest[]> {
@@ -1745,6 +2013,12 @@ export const firestoreServices = {
   get attendance() {
     if (!_services.attendance) _services.attendance = new AttendanceService();
     return _services.attendance;
+  },
+  get staffShiftAssignment() {
+    if (!_services.staffShiftAssignment) {
+      _services.staffShiftAssignment = new StaffShiftAssignmentService();
+    }
+    return _services.staffShiftAssignment;
   },
   get cashClose() {
     if (!_services.cashClose) _services.cashClose = new CashCloseService();
