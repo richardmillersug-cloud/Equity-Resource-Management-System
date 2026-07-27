@@ -16,6 +16,7 @@ import {
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase/config';
 import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import {
   reconcileOutstandingFromPaidAmount,
   getInvoiceAmount,
@@ -164,6 +165,20 @@ export default function OutstandingInvoicesPage() {
       day: 'numeric'
     });
   };
+
+  const invoiceExportData = useMemo(
+    () =>
+      displayedInvoices.map((inv) => ({
+        'Invoice #': inv.invoiceNumber,
+        Supplier: inv.supplierName,
+        Date: formatDate(inv.date),
+        Amount: formatCurrency(inv.amount),
+        Paid: formatCurrency(inv.paidAmount),
+        Remaining: formatCurrency(inv.remainingAmount),
+        Status: inv.status,
+      })),
+    [displayedInvoices]
+  );
 
   if (loading) {
     return (
@@ -428,6 +443,12 @@ export default function OutstandingInvoicesPage() {
                 className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+            <ExportButtons
+              data={invoiceExportData}
+              filename="outstanding-invoices"
+              title="Outstanding Invoices"
+              subtitle={`${displayedInvoices.length} invoice(s) · ${activeTab === 'all' ? 'all outstanding' : activeTab}`}
+            />
           </div>
         </div>
 

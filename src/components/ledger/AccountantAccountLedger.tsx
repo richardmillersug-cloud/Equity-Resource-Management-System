@@ -19,6 +19,8 @@ import {
   Receipt,
 } from 'lucide-react';
 import { generateAccountNumber, maskAccountNumber } from '@/lib/utils/account-number';
+import { ExportButtons } from '@/components/ui/ExportButtons';
+import type { ExportColumn } from '@/lib/export/table-export';
 
 function fmtUGX(n: number): string {
   return `UGX ${Math.round(n).toLocaleString()}`;
@@ -130,6 +132,49 @@ export function AccountantAccountLedger({
     if (txFilter === 'deposit' && shiftFilter !== 'all' && e.shiftType !== shiftFilter) return false;
     return true;
   }) ?? [];
+
+  const ledgerExportColumns: ExportColumn<WalletLedgerEntry>[] = [
+    { key: 'date', header: 'Date', value: (e) => fmtDate(e.date) },
+    {
+      key: 'type',
+      header: 'Type',
+      value: (e) => (e.entryType === 'expense_payment' ? 'Payment' : 'Deposit'),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      value: (e) =>
+        e.entryType === 'expense_payment'
+          ? e.expenseDescription || 'Expense Payment'
+          : `Cash Close Deposit (${e.shiftType === 'day' ? 'Day' : 'Night'})`,
+    },
+    { key: 'shift', header: 'Shift', value: (e) => e.shiftType || '' },
+    { key: 'vendor', header: 'Vendor', value: (e) => e.vendor || '' },
+    {
+      key: 'funding',
+      header: 'Funding Source',
+      value: (e) =>
+        e.fundingSource === 'DAILY_EXPENSE_FUND'
+          ? 'Daily Fund'
+          : e.fundingSource === 'GROSS_PROFIT'
+            ? 'Gross Profit'
+            : e.fundingSource || '',
+    },
+    {
+      key: 'credit',
+      header: 'Credit (UGX)',
+      value: (e) =>
+        e.entryType === 'expense_payment'
+          ? 0
+          : Math.round((e.grossProfitDeposit ?? 0) + (e.dailyExpenseDeposit ?? 0)),
+    },
+    {
+      key: 'debit',
+      header: 'Debit (UGX)',
+      value: (e) => (e.entryType === 'expense_payment' ? Math.round(e.debitAmount ?? 0) : 0),
+    },
+    { key: 'paidBy', header: 'Paid By', value: (e) => e.paidByName || '' },
+  ];
 
   const {
     currentPage,
@@ -382,14 +427,23 @@ export function AccountantAccountLedger({
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="w-4 h-4 text-gray-400" />
                   <h3 className="text-sm font-semibold text-gray-800">Transactions</h3>
                 </div>
-                <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
-                  {filteredEntries.length}{filteredEntries.length !== summary.entries.length ? ` / ${summary.entries.length}` : ''} transaction{summary.entries.length !== 1 ? 's' : ''}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
+                    {filteredEntries.length}{filteredEntries.length !== summary.entries.length ? ` / ${summary.entries.length}` : ''} transaction{summary.entries.length !== 1 ? 's' : ''}
+                  </span>
+                  <ExportButtons
+                    rows={filteredEntries}
+                    columns={ledgerExportColumns}
+                    filename={`accountant-account-ledger-${periodKey}`}
+                    title="Accountant Account Ledger"
+                    subtitle={`${holderName} · ${monthOptions.find((o) => o.key === periodKey)?.label || periodKey} · Net ${fmtUGX(summary.netBalance)}`}
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">

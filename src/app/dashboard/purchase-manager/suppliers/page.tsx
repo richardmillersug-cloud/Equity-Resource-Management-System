@@ -28,7 +28,8 @@ import {
   FileText
 } from 'lucide-react';
 import { getCompanyDisplayName, getCompanySubtitle } from '../../../../config/company';
-import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
+import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 
 interface SupplierStats {
   total: number;
@@ -878,13 +879,22 @@ export default function SuppliersPage() {
             </select>
               </div>
 
-              <button 
-                onClick={exportSuppliers}
-                className="bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
-              >
-              <Download className="w-4 h-4" />
-                <span>Export ({filteredSuppliers.length})</span>
-              </button>
+              <ExportButtons
+                data={filteredSuppliers.map((supplier) => ({
+                  Name: supplier.supplierName || '',
+                  TIN: supplier.tinNumber || '',
+                  Status: supplier.status || '',
+                  Phone: supplier.phoneNumbers?.[0] || supplier.contactPhone || '',
+                  Email: supplier.email || '',
+                  Address: supplier.address || '',
+                  Bank: supplier.bankAccounts?.[0]?.bankName || '',
+                  'Account Name': supplier.bankAccounts?.[0]?.accountName || '',
+                  'Account Number': supplier.bankAccounts?.[0]?.accountNumber || '',
+                }))}
+                filename="suppliers"
+                title="Suppliers"
+                subtitle={`${filteredSuppliers.length} supplier(s)`}
+              />
 
               <button 
                 onClick={printSuppliers}

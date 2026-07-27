@@ -29,7 +29,9 @@ import {
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
 import { usePagination, PaginationBar } from '@/components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { generateAccountNumber, maskAccountNumber } from '@/lib/utils/account-number';
+import type { ExportColumn } from '@/lib/export/table-export';
 
 interface LedgerEntry {
   id: string;
@@ -386,6 +388,23 @@ export function PMAccountLedger({
 
   const accountNumber = generateAccountNumber(branchId || 'default-branch');
 
+  type LedgerExportRow = (typeof filtered)[number];
+  const ledgerExportColumns: ExportColumn<LedgerExportRow>[] = [
+    { key: 'date', header: 'Date', value: (e) => `${fmt(e.date)} ${fmtTime(e.date)}`.trim() },
+    { key: 'description', header: 'Description', value: (e) => e.description },
+    { key: 'counterparty', header: 'Counterparty', value: (e) => e.counterparty || '' },
+    { key: 'type', header: 'Type', value: (e) => (e.type === 'credit' ? 'Received' : 'Payment') },
+    { key: 'amount', header: 'Amount (UGX)', value: (e) => Math.round(safeNum(e.amount)) },
+    {
+      key: 'signedAmount',
+      header: 'Signed Amount (UGX)',
+      value: (e) => Math.round(e.type === 'credit' ? safeNum(e.amount) : -safeNum(e.amount)),
+    },
+    { key: 'balance', header: 'Running Balance (UGX)', value: (e) => Math.round(e.runningBalance) },
+    { key: 'status', header: 'Status', value: (e) => e.status },
+    { key: 'reference', header: 'Reference', value: (e) => e.referenceId },
+  ];
+
   const handleCopy = () => {
     navigator.clipboard.writeText(accountNumber.replace(/\s/g, ''));
     setCopied(true);
@@ -605,7 +624,14 @@ export function PMAccountLedger({
         <div className="p-5 border-b border-gray-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <h3 className="font-semibold text-gray-900 text-lg">Transaction Ledger</h3>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <ExportButtons
+                rows={filtered}
+                columns={ledgerExportColumns}
+                filename={`pm-account-ledger-${holderName.replace(/\s+/g, '-').toLowerCase() || 'export'}`}
+                title="PM Account Ledger"
+                subtitle={`${holderName} · Balance ${fmtCurrency(balance)} · ${dateRange === 'all' ? 'All time' : dateRange} · ${filter}`}
+              />
               <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
                 {(['today', 'week', 'month', 'all'] as const).map(d => (
                   <button

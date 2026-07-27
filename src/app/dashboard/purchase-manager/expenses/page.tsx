@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { 
   Receipt, 
   Search, 
@@ -13,7 +14,6 @@ import {
   Calendar,
   User,
   RefreshCw,
-  Download,
   Plus,
   AlertTriangle
 } from 'lucide-react';
@@ -113,6 +113,20 @@ export default function ExpensesPage() {
       return 'Invalid Date';
     }
   };
+
+  const expenseExportData = useMemo(
+    () =>
+      filteredExpenses.map((expense) => ({
+        'Description/Details': [expense.description, expense.category].filter(Boolean).join(' · '),
+        Amount: formatCurrency(expense.amount),
+        Type: expense.type,
+        Priority: expense.priority.charAt(0).toUpperCase() + expense.priority.slice(1),
+        Status: expense.status.charAt(0).toUpperCase() + expense.status.slice(1),
+        'Submitted By': expense.submittedBy,
+        Date: formatDate(expense.createdAt),
+      })),
+    [filteredExpenses]
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -352,10 +366,12 @@ export default function ExpensesPage() {
                 </select>
               </div>
 
-              <button className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
+              <ExportButtons
+                data={expenseExportData}
+                filename="pm-expenses"
+                title="Purchase Manager Expenses"
+                subtitle={`${filteredExpenses.length} expense(s) · filtered view`}
+              />
             </div>
           </div>
         </div>

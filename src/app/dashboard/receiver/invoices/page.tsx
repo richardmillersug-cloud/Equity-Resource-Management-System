@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { enhancedInvoiceService, Invoice } from '../../../../lib/firebase/enhanced-invoice';
 import InvoicePrintView from '../../../../components/ui/InvoicePrintView';
 import { usePagination, PaginationBar } from '../../../../components/ui/Pagination';
@@ -252,61 +253,21 @@ export default function InvoicesPage() {
     return timestamp?.toDate?.()?.toLocaleDateString() || 'N/A';
   };
 
-  // Export invoices to CSV
-  const handleExportInvoices = () => {
-    try {
-      const headers = [
-        'Invoice Number',
-        'Supplier Name',
-        'Amount',
-        'Status',
-        'Date Created',
-        'Due Date',
-        'FDN',
-        'Description',
-        'Quantity'
-      ];
-
-      const csvData = filteredInvoices.map(invoice => [
-        invoice.invoiceNumber || 'N/A',
-        invoice.supplierName || 'N/A',
-        invoice.amount || 0,
-        invoice.status || 'N/A',
-        formatDate(invoice.createdAt),
-        formatDate(invoice.dueDate),
-        invoice.fdn || 'N/A',
-        invoice.description || 'N/A',
-        invoice.quantity || 0
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => 
-          row.map(field => 
-            typeof field === 'string' && (field.includes(',') || field.includes('"')) 
-              ? `"${field.replace(/"/g, '""')}"` 
-              : field
-          ).join(',')
-        )
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      
-      if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } catch (error) {
-      console.error('Error exporting invoices:', error);
-      alert('Error exporting invoices. Please try again.');
-    }
-  };
+  const invoiceExportData = useMemo(
+    () =>
+      filteredInvoices.map((invoice) => ({
+        'Invoice Number': invoice.invoiceNumber || 'N/A',
+        'Supplier Name': invoice.supplierName || 'N/A',
+        Amount: formatAmount(invoice.amount || 0),
+        Status: invoice.status || 'N/A',
+        'Date Created': formatDate(invoice.createdAt),
+        'Due Date': formatDate(invoice.dueDate),
+        FDN: invoice.fdn || 'N/A',
+        Description: invoice.description || 'N/A',
+        Quantity: invoice.quantity || 0,
+      })),
+    [filteredInvoices]
+  );
 
   // Print invoices list
   const handlePrintInvoices = () => {
@@ -674,14 +635,12 @@ export default function InvoicesPage() {
                 <QrCode className="w-5 h-5" />
                 <span className="hidden sm:inline">Generate QR</span>
               </button>
-              <button 
-                onClick={handleExportInvoices}
-                className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200 font-medium"
-                title="Export to CSV"
-              >
-                <Download className="w-5 h-5" />
-                <span className="hidden sm:inline">Export CSV</span>
-              </button>
+              <ExportButtons
+                data={invoiceExportData}
+                filename="receiver-invoices"
+                title="Invoices"
+                subtitle={`${filteredInvoices.length} invoice(s) · filtered view`}
+              />
               <button 
                 onClick={handlePrintInvoices}
                 className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-2xl transition-all duration-200 shadow-sm border border-gray-200 font-medium"

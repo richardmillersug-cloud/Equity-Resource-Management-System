@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePagination, PaginationBar } from '@/components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { authService } from '@/lib/firebase/auth';
 import {
   fetchCashPayData,
@@ -16,7 +17,6 @@ import {
 import {
   Banknote,
   Calendar,
-  Download,
   RefreshCw,
   TrendingUp,
   Wallet,
@@ -108,52 +108,31 @@ export default function CashPayPage() {
     endIndex,
   } = usePagination(rows, 15);
 
-  const exportCsv = () => {
-    const headers = [
-      'Date',
-      'Cash Close',
-      'PM Allocation',
-      '12% Gross Profit',
-      '100k Sys Fund',
-      'Cheques Cleared',
-      'Purchases Made',
-      'Payments Made',
-    ];
-    const lines = rows.map((r) =>
-      [
-        r.date,
-        r.totalCashClose,
-        r.pmAllocation,
-        r.grossProfit12,
-        r.daily100k,
-        r.chequesCleared,
-        r.purchasesMade,
-        r.paymentsMade,
-      ].join(',')
-    );
+  const cashPayExportData = useMemo(() => {
+    const data = rows.map((r) => ({
+      Date: fmtDate(r.date),
+      'Cash Close': fmtUGX(r.totalCashClose),
+      'PM Allocation': fmtUGX(r.pmAllocation),
+      '12% Gross Profit': fmtUGX(r.grossProfit12),
+      '100k Sys Fund': fmtUGX(r.daily100k),
+      'Cheques Cleared': fmtUGX(r.chequesCleared),
+      'Purchases Made': fmtUGX(r.purchasesMade),
+      'Payments Made': fmtUGX(r.paymentsMade),
+    }));
     if (totals) {
-      lines.push(
-        [
-          'TOTALS',
-          totals.totalCashClose,
-          totals.pmAllocation,
-          totals.grossProfit12,
-          totals.daily100k,
-          totals.chequesCleared,
-          totals.purchasesMade,
-          totals.paymentsMade,
-        ].join(',')
-      );
+      data.push({
+        Date: 'TOTALS',
+        'Cash Close': fmtUGX(totals.totalCashClose),
+        'PM Allocation': fmtUGX(totals.pmAllocation),
+        '12% Gross Profit': fmtUGX(totals.grossProfit12),
+        '100k Sys Fund': fmtUGX(totals.daily100k),
+        'Cheques Cleared': fmtUGX(totals.chequesCleared),
+        'Purchases Made': fmtUGX(totals.purchasesMade),
+        'Payments Made': fmtUGX(totals.paymentsMade),
+      });
     }
-    const csv = [headers.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cash-pay-${filterValue}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    return data;
+  }, [rows, totals]);
 
   const periodLabel =
     filterMode === 'month'
@@ -184,14 +163,12 @@ export default function CashPayPage() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            <button
-              onClick={exportCsv}
-              disabled={rows.length === 0}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-emerald-700 hover:bg-emerald-50 transition text-sm font-medium disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
+            <ExportButtons
+              data={cashPayExportData}
+              filename={`cash-pay-${filterValue}`}
+              title="Cash Pay"
+              subtitle={`${rows.length} day(s) · ${periodLabel}`}
+            />
           </div>
         </div>
         <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full bg-white/10" />

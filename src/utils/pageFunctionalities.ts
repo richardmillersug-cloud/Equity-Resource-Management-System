@@ -132,12 +132,12 @@ export function useExport() {
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
-      ...data.map(row => 
-        headers.map(field => `"${row[field] || ''}"`).join(',')
+      ...data.map(row =>
+        headers.map(field => `"${String(row[field] ?? '').replace(/"/g, '""')}"`).join(',')
       )
     ].join('\n');
 
-    downloadFile(csvContent, `${filename}.csv`, 'text/csv');
+    downloadFile(csvContent, `${filename}.csv`, 'text/csv;charset=utf-8;');
   };
 
   const exportToJSON = (data: any[], filename: string) => {
@@ -145,17 +145,21 @@ export function useExport() {
     downloadFile(jsonContent, `${filename}.json`, 'application/json');
   };
 
-  const exportToExcel = async (data: any[], filename: string) => {
-    // Note: This would require additional libraries like xlsx
-    console.log('Excel export functionality would go here');
-    // For now, export as CSV
-    exportToCSV(data, filename);
+  const exportToExcel = async (data: any[], filename: string, title?: string) => {
+    const { exportToXls } = await import('@/lib/export/table-export');
+    exportToXls(data, { filename, title: title || filename });
+  };
+
+  const exportToPdf = async (data: any[], filename: string, title?: string) => {
+    const { exportToPdf: toPdf } = await import('@/lib/export/table-export');
+    await toPdf(data, { filename, title: title || filename });
   };
 
   return {
     exportToCSV,
     exportToJSON,
-    exportToExcel
+    exportToExcel,
+    exportToPdf,
   };
 }
 

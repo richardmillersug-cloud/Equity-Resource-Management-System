@@ -1,12 +1,12 @@
 'use client';
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import {
   CheckCircle,
   Search,
   Filter,
-  Download,
   Eye,
   CreditCard,
   Banknote,
@@ -248,33 +248,21 @@ export default function PaymentsPage() {
     }
   };
 
-  const exportToCSV = () => {
-    if (filteredPayments.length === 0) return;
-    
-    const csvData = filteredPayments.map(payment => ({
-      'Payment Reference': payment.paymentReference,
-      'Invoice Number': payment.invoiceNumber,
-      'Supplier': payment.supplierName,
-      'Amount': payment.amount,
-      'Payment Method': getPaymentMethodLabel(payment.paymentMethod.type),
-      'Installment': payment.installmentNumber,
-      'Payment Date': payment.paymentDate.toLocaleDateString(),
-              'Paid By': `${payment.paidByName} (${payment.paidBy})`,
-      'Notes': payment.notes || ''
-    }));
-
-    const csvContent = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `payment_records_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
+  const paymentExportData = useMemo(
+    () =>
+      filteredPayments.map((payment) => ({
+        'Payment Reference': payment.paymentReference,
+        'Invoice Number': payment.invoiceNumber,
+        Supplier: payment.supplierName,
+        Amount: payment.amount,
+        'Payment Method': getPaymentMethodLabel(payment.paymentMethod.type),
+        Installment: payment.installmentNumber,
+        'Payment Date': payment.paymentDate.toLocaleDateString(),
+        'Paid By': `${payment.paidByName} (${payment.paidBy})`,
+        Notes: payment.notes || '',
+      })),
+    [filteredPayments]
+  );
 
   // Calculate statistics based on filtered payments
   const totalPayments = filteredPayments.length;
@@ -526,15 +514,12 @@ export default function PaymentsPage() {
                 )}
               </button>
 
-              {/* Export Button */}
-              <button
-                onClick={exportToCSV}
-                disabled={filteredPayments.length === 0}
-                className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
+              <ExportButtons
+                data={paymentExportData}
+                filename="payment-records"
+                title="Payment Records"
+                subtitle={`${filteredPayments.length} payment(s) · filtered view`}
+              />
             </div>
           </div>
 

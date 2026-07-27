@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { EmployeeService } from '../../../../lib/firebase/firestore-service';
 import { firestoreServices } from '../../../../lib/firebase/firestore-service';
 import { 
@@ -12,7 +13,6 @@ import {
   Edit, 
   Trash2, 
   Eye,
-  Download,
   Mail,
   Phone,
   MapPin,
@@ -188,29 +188,22 @@ export default function EmployeesPage() {
     }
   };
 
-  const exportEmployees = () => {
-    const csvContent = [
-      ['Name', 'Email', 'Phone', 'NIN', 'Status', 'Role', 'Salary', 'Hire Date'],
-      ...filteredEmployees.map(emp => [
-        `${emp.firstName} ${emp.lastName}`,
-        emp.email,
-        emp.phone || '',
-        emp.employeeNIN,
-        emp.employmentStatus,
-        emp.roles?.[0]?.jobTitle || '',
-        emp.employeeSalary?.toString() || '',
-        emp.hireDate ? new Date(emp.hireDate.seconds * 1000).toLocaleDateString() : ''
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'employees.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+  const employeeExportData = useMemo(
+    () =>
+      filteredEmployees.map((emp) => ({
+        Name: `${emp.firstName} ${emp.lastName}`,
+        Email: emp.email,
+        Phone: emp.phone || '',
+        NIN: emp.employeeNIN,
+        Status: emp.employmentStatus,
+        Role: emp.roles?.[0]?.jobTitle || '',
+        Salary: emp.employeeSalary ?? '',
+        'Hire Date': emp.hireDate
+          ? new Date(emp.hireDate.seconds * 1000).toLocaleDateString()
+          : '',
+      })),
+    [filteredEmployees]
+  );
 
   const uniqueRoles = [...new Set(employees.flatMap(emp => emp.roles?.map(role => role.jobTitle) || []))];
 
@@ -231,14 +224,12 @@ export default function EmployeesPage() {
           <p className="text-gray-500">Manage your workforce and employee records</p>
         </div>
         <div className="flex space-x-3">
-          <button 
-            onClick={exportEmployees}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            title="Export employee data to CSV"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
+          <ExportButtons
+            data={employeeExportData}
+            filename="employees"
+            title="Employee Directory"
+            subtitle={`${filteredEmployees.length} employee(s) · filtered view`}
+          />
           <button 
             onClick={loadEmployees}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"

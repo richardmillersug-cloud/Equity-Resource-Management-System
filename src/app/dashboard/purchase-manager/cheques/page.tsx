@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import {
   Banknote,
   RefreshCw,
@@ -209,6 +210,21 @@ export default function ChequesPage() {
     return matchSearch && matchStatus;
   });
 
+  const chequeExportData = useMemo(
+    () =>
+      filtered.map((cheque) => ({
+        'Cheque #': cheque.chequeNumber || '—',
+        Payee: getPayee(cheque),
+        Bank: cheque.bankName || 'N/A',
+        Amount: fmtCurrency(cheque.amount),
+        'Issue Date': fmt(getIssueDate(cheque)),
+        'Due Date': fmt(cheque.dueDate),
+        Status: STATUS_CONFIG[cheque.status]?.label ?? cheque.status,
+        Invoice: cheque.invoiceId ? cheque.invoiceId.slice(-8) : '',
+      })),
+    [filtered]
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -314,9 +330,17 @@ export default function ChequesPage() {
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Cheque Records</h3>
-            <span className="text-sm text-gray-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">Cheque Records</h3>
+              <span className="text-sm text-gray-400">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+            </div>
+            <ExportButtons
+              data={chequeExportData}
+              filename="cheque-records"
+              title="Cheque Records"
+              subtitle={`${filtered.length} record(s) · filtered view`}
+            />
           </div>
 
           <div className="overflow-x-auto">
