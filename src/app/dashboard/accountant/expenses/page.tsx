@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePagination, PaginationBar } from '@/components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { AccountantQueries } from '@/lib/firebase/role-based-queries';
 import { CashCloseService, ExpenseService } from '@/lib/firebase/firestore-service';
 import { SimpleCashCloseService } from '@/lib/firebase/firestore-service-simple';
@@ -18,7 +19,6 @@ import {
   XCircle,
   Plus,
   Search,
-  Download,
   Edit,
   Trash2,
   AlertTriangle,
@@ -740,6 +740,31 @@ export default function ExpensesPage() {
     }).format(amount);
   };
 
+  const expenseExportData = useMemo(
+    () =>
+      filteredExpenses.map((expense) => ({
+        Description: expense.description,
+        Amount: formatCurrency(expense.amount),
+        Paid: formatCurrency(expense.paidAmount),
+        Balance: formatCurrency(Math.abs(expense.remainingBalance)),
+        Status: expense.status,
+        'Payment Status': expense.paymentStatus.replace('_', ' '),
+        Category: expense.category,
+        Vendor: expense.vendor,
+        Date: expense.expenseDate.toLocaleDateString(),
+        Source:
+          expense.source === 'expenses_table'
+            ? 'Table'
+            : expense.source === 'expenses_collection'
+              ? 'Collection'
+              : expense.source === 'cash_close'
+                ? 'Till'
+                : 'Other',
+        Priority: expense.priority,
+      })),
+    [filteredExpenses]
+  );
+
   // Balance calculation functions
   const calculateFundBalances = (expenses: CombinedExpense[]) => {
     const dailyFundExpenses = expenses.filter(exp => exp.fundingSource === 'DAILY_EXPENSE_FUND');
@@ -1143,10 +1168,12 @@ export default function ExpensesPage() {
                 <option value="cash_close">Till Expenses</option>
                 {/* Removed mock data option */}
           </select>
-              <button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
+              <ExportButtons
+                data={expenseExportData}
+                filename="accountant-expenses"
+                title="Accountant Expenses"
+                subtitle={`${filteredExpenses.length} expense(s) · filtered view`}
+              />
             </div>
           </div>
         </div>

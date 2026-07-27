@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { usePagination, PaginationBar } from '@/components/ui/Pagination';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { 
   FileText, 
   Search, 
   DollarSign,
   Building2,
   RefreshCw,
-  Download,
   Receipt,
   Smartphone
 } from 'lucide-react';
@@ -160,37 +160,24 @@ export default function PaymentRecordsPage() {
     return labels[method] || method;
   };
 
-  const exportToCSV = () => {
-    const headers = ['Payment ID', 'Expense Name', 'Vendor', 'Payment Amount', 'Payment Method', 'Funding Source', 'Payment Date', 'Paid By', 'Reference'];
-    const csvData = filteredPayments.map(payment => {
-      const expense = expenses.find(e => e.id === payment.expenseId);
-      return [
-        payment.installmentNumber || 'N/A',
-        expense?.name || 'Unknown Expense',
-        expense?.vendor || 'N/A',
-        payment.amount || 0,
-        getPaymentMethodLabel(payment.paymentMethod.type),
-        payment.fundingSource || 'DAILY_EXPENSE_FUND',
-        formatDate(payment.paymentDate),
-        payment.paidByName || 'N/A',
-        payment.paymentReference || 'N/A'
-      ];
-    });
-
-    const csvContent = [headers, ...csvData]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `payment-records-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const paymentExportData = useMemo(
+    () =>
+      filteredPayments.map((payment) => {
+        const expense = expenses.find((e) => e.id === payment.expenseId);
+        return {
+          'Payment ID': payment.installmentNumber || 'N/A',
+          'Expense Name': expense?.name || 'Unknown Expense',
+          Vendor: expense?.vendor || 'N/A',
+          'Payment Amount': formatCurrency(payment.amount || 0),
+          'Payment Method': getPaymentMethodLabel(payment.paymentMethod.type),
+          'Funding Source': payment.fundingSource || 'DAILY_EXPENSE_FUND',
+          'Payment Date': formatDate(payment.paymentDate),
+          'Paid By': payment.paidByName || 'N/A',
+          Reference: payment.paymentReference || 'N/A',
+        };
+      }),
+    [filteredPayments, expenses]
+  );
 
   if (loading) {
     return (
@@ -234,13 +221,12 @@ export default function PaymentRecordsPage() {
                 <RefreshCw className="h-4 w-4" />
                 Refresh
               </button>
-              <button
-                onClick={exportToCSV}
-                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-medium transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </button>
+              <ExportButtons
+                data={paymentExportData}
+                filename="expense-payment-records"
+                title="Expense Payment Records"
+                subtitle={`${filteredPayments.length} payment(s) · filtered view`}
+              />
             </div>
           </div>
         </div>

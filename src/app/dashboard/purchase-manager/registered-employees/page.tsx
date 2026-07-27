@@ -38,6 +38,7 @@ import {
   normalizeStaffShift,
   type StaffShift,
 } from '@/lib/firebase/staff-shifts';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { SUPERMARKET_SECTIONS } from '@/lib/constants/supermarket-sections';
 import type { Attendance, Employee, LeaveRequest } from '@/lib/firebase/models';
 import HydrationSafeLoader from '@/components/ui/HydrationSafeLoader';
@@ -491,6 +492,71 @@ export default function RegisteredEmployeesPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [attendancePeriod, filteredAttendance, employeeNameById]);
 
+  const exportPayload = useMemo(() => {
+    if (view === 'leave') {
+      return {
+        filename: 'leave-requests',
+        title: 'Leave Requests',
+        data: filteredLeaves.map((leave) => ({
+          Employee: employeeNameById.get(leave.employeeId) || leave.employeeId,
+          Type: leave.leaveType,
+          From: formatDate(leave.startDate),
+          To: formatDate(leave.endDate),
+          Days: leave.daysRequested ?? '',
+          Status: leave.status,
+          Reason: leave.reason || '',
+          Comments: leave.comments || '',
+        })),
+      };
+    }
+    if (view === 'attendance') {
+      return {
+        filename: `attendance-${attendancePeriod}`,
+        title: 'Staff Attendance',
+        data: filteredAttendance.map((record) => ({
+          Employee: employeeNameById.get(record.employeeId) || record.employeeId,
+          Date: formatDate(record.attendanceDate),
+          Shift: record.shift || '',
+          'Check In': formatTime(record.checkInTime),
+          'Check Out': formatTime(record.checkOutTime),
+          Hours: record.hoursWorked ?? '',
+          IP: record.checkInIp || '',
+          GPS:
+            record.checkInLatitude != null && record.checkInLongitude != null
+              ? formatCoords(record.checkInLatitude, record.checkInLongitude)
+              : '',
+          Premises:
+            record.checkInOnPremises == null
+              ? ''
+              : record.checkInOnPremises
+                ? 'On premises'
+                : 'Off premises',
+        })),
+      };
+    }
+    return {
+      filename: 'registered-employees',
+      title: 'Registered Employees',
+      data: filtered.map((emp) => ({
+        Name: `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        Role: emp.roles?.[0]?.jobTitle || '',
+        Email: emp.email || '',
+        Phone: emp.phoneNumber || '',
+        Section: emp.workingSection || '',
+        'Default Shift': normalizeStaffShift(emp.assignedShift),
+        Status: emp.employmentStatus || '',
+        Branch: BRANCH_NAMES[emp.branchId || ''] || emp.branchId || '',
+      })),
+    };
+  }, [
+    view,
+    filtered,
+    filteredLeaves,
+    filteredAttendance,
+    employeeNameById,
+    attendancePeriod,
+  ]);
+
   const currentAuthUser = authService.getCurrentUser();
   const isExecUser = canCreateSystemAccounts(currentAuthUser);
   const backPath = isAdminUser(currentAuthUser)
@@ -546,7 +612,13 @@ export default function RegisteredEmployeesPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <ExportButtons
+                data={exportPayload.data}
+                filename={exportPayload.filename}
+                title={exportPayload.title}
+                subtitle={`${exportPayload.data.length} row(s)`}
+              />
               <button
                 type="button"
                 onClick={loadData}

@@ -22,6 +22,7 @@ import {
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../../../lib/firebase/config';
 import { PurchasingManagerService } from '../../../../lib/firebase/purchasing-manager-service';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 
 interface SupplierTotal {
   supplierId: string;
@@ -473,6 +474,23 @@ export default function SupplierTotalsPage() {
                 <RefreshCw className="w-4 h-4" />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
+              <ExportButtons
+                data={filteredAndSortedSuppliers.map((s) => ({
+                  Supplier: s.supplierName,
+                  'Outstanding (UGX)': Math.round(s.totalUnpaidAmount),
+                  'Paid (UGX)': Math.round(s.totalPaidAmount),
+                  Invoices: s.totalInvoicesCount,
+                  Unpaid: s.unpaidInvoicesCount,
+                  Partial: s.partialInvoicesCount,
+                  'Oldest Unpaid': s.oldestUnpaidDate
+                    ? s.oldestUnpaidDate.toLocaleDateString()
+                    : '',
+                  Status: s.paymentStatus,
+                }))}
+                filename="supplier-totals"
+                title="Supplier Totals"
+                subtitle={`${filteredAndSortedSuppliers.length} supplier(s)`}
+              />
             </div>
           </div>
         </div>
