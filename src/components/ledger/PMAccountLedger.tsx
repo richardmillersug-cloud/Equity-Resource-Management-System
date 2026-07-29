@@ -32,6 +32,7 @@ import { usePagination, PaginationBar } from '@/components/ui/Pagination';
 import { ExportButtons } from '@/components/ui/ExportButtons';
 import { generateAccountNumber, maskAccountNumber } from '@/lib/utils/account-number';
 import type { ExportColumn } from '@/lib/export/table-export';
+import { isValidPayment } from '@/lib/firebase/invoice-outstanding';
 
 interface LedgerEntry {
   id: string;
@@ -56,12 +57,16 @@ interface PendingAllocation {
   shiftType?: string;
 }
 
+export type PMLedgerFilter = 'all' | 'credit' | 'debit' | 'expense' | 'invoice';
+
 export interface PMAccountLedgerProps {
   activeLedgerUid: string;
   holderName?: string;
   branchId?: string;
   readOnly?: boolean;
   compactHeader?: boolean;
+  /** Optional initial transaction filter (e.g. expense follow-up from MD Expenses) */
+  initialFilter?: PMLedgerFilter;
 }
 
 const toDate = (v: any): Date => {
@@ -91,6 +96,7 @@ export function PMAccountLedger({
   branchId: branchIdProp,
   readOnly = false,
   compactHeader = false,
+  initialFilter = 'all',
 }: PMAccountLedgerProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +104,7 @@ export function PMAccountLedger({
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [pending, setPending] = useState<PendingAllocation[]>([]);
 
-  const [filter, setFilter] = useState<'all' | 'credit' | 'debit'>('all');
+  const [filter, setFilter] = useState<PMLedgerFilter>(initialFilter);
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
@@ -204,13 +210,15 @@ export function PMAccountLedger({
       invPaySnap.docs.forEach(d => {
         const data = d.data();
         if (data.paidBy !== uid && data.createdBy !== uid) return;
+        // Pending / uncleared cheques stay visible but do not debit the wallet until cleared
+        const status = data.paymentStatus || 'paid';
         entries.push({
           id: d.id,
           type: 'debit',
           amount: safeNum(data.paymentAmount ?? data.amount),
           description: data.description || `Invoice payment${data.invoiceNumber ? ` – INV ${data.invoiceNumber}` : ''}`,
-          date: toDate(data.paymentDate || data.createdAt),
-          status: data.paymentStatus || 'paid',
+          date: toDate(data.clearedAt || data.paymentDate || data.createdAt),
+          status,
           referenceType: 'invoice_payment',
           referenceId: data.invoiceId || d.id,
           counterparty: data.supplierName || data.paidByName,
@@ -221,13 +229,14 @@ export function PMAccountLedger({
       expPaySnap.docs.forEach(d => {
         const data = d.data();
         if (data.paidBy !== uid && data.createdBy !== uid) return;
+        const status = data.paymentStatus || 'paid';
         entries.push({
           id: d.id,
           type: 'debit',
           amount: safeNum(data.paymentAmount ?? data.amount),
           description: data.description || `Expense payment`,
-          date: toDate(data.paymentDate || data.createdAt),
-          status: data.paymentStatus || 'paid',
+          date: toDate(data.clearedAt || data.paymentDate || data.createdAt),
+          status,
           referenceType: 'expense_payment',
           referenceId: data.expenseId || d.id,
           counterparty: data.paidByName,
@@ -324,22 +333,41 @@ export function PMAccountLedger({
     }
   };
 
+  const debitsWallet = (entry: LedgerEntry): boolean => {
+    if (entry.type !== 'debit') return false;
+    return isValidPayment(entry.raw as Record<string, unknown>);
+  };
+
   const totalReceived = ledger
     .filter(e => e.type === 'credit')
     .reduce((s, e) => s + safeNum(e.amount), 0);
 
+  // Cheques only reduce the wallet after clearance (isValidPayment)
   const totalSpent = ledger
-    .filter(e => e.type === 'debit')
+    .filter(debitsWallet)
     .reduce((s, e) => s + safeNum(e.amount), 0);
 
   const balance = totalReceived - totalSpent;
   const pendingTotal = pending.reduce((s, p) => s + safeNum(p.amount), 0);
+  const pendingChequeDebits = ledger
+    .filter(
+      (e) =>
+        e.type === 'debit' &&
+        !debitsWallet(e) &&
+        ((e.raw as { paymentMethod?: { type?: string } })?.paymentMethod?.type === 'cheque' ||
+          e.status === 'pending')
+    )
+    .reduce((s, e) => s + safeNum(e.amount), 0);
 
   const withRunning = (() => {
     const oldest = [...ledger].reverse();
     let running = 0;
     const mapped = oldest.map(e => {
-      running += e.type === 'credit' ? safeNum(e.amount) : -safeNum(e.amount);
+      if (e.type === 'credit') {
+        running += safeNum(e.amount);
+      } else if (debitsWallet(e)) {
+        running -= safeNum(e.amount);
+      }
       return { ...e, runningBalance: running };
     });
     return mapped.reverse();
@@ -359,8 +387,20 @@ export function PMAccountLedger({
     return null;
   })();
 
+  useEffect(() => {
+    if (initialFilter) setFilter(initialFilter);
+    if (initialFilter === 'expense' || initialFilter === 'invoice') {
+      setDateRange('month');
+    }
+  }, [initialFilter]);
+
   const filtered = withRunning.filter(e => {
-    const matchFilter = filter === 'all' || e.type === filter;
+    const matchFilter =
+      filter === 'all' ||
+      (filter === 'credit' && e.type === 'credit') ||
+      (filter === 'debit' && e.type === 'debit') ||
+      (filter === 'expense' && e.referenceType === 'expense_payment') ||
+      (filter === 'invoice' && e.referenceType === 'invoice_payment');
     const matchDate = !dateRangeStart || e.date >= dateRangeStart;
     const matchSearch =
       !search ||
@@ -551,6 +591,11 @@ export function PMAccountLedger({
           <p className={`text-sm mt-2 font-medium ${balance >= 0 ? 'text-emerald-100' : 'text-red-100'}`}>
             {balance >= 0 ? `Available to spend` : `Overspent by ${fmtCurrency(Math.abs(balance))}`}
           </p>
+          {pendingChequeDebits > 0 && (
+            <p className="text-xs mt-2 text-white/80">
+              Pending cheques {fmtCurrency(pendingChequeDebits)} not deducted until cleared
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -568,7 +613,10 @@ export function PMAccountLedger({
             <ArrowUpCircle className="w-5 h-5 text-red-500" />
           </div>
           <p className="text-2xl font-bold text-red-700">{fmtCurrency(totalSpent)}</p>
-          <p className="text-xs text-gray-400 mt-1">{ledger.filter(e => e.type === 'debit').length} payments</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {ledger.filter(debitsWallet).length} cleared payments
+            {pendingChequeDebits > 0 ? ` · ${fmtCurrency(pendingChequeDebits)} pending cheques` : ''}
+          </p>
         </div>
       </div>
 
@@ -645,20 +693,30 @@ export function PMAccountLedger({
                   </button>
                 ))}
               </div>
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-                {(['all', 'credit', 'debit'] as const).map(f => (
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm flex-wrap">
+                {(
+                  [
+                    { key: 'all', label: 'All' },
+                    { key: 'credit', label: 'Received' },
+                    { key: 'debit', label: 'Payments' },
+                    { key: 'invoice', label: 'Invoices' },
+                    { key: 'expense', label: 'Expenses' },
+                  ] as const
+                ).map(({ key, label }) => (
                   <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-4 py-1.5 font-medium transition-colors ${
-                      filter === f
-                        ? f === 'credit' ? 'bg-emerald-600 text-white'
-                        : f === 'debit' ? 'bg-red-600 text-white'
-                        : 'bg-gray-900 text-white'
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`px-3 py-1.5 font-medium transition-colors ${
+                      filter === key
+                        ? key === 'credit'
+                          ? 'bg-emerald-600 text-white'
+                          : key === 'debit' || key === 'invoice' || key === 'expense'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-900 text-white'
                         : 'text-gray-500 hover:bg-gray-50'
                     }`}
                   >
-                    {f === 'all' ? 'All' : f === 'credit' ? 'Received' : 'Payments'}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -720,7 +778,13 @@ export function PMAccountLedger({
                         {entry.type === 'credit'
                           ? <ArrowDownCircle className="w-3 h-3" />
                           : <ArrowUpCircle className="w-3 h-3" />}
-                        {entry.type === 'credit' ? 'Received' : 'Payment'}
+                        {entry.type === 'credit'
+                          ? 'Received'
+                          : entry.referenceType === 'expense_payment'
+                            ? 'Expense'
+                            : entry.referenceType === 'invoice_payment'
+                              ? 'Invoice'
+                              : 'Payment'}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">

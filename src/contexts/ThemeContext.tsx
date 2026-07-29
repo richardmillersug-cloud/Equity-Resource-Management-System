@@ -16,14 +16,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('light');
 
-  // Load theme from localStorage on mount (default remains light when unset)
+  // Load theme from localStorage on mount — default to system preference
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
     if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
       setTheme(savedTheme);
     } else {
-      setTheme('light');
-      localStorage.setItem('theme', 'light');
+      setTheme('system');
+      localStorage.setItem('theme', 'system');
     }
   }, []);
 

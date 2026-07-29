@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { authService } from '@/lib/firebase/auth';
-import { PMAccountLedger } from '@/components/ledger/PMAccountLedger';
+import { PMAccountLedger, type PMLedgerFilter } from '@/components/ledger/PMAccountLedger';
 import { AccountantAccountLedger } from '@/components/ledger/AccountantAccountLedger';
 import { Wallet, Banknote, RefreshCw } from 'lucide-react';
 
@@ -23,6 +23,24 @@ const getUserRole = (user: { employee?: { roles?: { jobTitle?: string }[] } } | 
 
 const PM_ROLES = ['Purchase Manager', 'Purchasing Manager'];
 const ACCOUNTANT_ROLES = ['Accountant', 'Manager'];
+const EXCLUDED_FROM_PM_LEDGER = new Set([
+  'admin',
+  'system admin',
+  'super admin',
+  'superadmin',
+  'managing director',
+]);
+
+function employeeHasExcludedRole(roles: { jobTitle?: string }[] | undefined): boolean {
+  return (roles || []).some((r) =>
+    EXCLUDED_FROM_PM_LEDGER.has((r.jobTitle || '').toLowerCase())
+  );
+}
+
+function parsePmFilter(raw: string | null): PMLedgerFilter {
+  if (raw === 'expense' || raw === 'invoice' || raw === 'credit' || raw === 'debit') return raw;
+  return 'all';
+}
 
 export default function AccountLedgersPage() {
   const router = useRouter();
@@ -34,10 +52,12 @@ export default function AccountLedgersPage() {
   const [usersLoading, setUsersLoading] = useState(true);
 
   const initialType = (searchParams.get('type') as LedgerType) || 'pm';
+  const filterParam = searchParams.get('filter');
   const [ledgerType, setLedgerType] = useState<LedgerType>(
     initialType === 'accountant' ? 'accountant' : 'pm'
   );
   const [selectedUserId, setSelectedUserId] = useState(searchParams.get('user') || '');
+  const [ledgerFilter, setLedgerFilter] = useState<PMLedgerFilter>(parsePmFilter(filterParam));
 
   useEffect(() => {
     const existingUser = authService.getCurrentUser();
@@ -50,7 +70,10 @@ export default function AccountLedgersPage() {
       setAuthLoading(false);
     });
     const timer = setTimeout(() => setAuthLoading(false), 3000);
-    return () => { unsubscribe(); clearTimeout(timer); };
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -60,6 +83,15 @@ export default function AccountLedgersPage() {
       router.replace('/dashboard');
     }
   }, [authLoading, currentUser, router]);
+
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const user = searchParams.get('user') || '';
+    const filter = searchParams.get('filter');
+    if (type === 'accountant' || type === 'pm') setLedgerType(type);
+    setSelectedUserId(user);
+    setLedgerFilter(parsePmFilter(filter));
+  }, [searchParams]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -72,8 +104,11 @@ export default function AccountLedgersPage() {
 
         employeesSnapshot.docs.forEach((employeeDoc) => {
           const data = employeeDoc.data();
-          const role = data.roles?.[0]?.jobTitle || '';
-          const isPm = PM_ROLES.includes(role);
+          const roles = data.roles || [];
+          const role = roles[0]?.jobTitle || '';
+          const isPm =
+            roles.some((r: { jobTitle?: string }) => PM_ROLES.includes(r.jobTitle || '')) &&
+            !employeeHasExcludedRole(roles);
           const isAccountant = ACCOUNTANT_ROLES.includes(role);
 
           if (
@@ -105,23 +140,27 @@ export default function AccountLedgersPage() {
     loadUsers();
   }, [authLoading, ledgerType]);
 
+  const updateUrl = (type: LedgerType, uid: string, filter: PMLedgerFilter) => {
+    const params = new URLSearchParams();
+    params.set('type', type);
+    if (uid) params.set('user', uid);
+    if (filter && filter !== 'all') params.set('filter', filter);
+    router.replace(`/dashboard/account-ledgers?${params.toString()}`);
+  };
+
   const handleTypeChange = (type: LedgerType) => {
     setLedgerType(type);
     setSelectedUserId('');
-    const params = new URLSearchParams();
-    params.set('type', type);
-    router.replace(`/dashboard/account-ledgers?${params.toString()}`);
+    updateUrl(type, '', ledgerFilter);
   };
 
   const handleUserChange = (uid: string) => {
     setSelectedUserId(uid);
-    const params = new URLSearchParams();
-    params.set('type', ledgerType);
-    if (uid) params.set('user', uid);
-    router.replace(`/dashboard/account-ledgers?${params.toString()}`);
+    updateUrl(ledgerType, uid, ledgerFilter);
   };
 
   const selectedUser = users.find((u) => u.uid === selectedUserId);
+  const accountantTxFilter = ledgerFilter === 'expense' ? 'payment' : 'all';
 
   if (authLoading) {
     return (
@@ -135,8 +174,6 @@ export default function AccountLedgersPage() {
   return (
     <div className="bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/20 p-4 sm:p-6 pb-12 min-h-screen">
       <div className="max-w-6xl mx-auto space-y-6">
-
-        {/* Page Header */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
@@ -146,13 +183,14 @@ export default function AccountLedgersPage() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Account Ledgers</h1>
               <p className="text-sm text-gray-500">
                 View PM and accountant account ledgers across all users
+                {ledgerFilter === 'expense' && (
+                  <span className="text-indigo-600"> · Expense payments follow-up</span>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Controls: ledger type tabs + user selector */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* Ledger type toggle */}
             <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm font-medium shrink-0">
               <button
                 onClick={() => handleTypeChange('pm')}
@@ -178,7 +216,6 @@ export default function AccountLedgersPage() {
               </button>
             </div>
 
-            {/* User selector */}
             <div className="flex-1 min-w-0">
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 {ledgerType === 'pm' ? 'Purchase Manager' : 'Accountant / Manager'}
@@ -205,7 +242,6 @@ export default function AccountLedgersPage() {
           </div>
         </div>
 
-        {/* Ledger content */}
         {ledgerType === 'pm' ? (
           <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-4 sm:p-6">
             {selectedUserId ? (
@@ -215,6 +251,7 @@ export default function AccountLedgersPage() {
                 branchId={selectedUser?.branchId}
                 readOnly
                 compactHeader
+                initialFilter={ledgerFilter}
               />
             ) : (
               <div className="text-center py-16 text-gray-500">
@@ -230,6 +267,7 @@ export default function AccountLedgersPage() {
                 branchId={selectedUser.branchId || 'default-branch'}
                 holderName={selectedUser.name.toUpperCase()}
                 compactHeader
+                initialTxFilter={accountantTxFilter}
               />
             ) : (
               <div className="text-center py-16 text-gray-500">

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { subscribeToInvoicePayments, InvoicePayment, getInvoicePaymentHistory, PurchasingManagerService } from '@/lib/firebase/purchasing-manager-service';
 import { authService } from '@/lib/firebase/auth';
+import { getPaymentAmount, isValidPayment } from '@/lib/firebase/invoice-outstanding';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
@@ -265,8 +266,16 @@ export default function PaymentsPage() {
   );
 
   // Calculate statistics based on filtered payments
+  // Total Value matches MD/PM dashboards: completed (cleared) payments only when status filter is "all"
   const totalPayments = filteredPayments.length;
-  const totalAmount = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const paymentsForValue =
+    filterStatus === 'all'
+      ? filteredPayments.filter((p) => isValidPayment(p as unknown as Record<string, unknown>))
+      : filteredPayments;
+  const totalAmount = paymentsForValue.reduce(
+    (sum, payment) => sum + getPaymentAmount(payment as unknown as Record<string, unknown>),
+    0
+  );
   const cashPayments = filteredPayments.filter(p => p.paymentMethod.type === 'cash').length;
   const bankTransfers = filteredPayments.filter(p => p.paymentMethod.type === 'bank_deposit').length;
   const mobilePayments = filteredPayments.filter(p => ['mobile_money', 'momo', 'airtel_pay'].includes(p.paymentMethod.type)).length;
@@ -385,7 +394,9 @@ export default function PaymentsPage() {
                 <p className="text-2xl font-bold text-gray-900 group-hover:text-violet-600 transition-colors">UGX {totalAmount.toLocaleString()}</p>
                 <div className="flex items-center mt-2">
                   <div className="w-2 h-2 bg-violet-500 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-500">All payments</span>
+                  <span className="text-xs text-gray-500">
+                    {filterStatus === 'all' ? 'Completed payments' : 'Filtered payments'}
+                  </span>
                 </div>
               </div>
               <div className="w-14 h-14 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">

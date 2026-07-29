@@ -22,15 +22,18 @@ import {
   ThumbsUp,
   ThumbsDown,
   Clock,
+  Trash2,
 } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { authService } from '@/lib/firebase/auth';
 import { firestoreServices } from '@/lib/firebase/firestore-service';
-import { STAFF_PORTAL_ROLES, isStaffPortalRole } from '@/lib/firebase/staff-portal-roles';
+import { STAFF_PORTAL_ROLES, userHasStaffPortalRole } from '@/lib/firebase/staff-portal-roles';
 import {
   canCreateSystemAccounts,
+  canViewAllRegisteredStaff,
   isAdminUser,
   isManagingDirectorUser,
+  isPurchaseManagerUser,
 } from '@/lib/firebase/admin-access';
 import {
   SHIFT_DEFINITIONS,
@@ -150,23 +153,25 @@ export default function RegisteredEmployeesPage() {
       }
 
       let list: Employee[] = [];
-      const isExec = canCreateSystemAccounts(user);
 
-      if (isExec) {
-        // Admin / MD see all staff-portal employees
+      // Super Admin / System Admin, MD, and PM all see every registered staff
+      if (canViewAllRegisteredStaff(user)) {
         const all = await firestoreServices.employee.getAll();
-        list = all.filter((emp) => isStaffPortalRole(emp.roles?.[0]?.jobTitle));
+        list = all.filter(
+          (emp) => Boolean(emp.registeredBy) || userHasStaffPortalRole(emp.roles)
+        );
       } else {
+        // Other roles: only staff they personally registered (if any)
         try {
           list = await firestoreServices.employee.getRegisteredBy(user.uid);
         } catch (err) {
-          console.warn('registeredBy query failed, falling back to full staff list:', err);
-        }
-
-        if (list.length === 0) {
+          console.warn('registeredBy query failed, scanning employees locally:', err);
           const all = await firestoreServices.employee.getAll();
-          list = all.filter((emp) => isStaffPortalRole(emp.roles?.[0]?.jobTitle));
+          list = all.filter((emp) => emp.registeredBy === user.uid);
         }
+        list = list.filter(
+          (emp) => Boolean(emp.registeredBy) || userHasStaffPortalRole(emp.roles)
+        );
       }
 
       list.sort((a, b) => {
@@ -356,6 +361,56 @@ export default function RegisteredEmployeesPage() {
     } catch (err) {
       console.error('Failed to update staff:', err);
       setError(err instanceof Error ? err.message : 'Failed to update staff');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canDeleteStaff = (emp: Employee): boolean => {
+    const user = authService.getCurrentUser();
+    if (!user) return false;
+    // Super Admin / MD can delete any; PM deletes staff they registered
+    if (isAdminUser(user) || isManagingDirectorUser(user)) return true;
+    if (isPurchaseManagerUser(user) && emp.registeredBy === user.uid) return true;
+    return false;
+  };
+
+  const handleDeleteStaff = async () => {
+    if (!managing) return;
+    if (!canDeleteStaff(managing)) {
+      setError('You can only delete staff you registered.');
+      return;
+    }
+
+    const name = `${managing.firstName} ${managing.lastName}`.trim();
+    const confirmed = window.confirm(
+      `Delete ${name} permanently?\n\nTheir employee record will be removed and they will no longer be able to sign in. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const typed = window.prompt(`Type DELETE to confirm removing ${name}:`);
+    if (typed !== 'DELETE') {
+      setError('Deletion cancelled — you must type DELETE to confirm.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await firestoreServices.employee.delete(managing.id);
+      setEmployees((prev) => prev.filter((e) => e.id !== managing.id));
+      setLeaveRequests((prev) => prev.filter((l) => l.employeeId !== managing.id));
+      setAttendanceRecords((prev) => prev.filter((a) => a.employeeId !== managing.id));
+      setManaging(null);
+      setSuccess(`${name} has been deleted.`);
+    } catch (err) {
+      console.error('Failed to delete staff:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete staff. Deploy latest Firestore rules if permission was denied.'
+      );
     } finally {
       setSaving(false);
     }
@@ -1452,23 +1507,40 @@ export default function RegisteredEmployeesPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
-              <button
-                type="button"
-                onClick={closeManage}
-                disabled={saving}
-                className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveAssignment}
-                disabled={saving}
-                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-5 py-4">
+              {canDeleteStaff(managing) ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteStaff}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {saving ? 'Working…' : 'Delete staff'}
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400">
+                  PM can delete only staff they registered
+                </span>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeManage}
+                  disabled={saving}
+                  className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAssignment}
+                  disabled={saving}
+                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

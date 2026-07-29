@@ -277,7 +277,12 @@ export class ExpensePaymentService {
     await batch.commit();
     
     // Deduct from fund balance and record the assignment
-    const branchId = expense.branchId || 'kyengera';
+    // Align with accountant ledger default so expense reductions show on the same wallet
+    const branchId = expense.branchId || 'default-branch';
+    const paymentDateObj =
+      paymentData.paymentDate instanceof Date ? paymentData.paymentDate : new Date();
+    const paymentDateStr = `${paymentDateObj.getFullYear()}-${String(paymentDateObj.getMonth() + 1).padStart(2, '0')}-${String(paymentDateObj.getDate()).padStart(2, '0')}`;
+
     try {
       await fundingSourceService.updateFundBalance(branchId, fundingSource, paymentAmount, 'allocate');
       console.log(`✅ Deducted ${paymentAmount} UGX from ${fundingSource}`);
@@ -306,7 +311,7 @@ export class ExpensePaymentService {
       console.warn('⚠️ Could not record funding source assignment:', recordingError);
     }
 
-    // Record debit in walletLedger so the account page shows the payment out
+    // Record debit in walletLedger so the accountant account page shows money out
     try {
       await walletLedgerService.recordExpensePaymentDebit({
         expensePaymentId: paymentRef.id,
@@ -318,10 +323,11 @@ export class ExpensePaymentService {
         branchId,
         paidBy,
         paidByName,
+        date: paymentDateStr,
         notes: notes || undefined,
       });
     } catch (ledgerError) {
-      console.warn('⚠️ Could not record wallet ledger debit:', ledgerError);
+      console.error('❌ Could not record wallet ledger debit:', ledgerError);
     }
 
     console.log(`✅ Expense payment processed: ${paymentReference} for ${paymentAmount} from ${fundingSource}`);
@@ -642,5 +648,59 @@ export class ExpensePaymentService {
       console.error('Error getting all expense payment summaries:', error);
       return [];
     }
+  }
+
+  /**
+   * Mark every document in `expenses` as approved + FULLY_PAID.
+   * Sets paidAmount to the expense amount and remainingBalance to 0.
+   */
+  static async markAllExpensesApprovedAndFullyPaid(): Promise<{
+    updated: number;
+    skipped: number;
+    total: number;
+  }> {
+    const snapshot = await getDocs(collection(db, 'expenses'));
+    let updated = 0;
+    let skipped = 0;
+    const now = Timestamp.now();
+    const docs = snapshot.docs;
+    const CHUNK = 400;
+
+    for (let i = 0; i < docs.length; i += CHUNK) {
+      const chunk = docs.slice(i, i + CHUNK);
+      const batch = writeBatch(db);
+      let opsInBatch = 0;
+
+      chunk.forEach((expenseDoc) => {
+        const data = expenseDoc.data();
+        const amount = Number(data.amount ?? 0) || 0;
+        const alreadyOk =
+          String(data.status || '').toLowerCase() === 'approved' &&
+          data.paymentStatus === 'FULLY_PAID' &&
+          Number(data.remainingBalance ?? 1) === 0 &&
+          (amount <= 0 || Number(data.paidAmount ?? 0) >= amount);
+
+        if (alreadyOk) {
+          skipped += 1;
+          return;
+        }
+
+        batch.update(expenseDoc.ref, {
+          status: 'approved',
+          paymentStatus: 'FULLY_PAID',
+          paidAmount: amount,
+          remainingBalance: 0,
+          updatedAt: now,
+        });
+        opsInBatch += 1;
+        updated += 1;
+      });
+
+      if (opsInBatch > 0) {
+        await batch.commit();
+      }
+    }
+
+    return { updated, skipped, total: docs.length };
   }
 }

@@ -238,7 +238,8 @@ class FirebaseAuthService {
    */
   async createManagedAccount(
     signUpData: SignUpData,
-    createdBy: { uid: string; name?: string }
+    createdBy: { uid: string; name?: string; role?: string },
+    extras?: Record<string, unknown>
   ): Promise<{ uid: string; email: string }> {
     const roleSalaries = signUpData.roles
       .map((role) => Number(role.baseSalary) || 0)
@@ -320,10 +321,13 @@ class FirebaseAuthService {
 
       await setDoc(doc(db, 'employees', userCredential.user.uid), {
         ...employeeData,
+        ...(extras || {}),
         createdAt: new Date(),
         updatedAt: new Date(),
         registeredBy: createdBy.uid,
-        registeredByRole: createdBy.name || 'Admin',
+        registeredByName: (extras?.registeredByName as string) || createdBy.name || '',
+        registeredByRole:
+          (extras?.registeredByRole as string) || createdBy.role || createdBy.name || 'Admin',
       });
 
       try {

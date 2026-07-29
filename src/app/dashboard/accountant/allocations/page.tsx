@@ -127,9 +127,24 @@ export default function AccountantAllocationsPage() {
 
       employeesSnapshot.docs.forEach(doc => {
         const data = doc.data();
-        const role = data.roles?.[0]?.jobTitle;
+        const roles = data.roles || [];
+        const isPm = roles.some(
+          (r: { jobTitle?: string }) =>
+            r.jobTitle === 'Purchase Manager' || r.jobTitle === 'Purchasing Manager'
+        );
+        const isAdminOrMd = roles.some((r: { jobTitle?: string }) => {
+          const t = (r.jobTitle || '').toLowerCase();
+          return (
+            t === 'admin' ||
+            t === 'system admin' ||
+            t === 'super admin' ||
+            t === 'superadmin' ||
+            t === 'managing director'
+          );
+        });
 
-        if (role === 'Purchase Manager' || role === 'Purchasing Manager') {
+        // Admin / MD accounts are not operational PM wallets (ledger balance & used stay 0)
+        if (isPm && !isAdminOrMd) {
           pmUsersData.push({
             uid: doc.id,
             name: `${data.firstName || 'Unknown'} ${data.lastName || 'User'}`,

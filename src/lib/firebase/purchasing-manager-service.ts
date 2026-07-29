@@ -29,7 +29,8 @@ export interface CashClose {
   expectedAmount: number;
   cashPresent: number;
   airtel: number;
-  mtn: numb
+  mtn: number;
+  stanbicBank: number;
   equityBank: number;
   absaBank: number;
   pesaPal: number;

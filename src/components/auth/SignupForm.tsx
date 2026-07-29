@@ -14,7 +14,7 @@ interface SignupFormProps {
   onSwitchToLogin?: () => void;
   /** When true, only Admin/MD create accounts and stay signed in */
   managedCreation?: boolean;
-  createdBy?: { uid: string; name?: string } | null;
+  createdBy?: { uid: string; name?: string; role?: string } | null;
 }
 
 export default function SignupForm({
@@ -180,7 +180,11 @@ export default function SignupForm({
         if (!createdBy?.uid) {
           throw { message: 'You must be signed in as Admin or Managing Director to create accounts.' };
         }
-        await authService.createManagedAccount(formData, createdBy);
+        await authService.createManagedAccount(formData, {
+          uid: createdBy.uid,
+          name: createdBy.name,
+          role: createdBy.role || 'Admin',
+        });
       } else {
         await authService.signUp(formData);
       }

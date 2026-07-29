@@ -48,11 +48,31 @@ export function getPaymentDate(payment: Record<string, unknown>): Date | null {
 }
 
 export function isChequePayment(payment: Record<string, unknown>): boolean {
-  const method = payment.paymentMethod as { type?: string } | undefined;
+  const method = payment.paymentMethod as { type?: string; status?: string } | undefined;
   return method?.type === 'cheque';
 }
 
-/** Only completed (cleared) payments reduce outstanding. Cheques need explicit clearance. */
+/** Cheque is a confirmed payment only after it is cleared. */
+export function isClearedCheque(payment: Record<string, unknown>): boolean {
+  if (!isChequePayment(payment)) return false;
+  const status = payment.paymentStatus as string | undefined;
+  if (status === 'failed' || status === 'cancelled' || status === 'pending') {
+    return false;
+  }
+  const method = payment.paymentMethod as { status?: string } | undefined;
+  return (
+    status === 'completed' ||
+    Boolean(payment.clearedAt) ||
+    method?.status === 'cleared'
+  );
+}
+
+/**
+ * Confirmed payments only.
+ * Cash / bank / mobile: completed or paid (legacy missing status = completed).
+ * Cheques: not counted until marked cleared (paymentStatus completed / clearedAt).
+ * Use for wallet / ledger debits and available balance.
+ */
 export function isValidPayment(payment: Record<string, unknown>): boolean {
   const status = payment.paymentStatus as string | undefined;
 
@@ -61,11 +81,51 @@ export function isValidPayment(payment: Record<string, unknown>): boolean {
   }
 
   if (isChequePayment(payment)) {
-    return status === 'completed';
+    return isClearedCheque(payment);
   }
 
-  // Non-cheque legacy records without status are treated as completed
-  return (status || 'completed') === 'completed';
+  // Non-cheque: completed/paid, or legacy records without status
+  const normalized = (status || 'completed').toLowerCase();
+  return normalized === 'completed' || normalized === 'paid';
+}
+
+/**
+ * Payments for Purchase & Payment Trends / monthly “Payments” totals.
+ * Includes pending cheques (issued but not yet cleared). Excludes failed/cancelled/bounced.
+ * Bucket by paymentDate (issue date), not clearance date.
+ */
+export function isRecordedPayment(payment: Record<string, unknown>): boolean {
+  const status = (payment.paymentStatus as string | undefined)?.toLowerCase();
+  if (status === 'failed' || status === 'cancelled') {
+    return false;
+  }
+
+  if (isChequePayment(payment)) {
+    const method = payment.paymentMethod as { status?: string } | undefined;
+    const methodStatus = method?.status?.toLowerCase();
+    if (methodStatus === 'bounced' || methodStatus === 'cancelled') {
+      return false;
+    }
+    return true;
+  }
+
+  const normalized = (status || 'completed').toLowerCase();
+  return (
+    normalized === 'completed' ||
+    normalized === 'paid' ||
+    normalized === 'pending'
+  );
+}
+
+/**
+ * Date used when summing confirmed wallet debits in a period.
+ * Cleared cheques use clearedAt when present.
+ */
+export function getConfirmedPaymentDate(payment: Record<string, unknown>): Date | null {
+  if (isChequePayment(payment) && isClearedCheque(payment)) {
+    return toJsDate(payment.clearedAt) ?? getPaymentDate(payment);
+  }
+  return getPaymentDate(payment);
 }
 
 export function normalizePaymentDoc(

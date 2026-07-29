@@ -165,4 +165,42 @@ html {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Phone-readable data tables: swipe horizontally without breaking page layout */
+  .table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .table-scroll table {
+    min-width: 100%;
+  }
+
+  .page-shell {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Keep dashboard content inside the phone viewport */
+@media (max-width: 1023px) {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  main {
+    max-width: 100vw;
+  }
+
+  /* Prefer readable wrapping for money / long labels on phones */
+  .break-words,
+  .tabular-nums {
+    overflow-wrap: anywhere;
+  }
 }

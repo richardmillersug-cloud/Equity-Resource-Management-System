@@ -31,6 +31,11 @@ import { subscribeToInvoicePayments } from '@/lib/firebase/purchasing-manager-se
 import {
   getTotalOutstandingFromPaidAmount,
   getMonthOutstandingFromPaidAmount,
+  getPaymentAmount as sharedGetPaymentAmount,
+  getPaymentDate as sharedGetPaymentDate,
+  isRecordedPayment as sharedIsRecordedPayment,
+  getInvoiceAmount as sharedGetInvoiceAmount,
+  getInvoiceDate as sharedGetInvoiceDate,
 } from '@/lib/firebase/invoice-outstanding';
 import {
   Chart as ChartJS,
@@ -756,44 +761,14 @@ export default function PurchaseManagerDashboard() {
     const endOfYear = new Date(now.getFullYear() + 1, 0, 0); // Last day of current year
     endOfYear.setHours(23, 59, 59, 999);
 
-    // Get payment date
-    const getPaymentDate = (payment: any): Date | null => {
-      if (!payment) return null;
-      
-      // Try paymentDate first
-      if (payment.paymentDate) {
-        const date = payment.paymentDate?.toDate?.() || payment.paymentDate;
-        if (date instanceof Date && !isNaN(date.getTime())) return date;
-      }
-      
-      // Fallback to processedAt for completed payments
-      if (payment.status === 'completed' && payment.processedAt) {
-        const date = payment.processedAt?.toDate?.() || payment.processedAt;
-        if (date instanceof Date && !isNaN(date.getTime())) return date;
-      }
-      
-      // Fallback to createdAt as last resort
-      if (payment.createdAt) {
-        const date = payment.createdAt?.toDate?.() || payment.createdAt;
-        if (date instanceof Date && !isNaN(date.getTime())) return date;
-      }
-      
-      return null;
-    };
+    // Shared helpers — trends include pending cheques by paymentDate
+    const getPaymentDate = (payment: any): Date | null => sharedGetPaymentDate(payment);
+    const isValidPayment = (payment: any): boolean => sharedIsRecordedPayment(payment);
+    const getPaymentAmountValue = (payment: any): number => sharedGetPaymentAmount(payment);
 
     // Helper function to get invoice date (for filtering invoices by period)
-    const getInvoiceDate = (invoice: any): Date | null => {
-      try {
-        const invoiceDate = invoice.date || invoice.createdAt;
-        if (!invoiceDate) return null;
-        const date = invoiceDate?.toDate ? invoiceDate.toDate() : 
-                     invoiceDate instanceof Date ? invoiceDate : 
-                     new Date(invoiceDate);
-        return !isNaN(date.getTime()) ? date : null;
-      } catch (error) {
-        return null;
-      }
-    };
+    const getInvoiceDate = (invoice: any): Date | null => sharedGetInvoiceDate(invoice);
+    const getInvoiceAmountValue = (invoice: any): number => sharedGetInvoiceAmount(invoice);
 
     // Calculate invoices made in each period FIRST (using invoice date/createdAt)
     const dailyInvoices = invoices.filter(invoice => {
@@ -808,7 +783,7 @@ export default function PurchaseManagerDashboard() {
 
     const monthlyInvoices = invoices.filter(invoice => {
       const invoiceDate = getInvoiceDate(invoice);
-      return invoiceDate && invoiceDate >= startOfMonth && invoiceDate <= endOfMonth;
+      return invoiceDate && invoiceDate >= startOfMonth && invoiceDate <= endOfToday;
     });
 
     const yearlyInvoices = invoices.filter(invoice => {
@@ -818,24 +793,19 @@ export default function PurchaseManagerDashboard() {
 
     // Calculate purchase totals based on INVOICES created (not payments)
     // Daily: Sum of invoices created today
-    const dailyPurchases = dailyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const dailyPurchases = dailyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
     
     // Weekly: Sum of invoices created this week
-    const weeklyPurchases = weeklyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const weeklyPurchases = weeklyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
     
     // Monthly: Sum of invoices created this month
-    const monthlyPurchases = monthlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const monthlyPurchases = monthlyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
     
     // Yearly: Sum of invoices created this year
-    const yearlyPurchases = yearlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const yearlyPurchases = yearlyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
 
     // Helper function to check if payment should be counted (only completed payments)
-    const isValidPayment = (payment: any): boolean => {
-      // Include only completed payments (exclude pending cheques and failed payments)
-      // If no paymentStatus field, assume it's completed (backward compatibility)
-      const status = payment.paymentStatus || 'completed';
-      return status === 'completed';
-    };
+    // (isValidPayment / getPaymentAmountValue defined above from shared invoice-outstanding)
 
     // Calculate PAYMENTS made up to today (include all completed payments with valid dates up to end of today)
     const endOfTodayTime = new Date(endOfToday); // Use end of today instead of current moment
@@ -845,7 +815,7 @@ export default function PurchaseManagerDashboard() {
         // Include all completed payments up to end of today (includes payments made earlier today)
         return paymentDate && paymentDate <= endOfTodayTime && isValidPayment(payment);
       })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      .reduce((sum, payment) => sum + getPaymentAmountValue(payment), 0);
 
     // Daily: All payments made today (completed only)
     const dailyPaymentsMade = payments
@@ -853,7 +823,7 @@ export default function PurchaseManagerDashboard() {
         const paymentDate = getPaymentDate(payment);
         return paymentDate && paymentDate >= startOfToday && paymentDate <= endOfToday && isValidPayment(payment);
       })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      .reduce((sum, payment) => sum + getPaymentAmountValue(payment), 0);
 
     // Weekly: All payments made this week (completed only)
     const weeklyPaymentsMade = payments
@@ -861,15 +831,19 @@ export default function PurchaseManagerDashboard() {
         const paymentDate = getPaymentDate(payment);
         return paymentDate && paymentDate >= startOfWeek && paymentDate <= endOfWeek && isValidPayment(payment);
       })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      .reduce((sum, payment) => sum + getPaymentAmountValue(payment), 0);
 
-    // Monthly: All payments made this month (completed only)
+    // Monthly payments: 1st of month → today (matches MD / cleared-cheque rules)
+    const endOfMonthForPayments = new Date(Math.min(endOfMonth.getTime(), endOfToday.getTime()));
+    endOfMonthForPayments.setHours(23, 59, 59, 999);
+
+    // Monthly: All confirmed payments made this month through today
     const monthlyPaymentsMade = payments
       .filter(payment => {
         const paymentDate = getPaymentDate(payment);
-        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPayment(payment);
+        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonthForPayments && isValidPayment(payment);
       })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      .reduce((sum, payment) => sum + getPaymentAmountValue(payment), 0);
 
     // Yearly: All payments made this year (completed only)
     const yearlyPaymentsMade = payments
@@ -877,7 +851,7 @@ export default function PurchaseManagerDashboard() {
         const paymentDate = getPaymentDate(payment);
         return paymentDate && paymentDate >= startOfYear && paymentDate <= endOfYear && isValidPayment(payment);
       })
-      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      .reduce((sum, payment) => sum + getPaymentAmountValue(payment), 0);
     
     // Calculate payment counts by period (completed payments only)
     const dailyPayments = payments.filter(payment => {
@@ -892,7 +866,7 @@ export default function PurchaseManagerDashboard() {
 
     const monthlyPayments = payments.filter(payment => {
       const paymentDate = getPaymentDate(payment);
-      return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPayment(payment);
+      return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonthForPayments && isValidPayment(payment);
     });
 
     const yearlyPayments = payments.filter(payment => {
@@ -938,10 +912,10 @@ export default function PurchaseManagerDashboard() {
     });
 
     // Calculate invoice amounts for each period (invoices already filtered above)
-    const dailyInvoiceAmount = dailyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
-    const weeklyInvoiceAmount = weeklyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
-    const monthlyInvoiceAmount = monthlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
-    const yearlyInvoiceAmount = yearlyInvoices.reduce((sum, inv) => sum + (Number(inv.amount || inv.amountInDigits || 0)), 0);
+    const dailyInvoiceAmount = dailyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
+    const weeklyInvoiceAmount = weeklyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
+    const monthlyInvoiceAmount = monthlyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
+    const yearlyInvoiceAmount = yearlyInvoices.reduce((sum, inv) => sum + getInvoiceAmountValue(inv), 0);
 
     // Calculate invoice metrics
     const totalAmount = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
@@ -1109,10 +1083,10 @@ export default function PurchaseManagerDashboard() {
       };
     }).sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
 
-    // Calculate payment analytics
-    const paymentMethods = payments.reduce((acc, payment) => {
-      const method = payment.paymentMethod || 'unknown';
-      acc[method] = (acc[method] || 0) + (payment.amount || 0);
+    // Calculate payment analytics (completed payments only — same amount helper as MD)
+    const paymentMethods = payments.filter(isValidPayment).reduce((acc, payment) => {
+      const method = payment.paymentMethod?.type || payment.paymentMethod || 'unknown';
+      acc[method] = (acc[method] || 0) + getPaymentAmountValue(payment);
       return acc;
     }, {} as Record<string, number>);
 
@@ -1217,88 +1191,85 @@ export default function PurchaseManagerDashboard() {
     });
   };
 
-  // Generate monthly invoice trends (Purchase Amount from invoices)
+  // Generate monthly invoice trends (Purchase Amount from invoices) — local calendar months
   const generateMonthlyInvoiceTrends = (invoicesData: any[]) => {
     const months = [];
+    const now = new Date();
     for (let i = 11; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthKey = date.toISOString().slice(0, 7); // YYYY-MM format
-      
-      // Filter invoices created in this month
-      const monthInvoices = invoicesData.filter(invoice => {
-        try {
-          const invoiceDate = invoice.date || invoice.createdAt;
-          if (!invoiceDate) return false;
-          
-          const dateObj = invoiceDate?.toDate ? invoiceDate.toDate() : 
-                         invoiceDate instanceof Date ? invoiceDate : 
-                         new Date(invoiceDate);
-          
-          if (isNaN(dateObj.getTime())) return false;
-          
-          return dateObj.toISOString().slice(0, 7) === monthKey;
-        } catch (error) {
-          console.warn('Invalid invoice date:', invoice, error);
-          return false;
-        }
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
+      let endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      // Current month: only through today
+      if (year === now.getFullYear() && month === now.getMonth()) {
+        endOfMonth = new Date(now);
+        endOfMonth.setHours(23, 59, 59, 999);
+      }
+
+      const monthInvoices = invoicesData.filter((invoice) => {
+        const invoiceDate = sharedGetInvoiceDate(invoice);
+        return invoiceDate && invoiceDate >= startOfMonth && invoiceDate <= endOfMonth;
       });
-      
-      // Format month with year indicator for clarity (e.g., "Jan '26")
-      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' }) + " '" + date.getFullYear().toString().slice(-2);
-      
+
+      const monthLabel =
+        date.toLocaleDateString('en-US', { month: 'short' }) + " '" + String(year).slice(-2);
+
       months.push({
         month: monthLabel,
-        amount: monthInvoices.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0),
+        amount: monthInvoices.reduce((sum, inv) => sum + sharedGetInvoiceAmount(inv), 0),
         count: monthInvoices.length,
-        fullDate: monthKey
+        fullDate: monthKey,
       });
     }
-    
+
     console.log('📊 Purchase Amount Trends (Invoice Amounts by Month):', months);
     return months;
   };
 
-  // Generate monthly payment trends (Payment Count from completed payments)
-  // Uses EXACT SAME LOGIC as Payment Analysis Period Monthly card
-  const generateMonthlyPaymentTrends = (paymentsData: any[], getPaymentDateFunc: (payment: any) => Date | null, isValidPaymentFunc: (payment: any) => boolean) => {
+  // Generate monthly payment trends — same rules as MD: confirmed only; current month 1st→today
+  const generateMonthlyPaymentTrends = (
+    paymentsData: any[],
+    getPaymentDateFunc: (payment: any) => Date | null,
+    isValidPaymentFunc: (payment: any) => boolean
+  ) => {
     const months = [];
+    const now = new Date();
     for (let i = 11; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      
-      // Calculate month boundaries (same as Payment Analysis Period)
-      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      endOfMonth.setHours(23, 59, 59, 999);
-      
-      // Filter using EXACT SAME LOGIC as Payment Analysis Period Monthly card
-      const monthPayments = paymentsData.filter(payment => {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
+      let endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      if (year === now.getFullYear() && month === now.getMonth()) {
+        endOfMonth = new Date(now);
+        endOfMonth.setHours(23, 59, 59, 999);
+      }
+
+      const monthPayments = paymentsData.filter((payment) => {
         const paymentDate = getPaymentDateFunc(payment);
-        return paymentDate && paymentDate >= startOfMonth && paymentDate <= endOfMonth && isValidPaymentFunc(payment);
+        return (
+          paymentDate &&
+          paymentDate >= startOfMonth &&
+          paymentDate <= endOfMonth &&
+          isValidPaymentFunc(payment)
+        );
       });
-      
-      // Format month with year indicator for clarity (e.g., "Jan '26")
-      const monthLabel = date.toLocaleDateString('en-US', { month: 'short' }) + " '" + date.getFullYear().toString().slice(-2);
-      const monthKey = date.toISOString().slice(0, 7); // YYYY-MM format
-      
+
+      const monthLabel =
+        date.toLocaleDateString('en-US', { month: 'short' }) + " '" + String(year).slice(-2);
+
       months.push({
         month: monthLabel,
-        amount: monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+        amount: monthPayments.reduce((sum, p) => sum + sharedGetPaymentAmount(p), 0),
         count: monthPayments.length,
-        fullDate: monthKey // Keep full date for debugging (YYYY-MM)
+        fullDate: monthKey,
       });
     }
-    
-    console.log('📊 Payment Count Trends (Using Payment Analysis Period Logic):', months);
-    console.log('📊 Current month (Jan \'26) data:', {
-      month: months[months.length - 1]?.month,
-      amount: months[months.length - 1]?.amount,
-      count: months[months.length - 1]?.count,
-      formattedAmount: 'UGX ' + (months[months.length - 1]?.amount || 0).toLocaleString()
-    });
-    
+
+    console.log('📊 Payment Trends (confirmed; cleared cheques only):', months);
     return months;
   };
 
@@ -1547,7 +1518,10 @@ export default function PurchaseManagerDashboard() {
         },
         ticks: {
           callback: function(value: any) {
-            return formatCurrency(value).replace('UGX', '').trim() + 'K';
+            const n = Number(value) || 0;
+            if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+            if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+            return String(n);
           },
           font: {
             weight: '500'
@@ -2097,8 +2071,8 @@ export default function PurchaseManagerDashboard() {
       });
       
       const dayPaymentRecords = payments.filter(payment => {
-        const paymentDate = getPaymentDate(payment);
-        if (!paymentDate) return false;
+        const paymentDate = sharedGetPaymentDate(payment);
+        if (!paymentDate || !sharedIsRecordedPayment(payment)) return false;
         return paymentDate >= date && paymentDate < nextDay;
       });
       
@@ -2109,7 +2083,7 @@ export default function PurchaseManagerDashboard() {
       
       // Calculate daily used from payment records (if they exist separately)
       const dailyUsedFromPayments = dayPaymentRecords.reduce((sum, payment) => {
-        return sum + (Number(payment.amount) || 0);
+        return sum + sharedGetPaymentAmount(payment);
       }, 0);
       
       // Use the higher value to avoid double counting
@@ -2476,9 +2450,22 @@ export default function PurchaseManagerDashboard() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Purchase & Payment Trends</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-semibold text-pink-600">Purchases: {formatCurrencyForDisplay(metrics.invoiceAmountsByPeriod.monthly)}</span> | 
-                  <span className="font-semibold text-purple-600 ml-2">Payments: {formatCurrencyForDisplay(metrics.paymentAmountsByPeriod.monthly)}</span>
+                <p className="mt-1 text-sm text-gray-600">
+                  <span className="font-semibold text-pink-600">
+                    Purchases:{' '}
+                    {formatCurrencyForDisplay(
+                      metrics.invoiceTrends[metrics.invoiceTrends.length - 1]?.amount ??
+                        metrics.invoiceAmountsByPeriod.monthly
+                    )}
+                  </span>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <span className="font-semibold text-purple-600">
+                    Payments:{' '}
+                    {formatCurrencyForDisplay(
+                      metrics.paymentTrends[metrics.paymentTrends.length - 1]?.amount ??
+                        metrics.paymentAmountsByPeriod.monthly
+                    )}
+                  </span>
                 </p>
               </div>
               <div className="flex items-center space-x-4">
