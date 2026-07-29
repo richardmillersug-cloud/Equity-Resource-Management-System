@@ -41,19 +41,22 @@ function fmtShortDate(dateStr: string): string {
   return d.toLocaleDateString('en-UG', { day: '2-digit', month: 'short' });
 }
 
+type TxTypeFilter = 'all' | 'deposit' | 'payment';
+type ShiftFilter = 'all' | 'day' | 'night';
+
 export interface AccountantAccountLedgerProps {
   branchId: string;
   holderName?: string;
   compactHeader?: boolean;
+  /** Optional initial filter — use 'payment' for expense follow-up */
+  initialTxFilter?: TxTypeFilter;
 }
-
-type TxTypeFilter = 'all' | 'deposit' | 'payment';
-type ShiftFilter = 'all' | 'day' | 'night';
 
 export function AccountantAccountLedger({
   branchId,
   holderName: holderNameProp = 'Equity Shoppers',
   compactHeader = false,
+  initialTxFilter = 'all',
 }: AccountantAccountLedgerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export function AccountantAccountLedger({
   const [displayBalance, setDisplayBalance] = useState(0);
   const balanceAnim = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [txFilter, setTxFilter] = useState<TxTypeFilter>('all');
+  const [txFilter, setTxFilter] = useState<TxTypeFilter>(initialTxFilter);
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>('all');
   const [holderName, setHolderName] = useState(holderNameProp);
 
@@ -82,6 +85,10 @@ export function AccountantAccountLedger({
   useEffect(() => {
     setHolderName(holderNameProp);
   }, [holderNameProp]);
+
+  useEffect(() => {
+    setTxFilter(initialTxFilter);
+  }, [initialTxFilter]);
 
   function animateBalance(target: number) {
     if (balanceAnim.current) clearInterval(balanceAnim.current);
@@ -102,6 +109,12 @@ export function AccountantAccountLedger({
     setLoading(true);
     setError(null);
     try {
+      // Persist any expensePayments missing from walletLedger under this branch
+      try {
+        await walletLedgerService.syncMissingExpensePayments({ branchId, periodKey: key });
+      } catch (syncErr) {
+        console.warn('Expense payment ledger sync skipped:', syncErr);
+      }
       const s = await walletLedgerService.getWalletSummary(branchId, key);
       setSummary(s);
       setTimeout(() => animateBalance(s.netBalance), 150);
@@ -132,6 +145,27 @@ export function AccountantAccountLedger({
     if (txFilter === 'deposit' && shiftFilter !== 'all' && e.shiftType !== shiftFilter) return false;
     return true;
   }) ?? [];
+
+  // Chronological running balance for visible money reduction after each expense
+  const runningBalanceById = (() => {
+    if (!summary) return new Map<string, number>();
+    const chronological = [...filteredEntries].sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    let bal = 0;
+    const map = new Map<string, number>();
+    chronological.forEach((e) => {
+      if (e.entryType === 'expense_payment') {
+        bal -= e.debitAmount ?? 0;
+      } else {
+        bal += (e.grossProfitDeposit ?? 0) + (e.dailyExpenseDeposit ?? 0);
+      }
+      map.set(e.id, bal);
+    });
+    return map;
+  })();
 
   const ledgerExportColumns: ExportColumn<WalletLedgerEntry>[] = [
     { key: 'date', header: 'Date', value: (e) => fmtDate(e.date) },
@@ -299,9 +333,16 @@ export function AccountantAccountLedger({
             {loading ? (
               <div className="h-10 w-48 bg-white/10 rounded-lg animate-pulse" />
             ) : (
-              <p className="text-white text-4xl font-bold tabular-nums tracking-tight">
-                {fmtUGX(displayBalance)}
-              </p>
+              <>
+                <p className="text-white text-4xl font-bold tabular-nums tracking-tight">
+                  {fmtUGX(displayBalance)}
+                </p>
+                {summary && summary.totalExpensePayments > 0 && (
+                  <p className="text-red-200 text-xs mt-1">
+                    After −{fmtUGX(summary.totalExpensePayments)} expense payments
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -395,13 +436,13 @@ export function AccountantAccountLedger({
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">
-                  Payments Out
+                  Expense Payments Out
                 </p>
                 <p className="text-xl font-bold text-red-700 tabular-nums mt-0.5">
-                  -{fmtUGX(summary.totalExpensePayments)}
+                  −{fmtUGX(summary.totalExpensePayments)}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Net: {fmtUGX(summary.netBalance)}
+                <p className="text-xs text-gray-500 mt-1">
+                  In {fmtUGX(summary.combinedTotal)} · Left {fmtUGX(summary.netBalance)}
                 </p>
               </div>
             </div>
@@ -462,7 +503,7 @@ export function AccountantAccountLedger({
                           : 'bg-white text-gray-500 hover:bg-gray-50'
                       }`}
                     >
-                      {f === 'all' ? 'All' : f === 'deposit' ? 'Deposits' : 'Payments'}
+                      {f === 'all' ? 'All' : f === 'deposit' ? 'Deposits' : 'Expenses'}
                     </button>
                   ))}
                 </div>
@@ -501,7 +542,11 @@ export function AccountantAccountLedger({
             ) : (
               <div className="divide-y divide-gray-50">
                 {paginatedEntries.map((entry) => (
-                  <TransactionRow key={entry.id} entry={entry} />
+                  <TransactionRow
+                    key={entry.id}
+                    entry={entry}
+                    runningBalance={runningBalanceById.get(entry.id)}
+                  />
                 ))}
               </div>
             )}
@@ -524,11 +569,11 @@ export function AccountantAccountLedger({
                   <span className="text-sm font-semibold text-emerald-700">+{fmtUGX(summary.combinedTotal)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Total payments out</span>
-                  <span className="text-sm font-semibold text-red-600">-{fmtUGX(summary.totalExpensePayments)}</span>
+                  <span className="text-xs text-gray-500">Expense payments out</span>
+                  <span className="text-sm font-semibold text-red-600">−{fmtUGX(summary.totalExpensePayments)}</span>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                  <span className="text-xs text-gray-700 font-medium">Net balance</span>
+                  <span className="text-xs font-medium text-gray-700">Available after expenses</span>
                   <span className="text-sm font-bold text-gray-900">{fmtUGX(summary.netBalance)}</span>
                 </div>
               </div>
@@ -551,7 +596,13 @@ export function AccountantAccountLedger({
   );
 }
 
-function TransactionRow({ entry }: { entry: WalletLedgerEntry }) {
+function TransactionRow({
+  entry,
+  runningBalance,
+}: {
+  entry: WalletLedgerEntry;
+  runningBalance?: number;
+}) {
   const isDebit = entry.entryType === 'expense_payment';
 
   if (isDebit) {
@@ -565,7 +616,7 @@ function TransactionRow({ entry }: { entry: WalletLedgerEntry }) {
           <p className="text-sm font-medium text-gray-800 truncate">
             {entry.expenseDescription || 'Expense Payment'}
             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-              Payment
+              Expense
             </span>
           </p>
           <div className="flex items-center gap-3 mt-0.5">
@@ -584,8 +635,12 @@ function TransactionRow({ entry }: { entry: WalletLedgerEntry }) {
           )}
         </div>
         <div className="text-right shrink-0">
-          <p className="text-sm font-bold text-red-600">-{fmtUGX(amount)}</p>
-          <p className="text-xs text-gray-400">{fmtShortDate(entry.date)}</p>
+          <p className="text-sm font-bold text-red-600">−{fmtUGX(amount)}</p>
+          {typeof runningBalance === 'number' ? (
+            <p className="text-xs text-gray-500 font-mono">Bal {fmtUGX(runningBalance)}</p>
+          ) : (
+            <p className="text-xs text-gray-400">{fmtShortDate(entry.date)}</p>
+          )}
         </div>
       </div>
     );
@@ -627,7 +682,11 @@ function TransactionRow({ entry }: { entry: WalletLedgerEntry }) {
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm font-bold text-emerald-700">+{fmtUGX(total)}</p>
-        <p className="text-xs text-gray-400">{fmtShortDate(entry.date)}</p>
+        {typeof runningBalance === 'number' ? (
+          <p className="text-xs text-gray-500 font-mono">Bal {fmtUGX(runningBalance)}</p>
+        ) : (
+          <p className="text-xs text-gray-400">{fmtShortDate(entry.date)}</p>
+        )}
       </div>
     </div>
   );

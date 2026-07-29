@@ -302,10 +302,10 @@ export class EmployeeService extends FirestoreService<Employee> {
     ]);
   }
 
-  /** Staff accounts created by a Purchase Manager (registeredBy field). */
-  async getRegisteredBy(pmUserId: string): Promise<Employee[]> {
+  /** Staff accounts created by a specific user (registeredBy field). */
+  async getRegisteredBy(creatorUserId: string): Promise<Employee[]> {
     return this.getAll([
-      { field: 'registeredBy', operator: '==', value: pmUserId }
+      { field: 'registeredBy', operator: '==', value: creatorUserId }
     ]);
   }
 

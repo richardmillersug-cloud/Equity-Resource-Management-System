@@ -5,8 +5,10 @@ import {
   getInvoiceDate,
   getInvoiceAmount,
   getPaymentDate,
+  getConfirmedPaymentDate,
   getPaymentAmount,
   isChequePayment,
+  isValidPayment,
 } from './invoice-outstanding';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -313,13 +315,12 @@ export function buildCashPayRows(
     row.purchasesMade += getInvoiceAmount(raw);
   }
 
-  // Payments made — completed invoice payments by payment date
+  // Payments made — confirmed invoice payments only (cheques after clearance)
   for (const payment of data.payments) {
     const raw = payment as Record<string, unknown>;
-    const status = String(raw.paymentStatus || 'completed');
-    if (status === 'failed' || status === 'cancelled') continue;
+    if (!isValidPayment(raw)) continue;
 
-    const dateObj = getPaymentDate(raw);
+    const dateObj = getConfirmedPaymentDate(raw);
     if (!dateObj) continue;
 
     const dateKey = toDateKey(dateObj);

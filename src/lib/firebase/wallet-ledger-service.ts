@@ -326,6 +326,7 @@ export class WalletLedgerService {
   /**
    * Returns all ledger entries for a branch in the given calendar month.
    * Defaults to the current month.
+   * Falls back to unordered / period-wide queries when composite indexes are missing.
    */
   async getMonthlyLedger(branchId: string, periodKey?: string): Promise<WalletLedgerEntry[]> {
     const key = periodKey ?? this.getPeriodKey();
@@ -339,20 +340,167 @@ export class WalletLedgerService {
       const snap = await getDocs(q);
       return snap.docs.map((d) => this.normalizeEntry(d.id, d.data() as Record<string, unknown>));
     } catch (err) {
-      console.error('walletLedger: getMonthlyLedger error', err);
+      console.warn('walletLedger: ordered getMonthlyLedger failed, trying fallback', err);
+      try {
+        const q = query(
+          collection(db, LEDGER_COLLECTION),
+          where('branchId', '==', branchId),
+          where('periodKey', '==', key)
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+          .map((d) => this.normalizeEntry(d.id, d.data() as Record<string, unknown>))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      } catch (fallbackErr) {
+        console.error('walletLedger: getMonthlyLedger fallback error', fallbackErr);
+        return [];
+      }
+    }
+  }
+
+  private paymentDateToYmd(value: unknown): string {
+    const d = this.toJsDate(value);
+    if (!d.getTime()) {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  private expensePaymentToLedgerEntry(
+    id: string,
+    data: Record<string, unknown>,
+    branchId: string
+  ): WalletLedgerEntry {
+    const dateStr = this.paymentDateToYmd(data.paymentDate ?? data.createdAt);
+    const funding = data.fundingSource as WalletLedgerEntry['fundingSource'];
+    return {
+      id: `expensePayments:${id}`,
+      entryType: 'expense_payment',
+      date: dateStr,
+      periodKey: this.getPeriodKey(new Date(dateStr + 'T00:00:00')),
+      branchId: (data.branchId as string) || branchId,
+      createdBy: (data.paidBy as string) || (data.createdBy as string) || '',
+      createdAt: this.toJsDate(data.createdAt ?? data.paymentDate),
+      expensePaymentId: id,
+      expenseId: (data.expenseId as string) || '',
+      expenseDescription:
+        (data.expenseDescription as string) ||
+        (data.description as string) ||
+        'Expense payment',
+      vendor: (data.vendor as string) || 'Unknown vendor',
+      debitAmount: Number(data.amount ?? data.paymentAmount ?? 0) || 0,
+      fundingSource:
+        funding === 'DAILY_EXPENSE_FUND' || funding === 'WALLET_GROSS_PROFIT'
+          ? funding
+          : 'DAILY_EXPENSE_FUND',
+      paidBy: (data.paidBy as string) || '',
+      paidByName: (data.paidByName as string) || '',
+      notes: typeof data.notes === 'string' ? data.notes : undefined,
+    };
+  }
+
+  /**
+   * Pulls expensePayments for the month and returns any that are not already
+   * present in walletLedger (so balance reductions still show even if the
+   * post-payment ledger write failed or used a different branchId).
+   */
+  async getMissingExpensePaymentDebits(
+    branchId: string,
+    periodKey: string,
+    existing: WalletLedgerEntry[]
+  ): Promise<WalletLedgerEntry[]> {
+    const recorded = new Set(
+      existing
+        .map((e) => e.expensePaymentId)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    // Also treat debits already written under any branch as recorded to avoid duplicates
+    try {
+      const periodWide = await this.getAllBranchesMonthlyLedger(periodKey);
+      periodWide.forEach((e) => {
+        if (e.expensePaymentId) recorded.add(e.expensePaymentId);
+      });
+    } catch {
+      // ignore — branch-local recorded set is still used
+    }
+
+    try {
+      let snap;
+      try {
+        snap = await getDocs(
+          query(collection(db, 'expensePayments'), orderBy('paymentDate', 'desc'))
+        );
+      } catch {
+        snap = await getDocs(collection(db, 'expensePayments'));
+      }
+
+      const missing: WalletLedgerEntry[] = [];
+      snap.docs.forEach((d) => {
+        if (recorded.has(d.id)) return;
+        const data = d.data() as Record<string, unknown>;
+        const status = String(data.status || '').toLowerCase();
+        if (status === 'cancelled' || status === 'bounced') return;
+        const entry = this.expensePaymentToLedgerEntry(d.id, data, branchId);
+        if (entry.periodKey !== periodKey) return;
+        if (!entry.debitAmount || entry.debitAmount <= 0) return;
+        missing.push(entry);
+      });
+      return missing;
+    } catch (err) {
+      console.error('walletLedger: getMissingExpensePaymentDebits error', err);
       return [];
     }
   }
 
   /**
-   * Aggregated totals for the wallet for a calendar month.
+   * Persists missing expensePayments as walletLedger debits under the viewed branch
+   * so the accountant ledger permanently shows money out.
    */
-  async getWalletSummary(branchId: string, periodKey?: string): Promise<WalletMonthlySummary> {
-    const key = periodKey ?? this.getPeriodKey();
-    const entries = await this.getMonthlyLedger(branchId, key);
+  async syncMissingExpensePayments(params: {
+    branchId: string;
+    periodKey: string;
+  }): Promise<{ synced: number; skipped: number }> {
+    const { branchId, periodKey } = params;
+    const existing = await this.getMonthlyLedger(branchId, periodKey);
+    const missing = await this.getMissingExpensePaymentDebits(branchId, periodKey, existing);
+    let synced = 0;
+    let skipped = 0;
 
-    const deposits = entries.filter((e) => !e.entryType || e.entryType === 'deposit');
-    const debits = entries.filter((e) => e.entryType === 'expense_payment');
+    for (const entry of missing) {
+      try {
+        await this.recordExpensePaymentDebit({
+          expensePaymentId: entry.expensePaymentId!,
+          expenseId: entry.expenseId || '',
+          expenseDescription: entry.expenseDescription || 'Expense payment',
+          vendor: entry.vendor || 'Unknown vendor',
+          amount: entry.debitAmount || 0,
+          fundingSource: entry.fundingSource || 'DAILY_EXPENSE_FUND',
+          branchId,
+          paidBy: entry.paidBy || entry.createdBy || 'system',
+          paidByName: entry.paidByName || 'System',
+          date: entry.date,
+          notes: entry.notes,
+        });
+        synced += 1;
+      } catch (err) {
+        console.warn('walletLedger: syncMissingExpensePayments failed for', entry.expensePaymentId, err);
+        skipped += 1;
+      }
+    }
+
+    return { synced, skipped };
+  }
+
+  private buildSummary(
+    branchId: string,
+    periodKey: string,
+    entries: WalletLedgerEntry[]
+  ): WalletMonthlySummary {
+    const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+    const deposits = sorted.filter((e) => !e.entryType || e.entryType === 'deposit');
+    const debits = sorted.filter((e) => e.entryType === 'expense_payment');
 
     const grossProfitTotal = deposits.reduce((s, e) => s + (e.grossProfitDeposit ?? 0), 0);
     const dailyExpenseTotal = deposits.reduce((s, e) => s + (e.dailyExpenseDeposit ?? 0), 0);
@@ -361,17 +509,65 @@ export class WalletLedgerService {
     const daysCovered = new Set(deposits.map((e) => e.date)).size;
 
     return {
-      periodKey: key,
+      periodKey,
       branchId,
       grossProfitTotal,
       dailyExpenseTotal,
       combinedTotal,
       totalExpensePayments,
       netBalance: combinedTotal - totalExpensePayments,
-      entryCount: entries.length,
+      entryCount: sorted.length,
       daysCovered,
-      entries,
+      entries: sorted,
     };
+  }
+
+  /**
+   * Aggregated totals for the wallet for a calendar month.
+   * Merges expensePayments that never landed in walletLedger so expense
+   * reductions are always visible on the accountant ledger.
+   */
+  async getWalletSummary(branchId: string, periodKey?: string): Promise<WalletMonthlySummary> {
+    const key = periodKey ?? this.getPeriodKey();
+    let entries = await this.getMonthlyLedger(branchId, key);
+    const allPeriod = await this.getAllBranchesMonthlyLedger(key);
+
+    // Shared wallet: expense payments out should be visible regardless of which
+    // branchId the debit was originally written under.
+    const seenPaymentIds = new Set(
+      entries
+        .map((e) => e.expensePaymentId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const seenEntryIds = new Set(entries.map((e) => e.id));
+
+    for (const entry of allPeriod) {
+      if (entry.entryType !== 'expense_payment') continue;
+      if (entry.expensePaymentId && seenPaymentIds.has(entry.expensePaymentId)) continue;
+      if (seenEntryIds.has(entry.id)) continue;
+      entries.push(entry);
+      if (entry.expensePaymentId) seenPaymentIds.add(entry.expensePaymentId);
+      seenEntryIds.add(entry.id);
+    }
+
+    // If this branch has no deposits, fall back to period-wide deposits so the
+    // wallet is not blank when branch IDs were historically inconsistent.
+    const hasLocalDeposits = entries.some((e) => !e.entryType || e.entryType === 'deposit');
+    if (!hasLocalDeposits) {
+      for (const entry of allPeriod) {
+        if (entry.entryType === 'expense_payment') continue;
+        if (seenEntryIds.has(entry.id)) continue;
+        entries.push(entry);
+        seenEntryIds.add(entry.id);
+      }
+    }
+
+    const missingDebits = await this.getMissingExpensePaymentDebits(branchId, key, entries);
+    if (missingDebits.length > 0) {
+      entries = [...entries, ...missingDebits];
+    }
+
+    return this.buildSummary(branchId, key, entries);
   }
 
   /**
@@ -485,8 +681,17 @@ export class WalletLedgerService {
       const snap = await getDocs(q);
       return snap.docs.map((d) => this.normalizeEntry(d.id, d.data() as Record<string, unknown>));
     } catch (err) {
-      console.error('walletLedger: getAllBranchesMonthlyLedger error', err);
-      return [];
+      console.warn('walletLedger: ordered getAllBranchesMonthlyLedger failed, trying fallback', err);
+      try {
+        const q = query(collection(db, LEDGER_COLLECTION), where('periodKey', '==', key));
+        const snap = await getDocs(q);
+        return snap.docs
+          .map((d) => this.normalizeEntry(d.id, d.data() as Record<string, unknown>))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      } catch (fallbackErr) {
+        console.error('walletLedger: getAllBranchesMonthlyLedger error', fallbackErr);
+        return [];
+      }
     }
   }
 }

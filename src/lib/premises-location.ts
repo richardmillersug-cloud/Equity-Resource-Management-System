@@ -103,8 +103,56 @@ export async function fetchClientIp(): Promise<string | undefined> {
     const res = await fetch('/api/client-ip', { cache: 'no-store' });
     if (!res.ok) return undefined;
     const data = (await res.json()) as { ip?: string };
-    return data.ip || undefined;
+    const ip = data.ip?.trim();
+    if (!ip || ip === 'unknown') return undefined;
+    return ip;
   } catch {
     return undefined;
   }
+}
+
+export type CheckInLocationCapture = {
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  distanceMeters?: number;
+  onPremises?: boolean;
+  ipAddress?: string;
+  gpsError?: string;
+  ipError?: string;
+};
+
+/** Capture GPS and IP independently so one failure does not drop the other. */
+export async function captureCheckInLocation(): Promise<CheckInLocationCapture> {
+  const [gpsResult, ipResult] = await Promise.allSettled([
+    getCurrentPosition(),
+    fetchClientIp(),
+  ]);
+
+  const out: CheckInLocationCapture = {};
+
+  if (gpsResult.status === 'fulfilled') {
+    out.latitude = gpsResult.value.latitude;
+    out.longitude = gpsResult.value.longitude;
+    out.accuracyMeters = gpsResult.value.accuracyMeters;
+    const presence = evaluatePremisesPresence(out.latitude, out.longitude);
+    out.distanceMeters = presence.distanceMeters ?? undefined;
+    out.onPremises = presence.onPremises ?? undefined;
+  } else {
+    out.gpsError =
+      gpsResult.reason instanceof Error
+        ? gpsResult.reason.message
+        : 'Could not read GPS location';
+  }
+
+  if (ipResult.status === 'fulfilled' && ipResult.value) {
+    out.ipAddress = ipResult.value;
+  } else if (ipResult.status === 'rejected') {
+    out.ipError =
+      ipResult.reason instanceof Error ? ipResult.reason.message : 'Could not read IP address';
+  } else {
+    out.ipError = 'IP address unavailable';
+  }
+
+  return out;
 }

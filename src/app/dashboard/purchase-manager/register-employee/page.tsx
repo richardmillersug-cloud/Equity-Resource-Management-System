@@ -266,27 +266,39 @@ export default function PMRegisterEmployeePage() {
         ],
       };
 
-      const result = await authService.signUp(signUpData);
-      const employeeId = result.user.uid;
-      const employeeName = `${formData.firstName} ${formData.lastName}`;
+      const creatorName =
+        registeredByName ||
+        (pmUser.employee
+          ? `${pmUser.employee.firstName} ${pmUser.employee.lastName}`
+          : pmUser.displayName || pmUser.email || 'Purchase Manager');
 
-      const additionalData: Record<string, unknown> = {
+      const extras: Record<string, unknown> = {
         hireDate: new Date(formData.hireDate),
         employeeSalary: formData.baseSalary ? Number(formData.baseSalary) : 0,
-        registeredBy: pmUser.uid,
-        registeredByName: registeredByName || pmUser.displayName || pmUser.email,
+        registeredByName: creatorName,
         registeredByRole: 'Purchase Manager',
         assignedShift: formData.assignedShift,
         shiftAssignedAt: new Date(),
         shiftAssignedBy: pmUser.uid,
       };
 
-      if (formData.address) additionalData.address = formData.address;
-      if (formData.dateOfBirth) additionalData.dateOfBirth = new Date(formData.dateOfBirth);
-      if (formData.nextOfKinName) additionalData.nextOfKinName = formData.nextOfKinName;
-      if (formData.nextOfKinNIN) additionalData.nextOfKinNIN = formData.nextOfKinNIN;
-      if (formData.nextOfKinPhoneNumber) additionalData.nextOfKinPhoneNumber = formData.nextOfKinPhoneNumber;
-      if (formData.workingSection) additionalData.workingSection = formData.workingSection;
+      if (formData.address) extras.address = formData.address;
+      if (formData.dateOfBirth) extras.dateOfBirth = new Date(formData.dateOfBirth);
+      if (formData.nextOfKinName) extras.nextOfKinName = formData.nextOfKinName;
+      if (formData.nextOfKinNIN) extras.nextOfKinNIN = formData.nextOfKinNIN;
+      if (formData.nextOfKinPhoneNumber) extras.nextOfKinPhoneNumber = formData.nextOfKinPhoneNumber;
+      if (formData.workingSection) extras.workingSection = formData.workingSection;
+
+      // Keep PM session — do not use signUp (that would replace the logged-in user)
+      const result = await authService.createManagedAccount(
+        signUpData,
+        { uid: pmUser.uid, name: creatorName, role: 'Purchase Manager' },
+        extras
+      );
+      const employeeId = result.uid;
+      const employeeName = `${formData.firstName} ${formData.lastName}`;
+
+      const followUp: Record<string, unknown> = {};
 
       if (selectedPhoto) {
         setPhotoUploading(true);
@@ -295,26 +307,23 @@ export default function PMRegisterEmployeePage() {
         if (!photoResult.success) {
           throw new Error(photoResult.error || 'Photo upload failed');
         }
-        additionalData.passportPhoto = photoResult.photoUrl;
-        additionalData.passportPhotoFilename = photoResult.filename;
-        additionalData.passportPhotoUploadedAt = new Date();
+        followUp.passportPhoto = photoResult.photoUrl;
+        followUp.passportPhotoFilename = photoResult.filename;
+        followUp.passportPhotoUploadedAt = new Date();
       }
 
-      await firestoreServices.employee.update(employeeId, additionalData);
-      await uploadOptionalDocuments(employeeId, employeeName, employeeId);
+      if (Object.keys(followUp).length > 0) {
+        await firestoreServices.employee.update(employeeId, followUp);
+      }
+
+      await uploadOptionalDocuments(employeeId, employeeName, pmUser.uid);
 
       setCreatedEmployeeName(employeeName);
       setShowSuccess(true);
 
-      await authService.signOut();
-      sessionStorage.setItem(
-        'pm_employee_registered',
-        JSON.stringify({ name: employeeName, email: formData.email })
-      );
-
       setTimeout(() => {
-        router.push('/login?registered=1');
-      }, 2500);
+        router.push('/dashboard/purchase-manager/registered-employees');
+      }, 1800);
     } catch (err: unknown) {
       console.error('Error registering employee:', err);
       setError(err instanceof Error ? err.message : 'Failed to register employee');
@@ -335,7 +344,7 @@ export default function PMRegisterEmployeePage() {
           <p className="text-gray-600 mb-2">
             <strong>{createdEmployeeName}</strong> has been added to the system.
           </p>
-          <p className="text-sm text-gray-500">Redirecting you to sign in again...</p>
+          <p className="text-sm text-gray-500">Opening registered employees…</p>
         </div>
       </div>
     );

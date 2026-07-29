@@ -6,6 +6,9 @@ export const ADMIN_ROLE = 'Admin';
 /** Legacy title — treated as Admin for backward compatibility. */
 export const LEGACY_SYSTEM_ADMIN_ROLE = 'System Admin';
 
+/** Alternate title used in some accounts. */
+export const SUPER_ADMIN_ROLE = 'Super Admin';
+
 export const ADMIN_BASE_PATH = '/dashboard/admin';
 export const ADMIN_PLATFORM_PATH = '/dashboard/system-admin';
 
@@ -25,7 +28,12 @@ export function isAdminUser(user: AuthUser | null | undefined): boolean {
   if (!user?.employee?.roles?.length) return false;
   return user.employee.roles.some((r) => {
     const title = r.jobTitle.toLowerCase();
-    return title === ADMIN_ROLE.toLowerCase() || title === LEGACY_SYSTEM_ADMIN_ROLE.toLowerCase();
+    return (
+      title === ADMIN_ROLE.toLowerCase() ||
+      title === LEGACY_SYSTEM_ADMIN_ROLE.toLowerCase() ||
+      title === SUPER_ADMIN_ROLE.toLowerCase() ||
+      title === 'superadmin'
+    );
   });
 }
 
@@ -34,6 +42,19 @@ export function isManagingDirectorUser(user: AuthUser | null | undefined): boole
   return user.employee.roles.some(
     (r) => r.jobTitle.toLowerCase() === 'managing director'
   );
+}
+
+export function isPurchaseManagerUser(user: AuthUser | null | undefined): boolean {
+  if (!user?.employee?.roles?.length) return false;
+  return user.employee.roles.some((r) => {
+    const title = r.jobTitle.toLowerCase();
+    return title === 'purchase manager' || title === 'purchasing manager';
+  });
+}
+
+/** Admin (incl. System Admin), Managing Director, and Purchase Manager may view all registered staff. */
+export function canViewAllRegisteredStaff(user: AuthUser | null | undefined): boolean {
+  return isAdminUser(user) || isManagingDirectorUser(user) || isPurchaseManagerUser(user);
 }
 
 /** Only Admin (super admin) and Managing Director may create system accounts. */

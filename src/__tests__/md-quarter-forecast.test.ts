@@ -60,6 +60,15 @@ function buildSummaries(
       sumPartialRemaining: 0,
       sumsMatch: true,
     },
+    pmFundsAudit: {
+      monthKey: cashClose[cashClose.length - 1]?.monthKey || '2026-07',
+      label: "Jul '26",
+      activePms: [],
+      onlyActivePm: null,
+      totalAssignedThisMonth: 0,
+      totalUsedThisMonth: 0,
+      totalAvailableBalance: 0,
+    },
   };
 }
 

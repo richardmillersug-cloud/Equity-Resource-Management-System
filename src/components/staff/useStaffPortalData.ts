@@ -24,11 +24,7 @@ import {
   normalizeStaffShift,
   type StaffShift,
 } from '@/lib/firebase/staff-shifts';
-import {
-  evaluatePremisesPresence,
-  fetchClientIp,
-  getCurrentPosition,
-} from '@/lib/premises-location';
+import { captureCheckInLocation } from '@/lib/premises-location';
 
 export type LeaveType = LeaveRequest['leaveType'];
 export type { MonthlyAttendanceStat };
@@ -208,33 +204,23 @@ export function useStaffPortalData() {
       today.setHours(0, 0, 0, 0);
 
       // Capture GPS + IP for premises verification (PM attendance view)
-      let latitude: number | undefined;
-      let longitude: number | undefined;
-      let accuracyMeters: number | undefined;
-      let distanceMeters: number | undefined;
-      let onPremises: boolean | undefined;
-      let ipAddress: string | undefined;
+      const location = await captureCheckInLocation();
+      const {
+        latitude,
+        longitude,
+        accuracyMeters,
+        distanceMeters,
+        onPremises,
+        ipAddress,
+        gpsError,
+        ipError,
+      } = location;
 
-      try {
-        const [position, ip] = await Promise.all([
-          getCurrentPosition(),
-          fetchClientIp(),
-        ]);
-        latitude = position.latitude;
-        longitude = position.longitude;
-        accuracyMeters = position.accuracyMeters;
-        ipAddress = ip;
-        const presence = evaluatePremisesPresence(latitude, longitude);
-        distanceMeters = presence.distanceMeters ?? undefined;
-        onPremises = presence.onPremises ?? undefined;
-      } catch (locationErr) {
-        console.warn('Check-in location/IP capture failed:', locationErr);
-        // Still allow check-in; PM will see missing location
-        try {
-          ipAddress = await fetchClientIp();
-        } catch {
-          /* ignore */
-        }
+      if (gpsError) {
+        console.warn('Check-in GPS capture failed:', gpsError);
+      }
+      if (ipError) {
+        console.warn('Check-in IP capture failed:', ipError);
       }
 
       // Persist THIS day only — does not change other days' shifts
@@ -267,11 +253,16 @@ export function useStaffPortalData() {
           : onPremises === false
             ? ' · Off premises'
             : latitude == null
-              ? ' · Location unavailable'
+              ? gpsError
+                ? ` · GPS unavailable (${gpsError})`
+                : ' · GPS unavailable — enable location for this site'
               : '';
 
+      const ipNote =
+        !ipAddress && ipError ? ` · IP not captured (${ipError})` : '';
+
       setSuccess(
-        `Checked in on ${getShiftDefinition(useShift).label} shift for today only (${getShiftDefinition(useShift).hoursLabel})${locationNote}`
+        `Checked in on ${getShiftDefinition(useShift).label} shift for today only (${getShiftDefinition(useShift).hoursLabel})${locationNote}${ipNote}`
       );
       await loadData(employeeId, user?.employee?.assignedShift);
     } catch (err) {

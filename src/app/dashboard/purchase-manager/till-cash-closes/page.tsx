@@ -5,26 +5,15 @@ import CashTrackingInterface from '../../../../components/purchase-manager/CashT
 
 export default function TillCashClosesPage() {
   return (
-    <div className="w-full min-h-full bg-gray-50 p-4 sm:p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Till Cash Closes - Network Data Per Shift</h1>
-          <p className="text-gray-600 mt-2">Monitor till cash flow data with detailed network payment breakdown by shift (☀️ Day / 🌙 Night)</p>
-          <div className="mt-3 flex items-center space-x-4 text-sm">
-            <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full">
-              ✅ Same data source as Accountant Dashboard
-            </span>
-            <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
-              📱 Enhanced network data extraction from shifts/tills
-            </span>
-            <span className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full">
-              👤 User account lookup integrated
-            </span>
-          </div>
-        </div>
-        
-        {/* Cash Tracking Interface */}
-        <CashTrackingInterface className="w-full" />
+    <div className="w-full min-h-0 min-w-0 bg-gray-50 -mx-1 px-1 sm:mx-0 sm:px-0">
+      <div className="mb-3 sm:mb-6">
+        <h1 className="text-xl font-bold leading-tight text-gray-900 sm:text-2xl lg:text-3xl">
+          Till Cash Closes
+        </h1>
+        <p className="mt-1 text-xs text-gray-500 sm:text-sm">Network data per shift</p>
+      </div>
+
+      <CashTrackingInterface className="w-full" />
     </div>
   );
 }

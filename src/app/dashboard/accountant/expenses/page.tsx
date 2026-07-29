@@ -59,6 +59,30 @@ function deriveExpenseDisplayStatus(
   return resolvedBaseStatus;
 }
 
+function isPayableExpense(expense: {
+  id: string;
+  amount: number;
+  paidAmount: number;
+  paymentStatus: string;
+  source: string;
+}): boolean {
+  if (expense.source === 'cash_close') return false;
+  if (expense.id.startsWith('cashclose:')) return false;
+  const remaining = Math.max(0, Number(expense.amount || 0) - Number(expense.paidAmount || 0));
+  if (remaining <= 0) return false;
+  if (String(expense.paymentStatus || '').toUpperCase() === 'FULLY_PAID') return false;
+  return true;
+}
+
+function canSelectExpense(expense: {
+  id: string;
+  source: string;
+}): boolean {
+  if (expense.source === 'cash_close') return false;
+  if (expense.id.startsWith('cashclose:')) return false;
+  return true;
+}
+
 // Enhanced expense interface to combine expenses from both sources
 interface CombinedExpense {
   id: string;
@@ -134,9 +158,14 @@ export default function ExpensesPage() {
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  // Bulk payment selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkPaymentModal, setShowBulkPaymentModal] = useState(false);
+
   // Delete state
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Print handler
   const handlePrintExpense = (expense: CombinedExpense) => {
@@ -269,6 +298,152 @@ export default function ExpensesPage() {
     setPaymentError(null);
   };
 
+  const handleMarkAllApprovedAndFullyPaid = async () => {
+    const confirmed = window.confirm(
+      'Mark ALL expenses as Approved and Fully Paid?\n\nThis sets status=approved, paymentStatus=FULLY_PAID, paidAmount=amount, and remainingBalance=0 for every expense in the database.'
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkUpdating(true);
+      setPaymentError(null);
+      const result = await ExpensePaymentService.markAllExpensesApprovedAndFullyPaid();
+      setPaymentSuccess(
+        `Updated ${result.updated} expense(s) to approved & fully paid` +
+          (result.skipped ? ` · ${result.skipped} already up to date` : '') +
+          ` · ${result.total} total`
+      );
+      await loadExpenses();
+    } catch (err) {
+      console.error('Bulk expense update failed:', err);
+      setPaymentError(err instanceof Error ? err.message : 'Failed to update expenses');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const selectedExpenses = useMemo(
+    () => filteredExpenses.filter((e) => selectedIds.has(e.id) && isPayableExpense(e)),
+    [filteredExpenses, selectedIds]
+  );
+
+  const selectedBulkTotal = useMemo(
+    () =>
+      selectedExpenses.reduce(
+        (sum, e) => sum + Math.max(0, e.amount - e.paidAmount),
+        0
+      ),
+    [selectedExpenses]
+  );
+
+  const toggleSelectExpense = (id: string, expense?: CombinedExpense) => {
+    const target = expense || filteredExpenses.find((e) => e.id === id);
+    if (target && !isPayableExpense(target)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openBulkPaymentModal = () => {
+    if (selectedExpenses.length === 0) {
+      setPaymentError('Select at least one unpaid expense to pay.');
+      setPaymentSuccess(null);
+      return;
+    }
+    setShowBulkPaymentModal(true);
+    setPaymentSuccess(null);
+    setPaymentError(null);
+  };
+
+  const resetBulkPaymentModal = () => {
+    setShowBulkPaymentModal(false);
+    setPaymentNotes('');
+    setPaymentMethod('cash');
+    setFundingSource('DAILY_EXPENSE_FUND');
+  };
+
+  const handleBulkPaymentSubmit = async () => {
+    if (selectedExpenses.length === 0) return;
+
+    try {
+      setPaymentLoading(true);
+      setPaymentError(null);
+
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        setPaymentError('User not authenticated');
+        return;
+      }
+
+      const currentUserId = currentUser.uid;
+      const currentUserName =
+        currentUser.displayName ||
+        (currentUser?.employee
+          ? `${currentUser.employee.firstName} ${currentUser.employee.lastName}`
+          : 'Unknown User');
+
+      const paymentMethodData: PaymentMethod = {
+        type: paymentMethod,
+        details: {
+          payerName: currentUserName,
+        },
+        amount: 0,
+        status: 'cleared',
+      };
+
+      let paidCount = 0;
+      let paidTotal = 0;
+      const failures: string[] = [];
+
+      for (const expense of selectedExpenses) {
+        const remaining = Math.max(0, expense.amount - expense.paidAmount);
+        if (remaining <= 0) continue;
+        try {
+          paymentMethodData.amount = remaining;
+          await ExpensePaymentService.makeExpensePayment(
+            expense.id,
+            remaining,
+            { ...paymentMethodData, amount: remaining },
+            currentUserId,
+            currentUserName,
+            fundingSource,
+            paymentNotes || `Bulk payment · ${selectedExpenses.length} expenses`
+          );
+          paidCount += 1;
+          paidTotal += remaining;
+        } catch (err) {
+          console.error('Bulk payment failed for', expense.id, err);
+          failures.push(expense.description || expense.id);
+        }
+      }
+
+      if (paidCount > 0) {
+        setPaymentSuccess(
+          `Paid ${paidCount} expense(s) · ${formatCurrency(paidTotal)}` +
+            (failures.length ? ` · ${failures.length} failed` : '')
+        );
+        setSelectedIds(new Set());
+        setShowBulkPaymentModal(false);
+        await loadExpenses();
+        await loadFundBalances();
+      } else {
+        setPaymentError(
+          failures.length
+            ? `All payments failed. First: ${failures[0]}`
+            : 'No payable expenses in selection.'
+        );
+      }
+    } catch (error) {
+      console.error('Bulk payment processing error:', error);
+      setPaymentError(error instanceof Error ? error.message : 'Bulk payment failed');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const isSyntheticExpenseId = (id: string) =>
     id.startsWith('table_') || id.startsWith('collection_') || id.startsWith('cashclose:');
 
@@ -393,6 +568,12 @@ export default function ExpensesPage() {
     }
 
     setFilteredExpenses(filtered);
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const allowed = new Set(filtered.filter(isPayableExpense).map((e) => e.id));
+      const next = new Set([...prev].filter((id) => allowed.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
   }, [expenses, searchTerm, statusFilter, categoryFilter, priorityFilter, paymentStatusFilter, sourceFilter, monthFilter]);
 
   // Load fund balances
@@ -908,7 +1089,19 @@ export default function ExpensesPage() {
                   </p>
                 </div>
         </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap justify-end">
+                <button
+                  onClick={handleMarkAllApprovedAndFullyPaid}
+                  disabled={bulkUpdating}
+                  className="bg-white text-emerald-700 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold hover:bg-emerald-50 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0"
+                >
+                  {bulkUpdating ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5" />
+                  )}
+                  <span>{bulkUpdating ? 'Updating…' : 'Mark all approved & paid'}</span>
+                </button>
                 <button
                   onClick={() => {
                     loadExpenses();
@@ -1181,13 +1374,45 @@ export default function ExpensesPage() {
         {/* Modern Expenses List */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden backdrop-blur-sm w-full">
           <div className="px-4 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
-                <Receipt className="w-4 h-4 text-white" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+                  <Receipt className="w-4 h-4 text-white" />
+                </div>
+                Expenses ({(filteredExpenses || []).length})
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  Tick expenses one by one · {selectedExpenses.length} selected
+                  {selectedExpenses.length > 0 && (
+                    <span className="text-emerald-700 font-medium">
+                      {' '}
+                      · {formatCurrency(selectedBulkTotal)}
+                    </span>
+                  )}
+                </span>
+                {selectedExpenses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={openBulkPaymentModal}
+                  disabled={selectedExpenses.length === 0}
+                  className="px-4 py-1.5 text-sm rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Pay selected
+                  {selectedExpenses.length > 0 && ` (${selectedExpenses.length})`}
+                </button>
               </div>
-              Expenses ({(filteredExpenses || []).length})
-            </h2>
-      </div>
+            </div>
+          </div>
 
           {!filteredExpenses || filteredExpenses.length === 0 ? (
             <div className="text-center py-16">
@@ -1202,7 +1427,10 @@ export default function ExpensesPage() {
               <table className="w-full table-fixed divide-y divide-gray-100 text-sm">
                 <thead className="bg-gradient-to-r from-gray-50 to-emerald-50">
               <tr>
-                <th className="w-[24%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[5%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pick
+                </th>
+                <th className="w-[22%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Expense
                 </th>
                 <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1211,7 +1439,7 @@ export default function ExpensesPage() {
                 <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="w-[18%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[16%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Category
                 </th>
                 <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1223,8 +1451,48 @@ export default function ExpensesPage() {
               </tr>
             </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
-                  {paginatedExpenses.map((expense) => (
-                    <tr key={expense.id} className="hover:bg-emerald-50/50 transition-colors group">
+                  {paginatedExpenses.map((expense) => {
+                    const payable = isPayableExpense(expense);
+                    const selectable = canSelectExpense(expense);
+                    const checked = selectedIds.has(expense.id);
+                    return (
+                    <tr
+                      key={expense.id}
+                      onClick={() => {
+                        if (payable) toggleSelectExpense(expense.id, expense);
+                      }}
+                      className={`transition-colors group ${
+                        payable ? 'cursor-pointer hover:bg-emerald-50/80' : 'hover:bg-gray-50'
+                      } ${checked ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : ''}`}
+                    >
+                  <td
+                    className="px-3 py-3 align-middle"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {selectable ? (
+                      <label className="inline-flex items-center justify-center min-w-[28px] min-h-[28px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!payable}
+                          onChange={() => toggleSelectExpense(expense.id, expense)}
+                          className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            payable
+                              ? checked
+                                ? 'Remove from payment selection'
+                                : 'Select this expense to pay'
+                              : 'Already fully paid — cannot select'
+                          }
+                        />
+                      </label>
+                    ) : (
+                      <span
+                        className="inline-block w-5 h-5 rounded border border-dashed border-gray-200"
+                        title="Till expenses are paid at cash close"
+                      />
+                    )}
+                  </td>
                   <td className="px-3 py-2 align-top">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate" title={expense.description}>
@@ -1290,13 +1558,12 @@ export default function ExpensesPage() {
                        expense.source === 'cash_close' ? 'Till' : 'Other'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       {/* Payment button with proper validation */}
                       {(() => {
                         const actualRemainingBalance = Math.max(0, expense.amount - expense.paidAmount);
                         const isFullyPaid = expense.paymentStatus === 'FULLY_PAID' || actualRemainingBalance <= 0;
-                        const canMakePayment = !isFullyPaid && actualRemainingBalance > 0;
                         
                         return (
                           <button 
@@ -1341,7 +1608,8 @@ export default function ExpensesPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                    );
+                  })}
             </tbody>
           </table>
         </div>
@@ -1551,6 +1819,137 @@ export default function ExpensesPage() {
                       <>
                         <CreditCard className="w-4 h-4" />
                         Make Payment
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Payment Modal */}
+        {showBulkPaymentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-t-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Pay selected expenses</h2>
+                      <p className="text-green-100 text-sm">
+                        {selectedExpenses.length} expense(s) · {formatCurrency(selectedBulkTotal)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={resetBulkPaymentModal}
+                    className="text-white hover:text-green-200 transition-colors"
+                    disabled={paymentLoading}
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="bg-gray-50 rounded-xl p-4 max-h-48 overflow-y-auto space-y-2">
+                  {selectedExpenses.map((expense) => {
+                    const remaining = Math.max(0, expense.amount - expense.paidAmount);
+                    return (
+                      <div
+                        key={expense.id}
+                        className="flex items-start justify-between gap-3 text-sm border-b border-gray-100 pb-2 last:border-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{expense.description}</p>
+                          <p className="text-xs text-gray-500 truncate">{expense.vendor}</p>
+                        </div>
+                        <p className="font-semibold text-red-600 whitespace-nowrap">
+                          {formatCurrency(remaining)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between text-sm font-semibold bg-emerald-50 rounded-xl px-4 py-3">
+                  <span>Total to pay</span>
+                  <span className="text-emerald-800">{formatCurrency(selectedBulkTotal)}</span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="bank_deposit">Bank Deposit</option>
+                    <option value="mobile_money">Mobile Money</option>
+                  </select>
+                </div>
+
+                <div>
+                  <FundingSourceSelector
+                    value={fundingSource}
+                    onChange={setFundingSource}
+                    label="Funding Source"
+                    description="Same funding source for all selected payments"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    rows={2}
+                    placeholder="Bulk payment notes..."
+                  />
+                </div>
+
+                {paymentError && showBulkPaymentModal && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <span className="text-red-800 font-medium text-sm">{paymentError}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={resetBulkPaymentModal}
+                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                    disabled={paymentLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkPaymentSubmit}
+                    disabled={paymentLoading || selectedExpenses.length === 0}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {paymentLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Paying…
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4" />
+                        Pay {selectedExpenses.length} now
                       </>
                     )}
                   </button>

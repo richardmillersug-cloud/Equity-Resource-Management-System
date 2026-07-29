@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   UserCheck,
   UserPlus,
+  UserX,
   ClipboardList,
   QrCode,
   Factory,
@@ -46,8 +47,11 @@ import {
   Send,
   KeyRound,
   Monitor,
-  ArrowDownUp
+  ArrowDownUp,
+  Menu,
+  X
 } from 'lucide-react';
+import { EQUITY_BRAND } from '@/components/staff/brand';
 
 interface SidebarProps {
   activeItem?: string;
@@ -81,15 +85,8 @@ const navigationItems: NavigationItem[] = [
   { 
     id: 'business-analytics', 
     icon: <TrendingUp className="w-5 h-5" />, 
-    label: 'Business Analytics', 
+    label: 'Analytics & Forecasting', 
     path: '/dashboard/managing-director/analytics',
-    roles: ['Managing Director']
-  },
-  { 
-    id: 'forecasting', 
-    icon: <Activity className="w-5 h-5" />, 
-    label: 'Forecasting & Insights', 
-    path: '/dashboard/managing-director/forecasting',
     roles: ['Managing Director']
   },
   { 
@@ -144,10 +141,10 @@ const navigationItems: NavigationItem[] = [
     roles: ['Managing Director']
   },
   {
-    id: 'md-equity-wallet',
-    icon: <DollarSign className="w-5 h-5" />,
-    label: 'Equity Wallet',
-    path: '/dashboard/accountant/reports',
+    id: 'md-expenses',
+    icon: <Receipt className="w-5 h-5" />,
+    label: 'Expenses & Equity Wallet',
+    path: '/dashboard/managing-director/expenses',
     roles: ['Managing Director']
   },
   {
@@ -228,6 +225,13 @@ const navigationItems: NavigationItem[] = [
     label: 'Registered Employees',
     path: '/dashboard/purchase-manager/registered-employees',
     roles: ['Admin', 'Managing Director'],
+  },
+  {
+    id: 'md-pm-accounts',
+    icon: <UserX className="w-5 h-5" />,
+    label: 'PM Accounts',
+    path: '/dashboard/managing-director/pm-accounts',
+    roles: ['Managing Director'],
   },
   {
     id: 'admin-security',
@@ -735,6 +739,7 @@ interface HRQuickAction {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [expectedSuppliers, setExpectedSuppliers] = useState<ExpectedSupplier[]>([]);
@@ -785,6 +790,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
 
     return unsubscribe;
   }, []);
+
+  // Phone drawer: always show labels while open; close when route changes
+  useEffect(() => {
+    if (mobileOpen) setIsExpanded(true);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
+  const closeMobileNav = () => setMobileOpen(false);
 
   const loadExpectedSuppliers = async () => {
     try {
@@ -1012,6 +1041,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
         } else {
           router.push(item.path);
         }
+        closeMobileNav();
       }
     }
     // Special handling for PM dashboard item for purchasing managers
@@ -1031,6 +1061,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
         } else {
           router.push(item.path);
         }
+        closeMobileNav();
       }
     } else if (item.submenu) {
       // Toggle dropdown
@@ -1047,11 +1078,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
     } else {
       router.push(item.path);
     }
+    closeMobileNav();
     }
   };
 
   const handleSubmenuClick = (path: string) => {
     router.push(path);
+    closeMobileNav();
   };
 
   const isActiveItem = (item: NavigationItem): boolean => {
@@ -1072,45 +1105,80 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
 
   const filteredItems = getFilteredNavigationItems();
 
-  return (
-    <div className={`${isExpanded ? 'w-64' : 'w-20'} bg-white border-r border-gray-100 flex flex-col py-6 transition-all duration-300 ease-in-out relative`}>
+  const renderSidebarPanel = () => (
+    <div
+      className="relative flex h-full min-h-0 w-full flex-col border-r bg-white py-4 transition-all duration-300 ease-in-out dark:border-white/10 dark:bg-[#120818] sm:py-6"
+      style={{ borderColor: `${EQUITY_BRAND.purple}22` }}
+    >
       {/* Logo and Toggle */}
-      <div className="flex items-center px-6 mb-8">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-white border border-gray-200">
-          <img src="/equity-logo.png" alt="Equity Logo" className="w-full h-full object-contain" />
+      <div
+        className="mb-6 border-b px-4 pb-4 sm:mb-8 sm:px-6"
+        style={{
+          borderColor: `${EQUITY_BRAND.purple}22`,
+          background: `linear-gradient(135deg, ${EQUITY_BRAND.purpleSoft} 0%, #ffffff 45%, ${EQUITY_BRAND.greenSoft} 100%)`,
+        }}
+      >
+        <div className="flex items-center">
+        <div
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-white sm:h-12 sm:w-12"
+          style={{ borderColor: `${EQUITY_BRAND.purple}33` }}
+        >
+          <img src="/equity-logo.png" alt="Equity Logo" className="h-full w-full object-contain" />
         </div>
         {isExpanded && (
-          <div className="ml-3 overflow-hidden">
-            <h2 className="text-lg font-bold text-gray-900 whitespace-nowrap">Equity</h2>
-            <p className="text-sm text-gray-500 whitespace-nowrap">Retail System</p>
+          <div className="ml-3 min-w-0 overflow-hidden">
+            <h2 className="whitespace-nowrap text-base font-bold sm:text-lg" style={{ color: EQUITY_BRAND.purple }}>
+              Equity
+            </h2>
+            <p className="whitespace-nowrap text-xs font-medium sm:text-sm" style={{ color: EQUITY_BRAND.green }}>
+              Retail System
+            </p>
           </div>
         )}
         
-        {/* Toggle Button */}
+        {/* Toggle Button — desktop collapse only */}
         <button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`${isExpanded ? 'ml-auto' : 'absolute -right-3 top-6'} w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-all duration-200 z-10 shadow-sm`}
+          className={`${isExpanded ? 'ml-auto' : 'absolute -right-3 top-6'} z-10 hidden h-6 w-6 items-center justify-center rounded-full border bg-white shadow-sm transition-all duration-200 hover:bg-[#F3EAF7] lg:flex`}
+          style={{ borderColor: `${EQUITY_BRAND.purple}33`, color: EQUITY_BRAND.purple }}
         >
           <span className={`text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
             ←
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={closeMobileNav}
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg border lg:hidden"
+          style={{ borderColor: `${EQUITY_BRAND.purple}33`, color: EQUITY_BRAND.purple }}
+          aria-label="Close menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        </div>
       </div>
 
       {/* Role Badge */}
       {isExpanded && (
         <div className="px-6 mb-4">
           <div
-            className={`rounded-lg px-3 py-2 border ${
-              isAdminUser(currentUser)
-                ? 'bg-indigo-50 border-indigo-200'
-                : 'bg-emerald-50 border-emerald-200'
-            }`}
+            className="rounded-lg border px-3 py-2"
+            style={{
+              borderColor: isAdminUser(currentUser)
+                ? `${EQUITY_BRAND.purple}44`
+                : `${EQUITY_BRAND.green}44`,
+              backgroundColor: isAdminUser(currentUser)
+                ? EQUITY_BRAND.purpleSoft
+                : EQUITY_BRAND.greenSoft,
+            }}
           >
             <p
-              className={`text-xs font-medium uppercase tracking-wide ${
-                isAdminUser(currentUser) ? 'text-indigo-700' : 'text-emerald-700'
-              }`}
+              className="text-xs font-medium uppercase tracking-wide"
+              style={{
+                color: isAdminUser(currentUser) ? EQUITY_BRAND.purple : EQUITY_BRAND.green,
+              }}
             >
               {getUserRole()}
             </p>
@@ -1119,29 +1187,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       )}
 
       {/* Navigation Items */}
-      <nav className="flex flex-col gap-1 flex-1 px-3">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3">
         {filteredItems.map((item) => (
           <div key={item.id}>
           {item.isGroupHeader ? (
             // Group header label
             isExpanded ? (
               <div className="px-3 pt-4 pb-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 select-none">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-widest select-none"
+                  style={{ color: EQUITY_BRAND.orange }}
+                >
                   {item.label}
                 </span>
               </div>
             ) : (
-              <div className="my-2 mx-2 border-t border-gray-100" />
+              <div className="my-2 mx-2 border-t" style={{ borderColor: `${EQUITY_BRAND.purple}22` }} />
             )
           ) : (
           <>
           <button
             onClick={() => handleItemClick(item)}
-              className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} h-12 rounded-xl flex items-center transition-all duration-200 group relative w-full ${
+              className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} group relative flex h-12 w-full items-center rounded-xl transition-all duration-200 ${
               isActiveItem(item)
-                ? 'bg-gray-200 text-gray-900 border border-gray-300'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
-            }`}
+                ? 'text-white shadow-sm'
+                : 'text-slate-700 hover:bg-[#F3EAF7] dark:text-slate-300 dark:hover:bg-white/5'
+              }`}
+            style={
+              isActiveItem(item)
+                ? { backgroundColor: EQUITY_BRAND.green }
+                : undefined
+            }
             title={!isExpanded ? item.label : undefined}
           >
             <span className={`${isExpanded ? 'mr-3' : ''} flex-shrink-0`}>
@@ -1168,14 +1244,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
 
               {/* PM quick actions count badge for pm-dashboard - only when collapsed */}
               {!isExpanded && item.id === 'pm-dashboard' && (getUserRole() === 'Purchase Manager' || getUserRole() === 'Purchasing Manager') && pmQuickActions.length > 0 && (
-                <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <div
+                  className="absolute -top-1 -right-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  style={{ backgroundColor: EQUITY_BRAND.orange }}
+                >
                   {pmQuickActions.reduce((sum, action) => sum + action.count, 0)}
                 </div>
               )}
             
             {/* Tooltip - only show when collapsed */}
             {!isExpanded && (
-              <div className="absolute left-16 bg-gray-900 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+              <div
+                className="absolute left-16 text-white text-sm px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"
+                style={{ backgroundColor: EQUITY_BRAND.purpleDark }}
+              >
                 {item.label}
               </div>
             )}
@@ -1184,15 +1266,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
             {/* Submenu - only show when expanded and dropdown is open */}
             {isExpanded && item.submenu && openDropdowns.has(item.id) && (
               <div className="ml-6 mt-1 space-y-1">
-                {item.submenu.map((subItem) => (
+                {item.submenu.map((subItem) => {
+                  const subActive =
+                    pathname === subItem.path || pathname.startsWith(subItem.path + '/');
+                  return (
                   <button
                     key={subItem.id}
                     onClick={() => handleSubmenuClick(subItem.path)}
                     className={`w-full h-10 rounded-lg flex items-center px-3 transition-all duration-200 text-sm ${
-                      pathname === subItem.path || pathname.startsWith(subItem.path + '/')
-                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-700'
+                      subActive
+                        ? 'font-semibold text-white'
+                        : 'text-slate-600 hover:bg-[#F3EAF7] hover:text-slate-800'
                     }`}
+                    style={
+                      subActive
+                        ? { backgroundColor: EQUITY_BRAND.purple }
+                        : undefined
+                    }
                   >
                     <span className="mr-2 flex-shrink-0">
                       {subItem.icon}
@@ -1201,7 +1291,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
                       {subItem.label}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1397,20 +1488,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
       </nav>
 
       {/* User Profile */}
-      <div className="mt-auto px-3">
-        <button className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} w-full h-12 rounded-xl flex items-center hover:bg-gray-100 transition-all duration-200 group`}>
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-emerald-600 font-semibold text-sm">
+      <div className="mt-auto border-t px-3 pt-3" style={{ borderColor: `${EQUITY_BRAND.purple}22` }}>
+        <button
+          className={`${isExpanded ? 'justify-start px-3' : 'justify-center'} w-full h-12 rounded-xl flex items-center transition-all duration-200 group hover:bg-[#F3EAF7]`}
+        >
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: EQUITY_BRAND.purpleSoft }}
+          >
+            <span className="font-semibold text-sm" style={{ color: EQUITY_BRAND.purple }}>
               {currentUser?.employee?.firstName?.charAt(0) || 'U'}
             </span>
           </div>
           
           {isExpanded && (
             <div className="ml-3 text-left overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
+              <p className="text-sm font-medium text-slate-900 whitespace-nowrap">
                 {currentUser?.employee?.firstName} {currentUser?.employee?.lastName}
               </p>
-              <p className="text-xs text-gray-500 whitespace-nowrap">
+              <p className="text-xs font-medium whitespace-nowrap" style={{ color: EQUITY_BRAND.orange }}>
                 {getUserRole()}
               </p>
             </div>
@@ -1440,6 +1536,60 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick }) => 
           )}
         </button>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="contents">
+      {/* Phone top bar */}
+      <div
+        className="sticky top-0 z-40 flex w-full items-center justify-between border-b bg-white/95 px-3 py-2.5 backdrop-blur lg:hidden"
+        style={{ borderColor: `${EQUITY_BRAND.purple}33` }}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <img src="/equity-logo.png" alt="Equity" className="h-8 w-auto object-contain" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold" style={{ color: EQUITY_BRAND.purple }}>
+              Equity RMS
+            </p>
+            <p className="truncate text-[10px] font-medium" style={{ color: EQUITY_BRAND.green }}>
+              {getUserRole()}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white shadow-sm"
+          style={{ borderColor: `${EQUITY_BRAND.green}66`, color: EQUITY_BRAND.purple }}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Phone drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close menu"
+            onClick={closeMobileNav}
+          />
+          <aside className="absolute left-0 top-0 flex h-full w-[min(18rem,88vw)] flex-col bg-white shadow-2xl dark:bg-[#120818]">
+            {renderSidebarPanel()}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside
+        className={`${isExpanded ? 'w-64' : 'w-20'} hidden h-dvh shrink-0 overflow-hidden lg:flex lg:flex-col`}
+        style={{ borderColor: `${EQUITY_BRAND.purple}22` }}
+      >
+        {renderSidebarPanel()}
+      </aside>
     </div>
   );
 }; 

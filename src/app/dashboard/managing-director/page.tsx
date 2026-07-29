@@ -38,6 +38,7 @@ import {
   getAccountantCurrentMonthTotals,
   type MdMonthlySummaries
 } from '../../../lib/firebase/md-monthly-summary';
+import { ExportButtons } from '@/components/ui/ExportButtons';
 import { firestoreServices } from '../../../lib/firebase/firestore-service';
 import {
   computeQuarterForecast,
@@ -112,6 +113,21 @@ export default function ManagingDirectorDashboard() {
 
   const pmMonthTotals = monthlySummaries ? getPmCurrentMonthTotals(monthlySummaries) : null;
   const accountantMonthTotals = monthlySummaries ? getAccountantCurrentMonthTotals(monthlySummaries) : null;
+
+  const monthlyBreakdownExportRows = useMemo(() => {
+    if (!monthlySummaries) return [];
+    return monthlySummaries.pm.purchases.map((row, idx) => ({
+      Month: row.label,
+      'Purchases (UGX)': monthlySummaries.pm.purchases[idx]?.amount ?? 0,
+      'Payments (UGX)': monthlySummaries.pm.payments[idx]?.amount ?? 0,
+      'This Month (UGX)': monthlySummaries.pm.monthLoans[idx]?.amount ?? 0,
+      'Total Outstanding (UGX)': monthlySummaries.pm.loans[idx]?.amount ?? 0,
+      'Cash Close (UGX)': monthlySummaries.accountant.cashClose[idx]?.amount ?? 0,
+      'Expenses (UGX)': monthlySummaries.accountant.expenses[idx]?.amount ?? 0,
+      'PM Assigned (UGX)': monthlySummaries.accountant.pmAssigned[idx]?.amount ?? 0,
+      'PM Used (UGX)': monthlySummaries.accountant.pmUsed[idx]?.amount ?? 0,
+    }));
+  }, [monthlySummaries]);
 
   const quarterForecast = useMemo<QuarterForecast | null>(() => {
     if (!forecastSummaries) return null;
@@ -438,6 +454,11 @@ export default function ManagingDirectorDashboard() {
                       <p className="text-sm font-bold text-blue-600 mt-1">
                         {(accountantMonthTotals?.pmUtilization ?? 0).toFixed(1)}%
                       </p>
+                      {accountantMonthTotals?.onlyActivePm && (
+                        <p className="text-[10px] text-gray-400 mt-1 truncate" title={accountantMonthTotals.onlyActivePm.name}>
+                          {accountantMonthTotals.onlyActivePm.name}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -448,15 +469,73 @@ export default function ManagingDirectorDashboard() {
               </div>
             </div>
 
-            {/* PM Fund Assignment vs Usage */}
+            {/* PM Fund Assignment vs Usage — scoped to Purchase Manager accounts (matches PM ledger) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5 text-blue-600" />
                 PM Funds — Assigned vs Used (Monthly)
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                Money allocated to the Purchasing Manager by the accountant compared to payments made by PM
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Muhammad Sebunya’s accepted allocations vs invoice + expense payments
+                (same wallet rules as his PM Account ledger)
               </p>
+
+              {monthlySummaries.pmFundsAudit && (
+                <div className="mb-5 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4">
+                  {monthlySummaries.pmFundsAudit.onlyActivePm ? (
+                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                      <span className="font-semibold">PM Funds account ({monthlySummaries.pmFundsAudit.label}):</span>{' '}
+                      {monthlySummaries.pmFundsAudit.onlyActivePm.name}
+                      <span className="text-blue-700/80 dark:text-blue-300">
+                        {' '}
+                        — Assigned / Used / Balance use this account only
+                      </span>
+                    </p>
+                  ) : monthlySummaries.pmFundsAudit.activePms.length > 1 ? (
+                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                      <p className="font-semibold mb-1">
+                        Active PMs this month ({monthlySummaries.pmFundsAudit.label}):
+                      </p>
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        {monthlySummaries.pmFundsAudit.activePms.map((pm) => (
+                          <li key={pm.uid}>
+                            {pm.name} — assigned {formatCurrency(pm.assignedThisMonth)}, used{' '}
+                            {formatCurrency(pm.usedThisMonth)}, balance {formatCurrency(pm.availableBalance)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                      Muhammad Sebunya’s Purchase Manager account was not found, or has no ledger data yet.
+                    </p>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-white/80 dark:bg-gray-800/60 p-3 border border-blue-100 dark:border-blue-900/30">
+                      <p className="text-xs text-gray-500">Assigned (month)</p>
+                      <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                        {formatCurrency(monthlySummaries.pmFundsAudit.totalAssignedThisMonth)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white/80 dark:bg-gray-800/60 p-3 border border-green-100 dark:border-green-900/30">
+                      <p className="text-xs text-gray-500">Used (month)</p>
+                      <p className="text-sm font-bold text-green-700 dark:text-green-300">
+                        {formatCurrency(monthlySummaries.pmFundsAudit.totalUsedThisMonth)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white/80 dark:bg-gray-800/60 p-3 border border-emerald-100 dark:border-emerald-900/30">
+                      <p className="text-xs text-gray-500">Available balance (ledger)</p>
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                        {formatCurrency(monthlySummaries.pmFundsAudit.totalAvailableBalance)}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Muhammad Sebunya PM Account wallet (all-time credits − debits)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 h-72">
@@ -467,7 +546,11 @@ export default function ManagingDirectorDashboard() {
                   {monthlySummaries.accountant.pmAssigned.map((assigned, idx) => {
                     const used = monthlySummaries.accountant.pmUsed[idx];
                     const utilization = assigned.amount > 0 ? (used.amount / assigned.amount) * 100 : 0;
-                    const gap = assigned.amount - used.amount;
+                    const isCurrent =
+                      assigned.monthKey === monthlySummaries.pmFundsAudit?.monthKey;
+                    const gap = isCurrent
+                      ? monthlySummaries.pmFundsAudit.totalAvailableBalance
+                      : assigned.amount - used.amount;
                     return (
                       <div
                         key={assigned.monthKey}
@@ -487,7 +570,10 @@ export default function ManagingDirectorDashboard() {
                         </div>
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                           <span>Assigned: {formatCurrency(assigned.amount)}</span>
-                          <span>Gap: {formatCurrency(gap)}</span>
+                          <span>
+                            {isCurrent ? 'Balance: ' : 'Month gap: '}
+                            {formatCurrency(gap)}
+                          </span>
                         </div>
                       </div>
                     );
@@ -497,41 +583,93 @@ export default function ManagingDirectorDashboard() {
             </div>
 
             {/* Monthly Summary Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 overflow-x-auto">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <LineChart className="w-5 h-5" />
-                Monthly Breakdown Table
-              </h3>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-600">
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-gray-400">Month</th>
-                    <th className="text-right py-3 px-2 font-semibold text-pink-600">Purchases</th>
-                    <th className="text-right py-3 px-2 font-semibold text-purple-600">Payments</th>
-                    <th className="text-right py-3 px-2 font-semibold text-amber-600">This Month</th>
-                    <th className="text-right py-3 px-2 font-semibold text-orange-600">Total Outstanding</th>
-                    <th className="text-right py-3 px-2 font-semibold text-emerald-600">Cash Close</th>
-                    <th className="text-right py-3 px-2 font-semibold text-red-600">Expenses</th>
-                    <th className="text-right py-3 px-2 font-semibold text-blue-600">PM Assigned</th>
-                    <th className="text-right py-3 px-2 font-semibold text-green-600">PM Used</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlySummaries.pm.purchases.map((row, idx) => (
-                    <tr key={row.monthKey} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="py-2.5 px-2 font-medium text-gray-900 dark:text-white">{row.label}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.pm.purchases[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.pm.payments[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.pm.monthLoans[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.pm.loans[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.accountant.cashClose[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.accountant.expenses[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.accountant.pmAssigned[idx].amount)}</td>
-                      <td className="py-2.5 px-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(monthlySummaries.accountant.pmUsed[idx].amount)}</td>
+            <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:p-4 lg:p-6">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
+                  <LineChart className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+                  Monthly Breakdown Table
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] text-gray-500 md:hidden">Swipe sideways for all columns →</p>
+                  <ExportButtons
+                    data={monthlyBreakdownExportRows}
+                    filename="md-monthly-breakdown"
+                    title="Monthly Breakdown Table"
+                    subtitle={`${monthlyBreakdownExportRows.length} months · Managing Director`}
+                  />
+                </div>
+              </div>
+              <div className="table-scroll -mx-1 rounded-lg border border-gray-100 dark:border-gray-700 sm:mx-0">
+                <table className="w-full min-w-[860px] border-collapse text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/40">
+                      <th className="sticky left-0 z-10 whitespace-nowrap bg-gray-50 px-2 py-2.5 text-left font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400 sm:px-3 sm:py-3">
+                        Month
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-pink-600 sm:px-3 sm:py-3">
+                        Purchases
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-purple-600 sm:px-3 sm:py-3">
+                        Payments
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-amber-600 sm:px-3 sm:py-3">
+                        This Month
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-orange-600 sm:px-3 sm:py-3">
+                        Total Outstanding
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-emerald-600 sm:px-3 sm:py-3">
+                        Cash Close
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-red-600 sm:px-3 sm:py-3">
+                        Expenses
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-blue-600 sm:px-3 sm:py-3">
+                        PM Assigned
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2.5 text-right font-semibold text-green-600 sm:px-3 sm:py-3">
+                        PM Used
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {monthlySummaries.pm.purchases.map((row, idx) => (
+                      <tr
+                        key={row.monthKey}
+                        className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/30"
+                      >
+                        <td className="sticky left-0 z-[1] whitespace-nowrap bg-white px-2 py-2 font-medium text-gray-900 dark:bg-gray-800 dark:text-white sm:px-3 sm:py-2.5">
+                          {row.label}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.pm.purchases[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.pm.payments[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.pm.monthLoans[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.pm.loans[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.accountant.cashClose[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.accountant.expenses[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.accountant.pmAssigned[idx].amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300 sm:px-3 sm:py-2.5">
+                          {formatCurrency(monthlySummaries.accountant.pmUsed[idx].amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

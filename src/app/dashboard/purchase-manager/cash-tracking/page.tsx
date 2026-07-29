@@ -5,8 +5,8 @@ import CashTrackingInterface from '../../../../components/purchase-manager/CashT
 
 export default function CashTrackingPage() {
   return (
-    <div className="w-full min-h-full bg-gray-50 p-4 sm:p-6">
+    <div className="w-full min-h-0 min-w-0 bg-gray-50 -mx-1 px-1 sm:mx-0 sm:px-0">
       <CashTrackingInterface className="w-full" />
     </div>
   );
-} 
+}

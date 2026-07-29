@@ -33,9 +33,9 @@ service cloud.firestore {
       return isAuthenticated() && userRole != null && userRole in roles;
     }
     
-    // Unified administrator (Admin; legacy System Admin title still accepted)
+    // Unified administrator (Admin; legacy System Admin / Super Admin titles still accepted)
     function isAdmin() {
-      return hasAnyRole(['Admin', 'System Admin']);
+      return hasAnyRole(['Admin', 'System Admin', 'Super Admin']);
     }
 
     function isSystemAdmin() {
@@ -99,6 +99,11 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         employeeId == request.auth.uid || // Can update own record
         hasAnyRole(['Admin', 'HR', 'Managing Director']) || // HR/Admin/MD can update all
+        // Creator may fully manage staff they registered
+        (
+          hasAnyRole(['Purchasing Manager', 'Purchase Manager', 'Admin', 'Managing Director']) &&
+          resource.data.registeredBy == request.auth.uid
+        ) ||
         // Purchase Manager may manage staff default shift, section, and employment status
         (
           hasAnyRole(['Purchasing Manager', 'Purchase Manager']) &&
@@ -113,16 +118,15 @@ service cloud.firestore {
             ])
         )
       );
-      allow delete: if hasRole('Admin');
-    }
-
-    // =====================================================
-    // STAFF SHIFT ASSIGNMENTS (per-day Day/Night by PM)
-    // =====================================================
+      allow delete: if hasAnyRole(['Admin', 'Managing Director']) ||
+        (
+          hasAnyRole(['Purchasing Manager', 'Purchase Manager']) &&
+          resource.data.registeredBy == request.auth.uid
+        );
     match /staffShiftAssignments/{assignmentId} {
       allow read: if isAuthenticated() && (
         resource.data.employeeId == request.auth.uid ||
-        hasAnyRole(['Admin', 'System Admin', 'HR', 'Purchasing Manager', 'Purchase Manager', 'Manager'])
+        hasAnyRole(['Admin', 'System Admin', 'HR', 'Purchasing Manager', 'Purchase Manager', 'Manager', 'Managing Director'])
       );
       allow create, update: if hasAnyRole(['Admin', 'HR', 'Purchasing Manager', 'Purchase Manager']);
       allow delete: if hasAnyRole(['Admin', 'HR', 'Purchasing Manager', 'Purchase Manager']);

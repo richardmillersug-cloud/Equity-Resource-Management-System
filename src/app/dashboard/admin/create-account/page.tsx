@@ -73,6 +73,7 @@ export default function CreateAccountPage() {
         name: user.employee
           ? `${user.employee.firstName} ${user.employee.lastName}`
           : user.displayName || user.email,
+        role: user.employee?.roles?.[0]?.jobTitle || 'Admin',
       }
     : null;
 
