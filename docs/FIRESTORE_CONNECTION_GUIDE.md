@@ -317,7 +317,7 @@ await bulletproofServices.expenses.bulkUpdate(updates);
 ## Quick Reference
 
 - **Template File**: `src/app/dashboard/example-firestore-page/page.tsx`
-- **Utility File**: `src/utils/firestorePageTemplate.ts`
+- **Utility File**: `src/lib/utils/firestorePageTemplate.ts`
 - **Main Service**: `bulletproofServices` from `src/lib/firebase/firestore-service-fixed.ts`
 - **Auth Service**: `authService` from `src/lib/firebase/auth.ts`
 

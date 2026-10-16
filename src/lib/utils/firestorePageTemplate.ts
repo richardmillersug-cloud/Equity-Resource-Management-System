@@ -2,8 +2,8 @@
 // Copy this template and modify for your specific needs
 
 import { useState, useEffect } from 'react';
-import { authService } from '../lib/firebase/auth';
-import { bulletproofServices } from '../lib/firebase/firestore-service-fixed';
+import { authService } from '../firebase/auth';
+import { bulletproofServices } from '../firebase/firestore-service-fixed';
 
 // Step 1: Define your data interface
 interface YourDataInterface {

@@ -2,7 +2,7 @@
  * Integration utilities for combining imported CSV sales data with existing analytics
  */
 
-import { ImportedSalesData } from '../app/dashboard/managing-director/sales-import/page';
+import { ImportedSalesData } from '../../app/dashboard/managing-director/sales-import/page';
 
 export interface CombinedSalesData {
   totalSales: number;

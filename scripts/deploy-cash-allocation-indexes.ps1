@@ -1,4 +1,5 @@
 # PowerShell script to deploy Firestore indexes for cash_allocations
+Set-Location (Join-Path $PSScriptRoot '..')
 Write-Host "===============================================" -ForegroundColor Cyan
 Write-Host "   DEPLOYING CASH ALLOCATION FIRESTORE INDEXES" -ForegroundColor Cyan  
 Write-Host "===============================================" -ForegroundColor Cyan

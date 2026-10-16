@@ -21,6 +21,7 @@ import {
   reconcileOutstandingFromPaidAmount,
   getInvoiceAmount,
   getInvoiceDate,
+  isRejectedInvoice,
   safeNumber,
   type OutstandingReconciliation,
 } from '../../../../lib/firebase/invoice-outstanding';
@@ -79,6 +80,8 @@ export default function OutstandingInvoicesPage() {
 
       invoicesSnapshot.docs.forEach(doc => {
         const data = doc.data();
+        if (isRejectedInvoice(data)) return;
+
         invoiceRecords.push({ id: doc.id, ...data });
         const amount = getInvoiceAmount(data);
         const paidAmount = safeNumber(data.paidAmount);
@@ -325,7 +328,7 @@ export default function OutstandingInvoicesPage() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {summary.totalInvoices} total invoices in database
+                    {summary.totalInvoices} invoices, excluding rejected
                   </p>
                 </div>
               </div>

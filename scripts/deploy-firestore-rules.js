@@ -9,7 +9,7 @@
  * - Inventory management permissions for restocking operations
  * 
  * Usage:
- *   node deploy-firestore-rules.js
+ *   node scripts/deploy-firestore-rules.js
  * 
  * Prerequisites:
  *   - Firebase CLI installed and configured
@@ -22,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const RULES_FILE = 'firestore.rules';
+const ROOT = path.join(__dirname, '..');
+const RULES_FILE = path.join(ROOT, 'firestore.rules');
 const PROJECT_ID = 'equitysys-41320'; // Update this to match your Firebase project ID
 
 console.log('🔥 Firebase Firestore Rules Deployment Script');
@@ -30,7 +31,7 @@ console.log('===============================================');
 
 // Check if rules file exists
 if (!fs.existsSync(RULES_FILE)) {
-  console.error(`❌ Error: ${RULES_FILE} not found in current directory`);
+  console.error(`❌ Error: ${RULES_FILE} not found`);
   process.exit(1);
 }
 
@@ -69,7 +70,7 @@ console.log(`📡 Target project: ${PROJECT_ID}`);
 
 const deployCommand = `firebase deploy --only firestore:rules --project ${PROJECT_ID}`;
 
-exec(deployCommand, (error, stdout, stderr) => {
+exec(deployCommand, { cwd: ROOT }, (error, stdout, stderr) => {
   if (error) {
     console.error(`❌ Deployment failed: ${error.message}`);
     console.error('💡 Troubleshooting tips:');

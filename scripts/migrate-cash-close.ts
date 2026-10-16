@@ -13,7 +13,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { comprehensiveCashCloseService, ComprehensiveCashClose } from '../lib/firebase/comprehensive-cash-close-service';
+import { comprehensiveCashCloseService, ComprehensiveCashClose } from '../src/lib/firebase/comprehensive-cash-close-service';
 
 // Firebase config (you'll need to provide this)
 const firebaseConfig = {
