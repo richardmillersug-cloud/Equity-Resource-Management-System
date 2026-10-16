@@ -335,7 +335,7 @@ export default function ManagingDirectorDashboard() {
                     Purchasing Manager — Monthly
                   </h3>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-5">
                     <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-pink-100 dark:border-pink-900/30">
                       <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                         <Receipt className="w-3 h-3" /> Purchases
@@ -352,12 +352,26 @@ export default function ManagingDirectorDashboard() {
                         {formatCurrency(pmMonthTotals?.payments ?? 0)}
                       </p>
                     </div>
-                    <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-amber-100 dark:border-amber-900/30">
+                    <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-red-100 dark:border-red-900/30">
                       <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        <Wallet className="w-3 h-3" /> This Month Outstanding
+                        <Receipt className="w-3 h-3" /> Unpaid invoices
                       </p>
-                      <p className="text-sm font-bold text-amber-600 mt-1">
-                        {formatCurrency(pmMonthTotals?.monthLoans ?? 0)}
+                      <p className="text-sm font-bold text-red-600 mt-1">
+                        {formatCurrency(monthlySummaries.outstandingBreakdown?.total.fullyUnpaid.amount ?? 0)}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {monthlySummaries.outstandingBreakdown?.total.fullyUnpaid.count ?? 0} invoices
+                      </p>
+                    </div>
+                    <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-yellow-100 dark:border-yellow-900/30">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <Wallet className="w-3 h-3" /> Partial balance
+                      </p>
+                      <p className="text-sm font-bold text-yellow-600 mt-1">
+                        {formatCurrency(monthlySummaries.outstandingBreakdown?.total.partiallyPaid.amount ?? 0)}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {monthlySummaries.outstandingBreakdown?.total.partiallyPaid.count ?? 0} invoices remaining
                       </p>
                     </div>
                     <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-orange-100 dark:border-orange-900/30">
@@ -374,7 +388,7 @@ export default function ManagingDirectorDashboard() {
                     <div className="mb-5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-700/30 p-3 text-xs text-gray-600 dark:text-gray-400 space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-medium text-gray-700 dark:text-gray-300">
-                          Outstanding from invoice paid amounts (matches PM reconciliation).
+                          Unpaid and partial balances exclude rejected invoices.
                         </p>
                         {monthlySummaries.reconciliation?.sumsMatch && (
                           <span className="flex items-center gap-1 text-green-700 dark:text-green-400 font-medium">
@@ -383,21 +397,13 @@ export default function ManagingDirectorDashboard() {
                           </span>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-orange-600 font-semibold">Total:</span>{' '}
-                          {monthlySummaries.outstandingBreakdown.total.fullyUnpaid.count} fully unpaid (
-                          {formatCurrency(monthlySummaries.outstandingBreakdown.total.fullyUnpaid.amount)}),{' '}
-                          {monthlySummaries.outstandingBreakdown.total.partiallyPaid.count} partially paid (
-                          {formatCurrency(monthlySummaries.outstandingBreakdown.total.partiallyPaid.amount)} remaining)
-                        </div>
-                        <div>
-                          <span className="text-amber-600 font-semibold">This month:</span>{' '}
-                          {monthlySummaries.outstandingBreakdown.thisMonth.fullyUnpaid.count} fully unpaid (
-                          {formatCurrency(monthlySummaries.outstandingBreakdown.thisMonth.fullyUnpaid.amount)}),{' '}
-                          {monthlySummaries.outstandingBreakdown.thisMonth.partiallyPaid.count} partially paid (
-                          {formatCurrency(monthlySummaries.outstandingBreakdown.thisMonth.partiallyPaid.amount)} remaining)
-                        </div>
+                      <div>
+                        <span className="text-amber-600 font-semibold">This month:</span>{' '}
+                        {monthlySummaries.outstandingBreakdown.thisMonth.fullyUnpaid.count} fully unpaid (
+                        {formatCurrency(monthlySummaries.outstandingBreakdown.thisMonth.fullyUnpaid.amount)}),{' '}
+                        {monthlySummaries.outstandingBreakdown.thisMonth.partiallyPaid.count} partially paid (
+                        {formatCurrency(monthlySummaries.outstandingBreakdown.thisMonth.partiallyPaid.amount)} remaining)
+                        {' '}· this month outstanding {formatCurrency(pmMonthTotals?.monthLoans ?? 0)}
                       </div>
                       {monthlySummaries.reconciliation && (
                         <p className="text-gray-500 dark:text-gray-400">

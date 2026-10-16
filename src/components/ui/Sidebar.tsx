@@ -467,6 +467,13 @@ const navigationItems: NavigationItem[] = [
     path: '/dashboard/purchase-manager/till-cash-closes',
     roles: ['Purchase Manager', 'Purchasing Manager']
   },
+  {
+    id: 'pm-sales',
+    icon: <BarChart3 className="w-5 h-5" />,
+    label: 'Sales',
+    path: '/dashboard/purchase-manager/sales',
+    roles: ['Purchase Manager', 'Purchasing Manager']
+  },
 
   
   // HR specific

@@ -1,5 +1,6 @@
 // Simple script to deploy only cash closes indexes
 const { exec } = require('child_process');
+const path = require('path');
 
 console.log('🔧 Deploying Cash Closes Indexes Only...\n');
 
@@ -10,7 +11,7 @@ console.log('📋 Using indexes from: cash-closes-indexes-only.json');
 console.log('⚡ Executing:', command);
 console.log('⏳ This should create 13 new cashCloses indexes...\n');
 
-exec(command, { cwd: process.cwd() }, (error, stdout, stderr) => {
+exec(command, { cwd: path.join(__dirname, '..') }, (error, stdout, stderr) => {
   if (error) {
     console.error('❌ Deployment failed:');
     console.error(error.message);

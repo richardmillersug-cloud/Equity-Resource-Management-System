@@ -34,17 +34,17 @@ npm run create-hr
 
 ### Option 2: Using ts-node directly
 ```bash
-npx ts-node src/scripts/create-hr-account.ts
+npx ts-node scripts/create-hr-account.ts
 ```
 
 ### Option 3: Using Node.js (if you prefer JavaScript)
 ```bash
-node src/scripts/create-hr-account.js
+node scripts/create-hr-account.js
 ```
 
 ## Before Running the Script
 
-1. **Update Account Details**: Edit the `src/scripts/create-hr-account.ts` file to update:
+1. **Update Account Details**: Edit the `scripts/create-hr-account.ts` file to update:
    - Email address
    - Password (use a strong password)
    - Employee NIN (National Identification Number)

@@ -1,4 +1,4 @@
-import { bulletproofServices } from '../lib/firebase/firestore-service-fixed';
+import { bulletproofServices } from '../firebase/firestore-service-fixed';
 import { SalesReportParser } from './salesReportParser';
 import { CSVParser, salesDataColumns } from './csvParser';
 

@@ -415,7 +415,7 @@ return (
 ## 📁 Files Created/Updated
 
 1. **`src/app/dashboard/managing-director/csv-analyzer/page.tsx`** - Enhanced with all new functionalities
-2. **`src/utils/pageFunctionalities.ts`** - Reusable functionality hooks
+2. **`src/lib/utils/pageFunctionalities.ts`** - Reusable functionality hooks
 3. **`ADD_FUNCTIONALITY_GUIDE.md`** - This comprehensive guide
 
 ## 🎉 Ready to Use!

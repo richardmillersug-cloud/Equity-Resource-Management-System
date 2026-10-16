@@ -27,7 +27,7 @@ yarn install
 ### 3. Environment Setup
 ```bash
 # Copy the example environment file
-cp env.example .env.local
+cp .env.example .env.local
 
 # Edit .env.local with your Firebase configuration
 # You can get these values from your Firebase project settings

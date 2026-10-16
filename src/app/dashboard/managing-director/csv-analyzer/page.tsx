@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import { bulletproofServices } from '../../../../lib/firebase/firestore-service-fixed';
 import { authService } from '../../../../lib/firebase/auth';
-import { CSVParser, salesDataColumns } from '../../../../utils/csvParser';
-import { SalesReportParser } from '../../../../utils/salesReportParser';
+import { CSVParser, salesDataColumns } from '@/lib/utils/csvParser';
+import { SalesReportParser } from '@/lib/utils/salesReportParser';
 
 interface CSVAnalysis {
   file: any;

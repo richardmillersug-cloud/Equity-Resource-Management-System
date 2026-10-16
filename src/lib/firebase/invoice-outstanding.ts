@@ -31,6 +31,11 @@ export function getInvoiceAmount(invoice: Record<string, unknown>): number {
   );
 }
 
+/** Rejected invoices are not obligations and are left out of outstanding totals. */
+export function isRejectedInvoice(invoice: Record<string, unknown>): boolean {
+  return String(invoice.status ?? '').toLowerCase() === 'rejected';
+}
+
 export function getPaymentAmount(payment: Record<string, unknown>): number {
   return safeNumber(
     payment.amount ?? payment.paidAmount ?? payment.paymentAmount ?? 0
@@ -149,6 +154,7 @@ export function getInvoiceOutstandingAt(
   payments: Record<string, unknown>[],
   asOf: Date
 ): number {
+  if (isRejectedInvoice(invoice)) return 0;
   const invoiceAmount = getInvoiceAmount(invoice);
   const paidUpTo = payments
     .filter((payment) => {
@@ -270,7 +276,12 @@ export function reconcileOutstandingFromPaidAmount(
   let sumFullyUnpaidRemaining = 0;
   let sumPartialRemaining = 0;
 
+  let includedInvoices = 0;
+
   invoices.forEach((invoice) => {
+    if (isRejectedInvoice(invoice)) return;
+    includedInvoices++;
+
     const amount = getInvoiceAmount(invoice);
     const paid = safeNumber(invoice.paidAmount);
     const remaining = Math.max(0, amount - paid);
@@ -295,7 +306,7 @@ export function reconcileOutstandingFromPaidAmount(
   const remainingSum = sumFullyUnpaidRemaining + sumPartialRemaining;
 
   return {
-    totalInvoices: invoices.length,
+    totalInvoices: includedInvoices,
     sumAllInvoices,
     sumCompletelyPaid,
     sumPartialPayments,
@@ -322,6 +333,8 @@ export function sumOutstandingFromPaidAmount(
   let partiallyPaidCount = 0;
 
   invoices.forEach((invoice) => {
+    if (isRejectedInvoice(invoice)) return;
+
     const invoiceDate = getInvoiceDate(invoice);
     if (filter && (!invoiceDate || !filter(invoiceDate))) return;
 

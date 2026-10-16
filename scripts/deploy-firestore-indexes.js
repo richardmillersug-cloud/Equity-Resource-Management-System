@@ -15,7 +15,7 @@ console.log('🔥 Firestore Index Deployment Script');
 console.log('=====================================\n');
 
 // Check if firestore.indexes.json exists
-const indexesFile = path.join(__dirname, 'firestore.indexes.json');
+const indexesFile = path.join(__dirname, '..', 'firestore.indexes.json');
 if (!fs.existsSync(indexesFile)) {
   console.error('❌ firestore.indexes.json not found!');
   console.log('   Make sure you have the firestore.indexes.json file in the project root.');

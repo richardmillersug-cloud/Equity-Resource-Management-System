@@ -1,5 +1,5 @@
-import { CashCloseService } from '../lib/firebase/firestore-service';
-import { authService } from '../lib/firebase/auth';
+import { CashCloseService } from '../src/lib/firebase/firestore-service';
+import { authService } from '../src/lib/firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 
 // Sample cash close data
