@@ -6,6 +6,11 @@ import { BarChart3, ChevronDown, ChevronRight, Receipt, RefreshCw, Search, Troph
 import { db } from '@/lib/firebase/config';
 import { usePagination, PaginationBar, type UsePaginationReturn } from '@/components/ui/Pagination';
 import { ExportButtons } from '@/components/ui/ExportButtons';
+import {
+  formatShiftDateKey,
+  resolveOperatingShift,
+  type OperatingShift,
+} from '@/lib/utils/shop-operating-shifts';
 
 const COLLECTION = 'equitysales';
 
@@ -26,6 +31,7 @@ type SaleTicket = {
   branch: string;
   soldBy: string;
   payment: string;
+  operatingShift: OperatingShift;
   lines: SaleLine[];
   quantity: number;
   total: number;
@@ -208,14 +214,16 @@ function toTicket(id: string, data: Record<string, unknown>): SaleTicket {
       ? nested.map((item, index) => lineFrom(`${id}-${index}`, item, data))
       : [lineFrom(id, data, data)];
   const number = firstText(data, TICKET_KEYS) || id.slice(0, 8).toUpperCase();
+  const date = firstDate(data, DATE_KEYS);
 
   return {
     id,
     number,
-    date: firstDate(data, DATE_KEYS),
+    date,
     branch: firstText(data, BRANCH_KEYS) || '—',
     soldBy: firstText(data, SELLER_KEYS) || '—',
     payment: firstText(data, PAYMENT_KEYS) || '—',
+    operatingShift: resolveOperatingShift(date),
     lines,
     quantity: lines.reduce((sum, line) => sum + line.quantity, 0),
     total: lines.reduce((sum, line) => sum + line.total, 0),
@@ -228,7 +236,7 @@ function mergeTickets(tickets: SaleTicket[]): SaleTicket[] {
   tickets.forEach((ticket) => {
     const sharedNumber = ticket.number !== ticket.id.slice(0, 8).toUpperCase();
     const key = sharedNumber
-      ? `${ticket.number}|${dayKey(ticket.date)}|${ticket.branch}`
+      ? `${ticket.number}|${ticket.operatingShift.shiftDateKey}|${ticket.branch}`
       : ticket.id;
     const existing = groups.get(key);
     if (!existing) {
@@ -268,14 +276,6 @@ function formatDate(date: Date | null): string {
 function formatTime(date: Date | null): string {
   if (!date) return '';
   return date.toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' });
-}
-
-function dayKey(date: Date | null): string {
-  if (!date) return 'undated';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 const MONTH_NAMES = [
@@ -341,9 +341,10 @@ export default function PurchaseManagerSalesPage() {
   const periods = useMemo(() => {
     const values = new Map<string, string>();
     tickets.forEach((ticket) => {
-      if (!ticket.date) return;
-      const key = `${ticket.date.getFullYear()}-${String(ticket.date.getMonth() + 1).padStart(2, '0')}`;
-      values.set(key, `${MONTH_NAMES[ticket.date.getMonth()]} ${ticket.date.getFullYear()}`);
+      const shiftDate = ticket.operatingShift.shiftDate;
+      if (!shiftDate) return;
+      const key = `${shiftDate.getFullYear()}-${String(shiftDate.getMonth() + 1).padStart(2, '0')}`;
+      values.set(key, `${MONTH_NAMES[shiftDate.getMonth()]} ${shiftDate.getFullYear()}`);
     });
     return [...values.entries()]
       .sort(([a], [b]) => b.localeCompare(a))
@@ -353,12 +354,13 @@ export default function PurchaseManagerSalesPage() {
   const days = useMemo(() => {
     const values = new Set<number>();
     tickets.forEach((ticket) => {
-      if (!ticket.date) return;
+      const shiftDate = ticket.operatingShift.shiftDate;
+      if (!shiftDate) return;
       if (period !== 'all') {
-        const key = `${ticket.date.getFullYear()}-${String(ticket.date.getMonth() + 1).padStart(2, '0')}`;
+        const key = `${shiftDate.getFullYear()}-${String(shiftDate.getMonth() + 1).padStart(2, '0')}`;
         if (key !== period) return;
       }
-      values.add(ticket.date.getDate());
+      values.add(shiftDate.getDate());
     });
     return [...values].sort((a, b) => a - b);
   }, [tickets, period]);
@@ -367,30 +369,36 @@ export default function PurchaseManagerSalesPage() {
     return tickets.filter((ticket) => {
       if (branch !== 'all' && ticket.branch !== branch) return false;
       if (period === 'all' && day === 'all') return true;
-      if (!ticket.date) return false;
+      const shiftDate = ticket.operatingShift.shiftDate;
+      if (!shiftDate) return false;
       if (period !== 'all') {
-        const key = `${ticket.date.getFullYear()}-${String(ticket.date.getMonth() + 1).padStart(2, '0')}`;
+        const key = `${shiftDate.getFullYear()}-${String(shiftDate.getMonth() + 1).padStart(2, '0')}`;
         if (key !== period) return false;
       }
-      if (day !== 'all' && ticket.date.getDate() !== Number(day)) return false;
+      if (day !== 'all' && shiftDate.getDate() !== Number(day)) return false;
       return true;
     });
   }, [tickets, branch, period, day]);
 
-  const shifts = useMemo(() => {
-    const names = new Set(datedTickets.map((ticket) => ticket.soldBy).filter((name) => name && name !== '—'));
-    return [...names].sort();
-  }, [datedTickets]);
+  const shifts = useMemo(
+    () =>
+      [
+        { value: 'shop1', label: 'Shop1 · 9:00 PM – 9:00 AM' },
+        { value: 'server', label: 'Server · 9:00 AM – 9:00 PM' },
+      ].filter((item) => datedTickets.some((ticket) => ticket.operatingShift.id === item.value)),
+    [datedTickets]
+  );
 
   const filteredTickets = useMemo(() => {
     const term = search.trim().toLowerCase();
     return datedTickets.filter((ticket) => {
-      if (shift !== 'all' && ticket.soldBy !== shift) return false;
+      if (shift !== 'all' && ticket.operatingShift.id !== shift) return false;
       if (!term) return true;
       const haystack = [
         ticket.number,
         ticket.branch,
         ticket.soldBy,
+        ticket.operatingShift.label,
         ticket.payment,
         formatDate(ticket.date),
         ...ticket.lines.map((line) => line.product),
@@ -482,11 +490,13 @@ export default function PurchaseManagerSalesPage() {
       Ticket: ticket.number,
       Date: formatDate(ticket.date),
       Time: formatTime(ticket.date) || '—',
+      'Shift date': formatShiftDateKey(ticket.operatingShift.shiftDateKey),
+      Shift: ticket.operatingShift.label,
       Products: ticket.lines.map((line) => line.product).join(', '),
       Quantity: ticket.quantity || '—',
       Total: formatMoney(ticket.total),
       Branch: ticket.branch,
-      Shift: ticket.soldBy,
+      Cashier: ticket.soldBy,
       Payment: ticket.payment,
     }));
   }, [view, unitsRanking, salesRanking, filteredTickets]);
@@ -601,15 +611,16 @@ export default function PurchaseManagerSalesPage() {
           </FilterSelect>
           <FilterSelect label="Shift" value={shift} onChange={setShift}>
             <option value="all">All shifts</option>
-            {shifts.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {shifts.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </FilterSelect>
         </div>
         <p className="mt-2 text-xs text-gray-500">
-          A change in who sold the ticket is a change of shift.
+          Shop1 is overnight (9:00 PM to 9:00 AM). Morning tickets before 9:00 AM stay on last night&apos;s
+          Shop1 shift. Server starts when Shop1 closes at 9:00 AM.
         </p>
       </div>
 
@@ -649,7 +660,7 @@ export default function PurchaseManagerSalesPage() {
                           ...(ticketColumns.qty ? [['Qty', 'right'] as const] : []),
                           ['Total', 'right'],
                           ...(ticketColumns.branch ? [['Branch', 'left'] as const] : []),
-                          ...(ticketColumns.soldBy ? [['Shift', 'left'] as const] : []),
+                          ...(ticketColumns.soldBy ? [['Cashier', 'left'] as const] : []),
                           ...(ticketColumns.payment ? [['Payment', 'left'] as const] : []),
                         ] as const
                       ).map(([heading, align]) => (
@@ -668,14 +679,17 @@ export default function PurchaseManagerSalesPage() {
                     {ticketPage.paginatedItems.map((ticket, index) => {
                       const open = openTicketId === ticket.id;
                       const previous = index > 0 ? ticketPage.paginatedItems[index - 1] : null;
-                      const shiftChanged = !previous || previous.soldBy !== ticket.soldBy;
+                      const shiftChanged =
+                        !previous ||
+                        previous.operatingShift.id !== ticket.operatingShift.id ||
+                        previous.operatingShift.shiftDateKey !== ticket.operatingShift.shiftDateKey;
                       return (
                         <TicketRows
                           key={ticket.id}
                           ticket={ticket}
                           open={open}
                           columns={ticketColumns}
-                          showShift={shiftChanged && ticket.soldBy !== '—'}
+                          showShift={shiftChanged}
                           onToggle={() => setOpenTicketId(open ? null : ticket.id)}
                         />
                       );
@@ -772,7 +786,8 @@ function TicketRows({
       {showShift && (
         <tr className="bg-[#FFF4E8]">
           <td colSpan={colSpan} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#F49121]">
-            Shift · {ticket.soldBy}
+            {ticket.operatingShift.label} · {formatShiftDateKey(ticket.operatingShift.shiftDateKey)} ·{' '}
+            {ticket.operatingShift.hoursLabel}
           </td>
         </tr>
       )}
