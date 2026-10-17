@@ -91,10 +91,15 @@ function normalizeKey(key: string): string {
 }
 
 function findValue(source: Record<string, unknown>, keys: string[]): unknown {
-  const wanted = new Set(keys.map(normalizeKey));
+  const byKey = new Map<string, unknown>();
   for (const [key, value] of Object.entries(source)) {
     if (value == null || value === '') continue;
-    if (wanted.has(normalizeKey(key))) return value;
+    const normalized = normalizeKey(key);
+    if (!byKey.has(normalized)) byKey.set(normalized, value);
+  }
+  for (const key of keys) {
+    const value = byKey.get(normalizeKey(key));
+    if (value != null && value !== '') return value;
   }
   return undefined;
 }
@@ -148,13 +153,16 @@ const QTY_KEYS = [
   'count',
   'times',
 ];
-const PRICE_KEYS = ['netUnit', 'unitPrice', 'price', 'sellingPrice', 'rate'];
+const PRICE_KEYS = ['netUnit', 'unitPrice', 'sellingPrice', 'unitCost', 'rate', 'price'];
 const TOTAL_KEYS = [
   'totalAmount',
   'saleAmount',
   'lineTotal',
-  'grandTotal',
+  'salesIncTax',
+  'salesInclTax',
+  'salesInclusive',
   'netAmount',
+  'lineAmount',
   'amount',
   'total',
 ];
@@ -181,13 +189,56 @@ function asRecords(value: unknown): Record<string, unknown>[] {
   );
 }
 
+function amountsNear(a: number, b: number): boolean {
+  if (a <= 0 || b <= 0) return false;
+  const diff = Math.abs(a - b);
+  return diff <= 1 || diff / Math.max(a, b) < 0.02;
+}
+
+/**
+ * Item total is the money on that line. Receipt units are the sum of line qty.
+ * POS sometimes stores netUnit as a real unit price, and sometimes as the line total.
+ */
+function resolveLineMoney(
+  quantity: number,
+  advertisedUnit: number,
+  recordedTotal: number
+): { unitPrice: number; total: number } {
+  const qty = quantity > 0 ? quantity : 1;
+
+  if (recordedTotal > 0 && advertisedUnit > 0) {
+    if (amountsNear(advertisedUnit * qty, recordedTotal)) {
+      return { unitPrice: advertisedUnit, total: recordedTotal };
+    }
+    if (qty > 1 && amountsNear(advertisedUnit, recordedTotal)) {
+      return { unitPrice: recordedTotal / qty, total: recordedTotal };
+    }
+    return { unitPrice: recordedTotal / qty, total: recordedTotal };
+  }
+
+  if (recordedTotal > 0) {
+    return { unitPrice: recordedTotal / qty, total: recordedTotal };
+  }
+
+  if (advertisedUnit > 0) {
+    if (qty > 1) {
+      return { unitPrice: advertisedUnit, total: advertisedUnit * qty };
+    }
+    return { unitPrice: advertisedUnit, total: advertisedUnit };
+  }
+
+  return { unitPrice: 0, total: 0 };
+}
+
 function lineFrom(id: string, source: Record<string, unknown>, parent: Record<string, unknown>): SaleLine {
-  const rawQuantity = firstNumber(source, QTY_KEYS) ?? firstNumber(parent, QTY_KEYS);
+  const useParent = source === parent;
+  const rawQuantity = firstNumber(source, QTY_KEYS) ?? (useParent ? firstNumber(parent, QTY_KEYS) : null);
   const quantity = rawQuantity != null && rawQuantity > 0 ? rawQuantity : 1;
-  const unitPrice = firstNumber(source, PRICE_KEYS) ?? firstNumber(parent, PRICE_KEYS) ?? 0;
-  const recordedTotal = firstNumber(source, TOTAL_KEYS) ?? firstNumber(parent, TOTAL_KEYS) ?? 0;
-  const resolvedUnit = unitPrice || (quantity ? recordedTotal / quantity : 0);
-  const total = resolvedUnit > 0 && quantity > 0 ? resolvedUnit * quantity : recordedTotal;
+  const advertisedUnit =
+    firstNumber(source, PRICE_KEYS) ?? (useParent ? firstNumber(parent, PRICE_KEYS) : null) ?? 0;
+  const recordedTotal =
+    firstNumber(source, TOTAL_KEYS) ?? (useParent ? firstNumber(parent, TOTAL_KEYS) : null) ?? 0;
+  const { unitPrice, total } = resolveLineMoney(quantity, advertisedUnit, recordedTotal);
 
   return {
     id,
@@ -197,7 +248,7 @@ function lineFrom(id: string, source: Record<string, unknown>, parent: Record<st
       firstText(source, ['productRef', 'sku', 'barcode']) ||
       'Sale',
     quantity,
-    unitPrice: resolvedUnit,
+    unitPrice,
     total,
   };
 }
