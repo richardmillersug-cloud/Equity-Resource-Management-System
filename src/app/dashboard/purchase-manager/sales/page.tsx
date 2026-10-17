@@ -153,7 +153,8 @@ const QTY_KEYS = [
   'count',
   'times',
 ];
-const PRICE_KEYS = ['netUnit', 'unitPrice', 'sellingPrice', 'unitCost', 'rate', 'price'];
+const PRICE_KEYS = ['netUnit', 'unitPrice', 'sellingPrice', 'rate', 'price'];
+const COST_KEYS = ['buyingPrice', 'buyPrice', 'purchasePrice', 'unitCost', 'costPrice', 'cost'];
 const TOTAL_KEYS = [
   'totalAmount',
   'saleAmount',
@@ -195,16 +196,48 @@ function amountsNear(a: number, b: number): boolean {
   return diff <= 1 || diff / Math.max(a, b) < 0.02;
 }
 
+function uniqueAmounts(...values: Array<number | null | undefined>): number[] {
+  const amounts: number[] = [];
+  for (const value of values) {
+    if (value == null || !Number.isFinite(value) || value <= 0) continue;
+    if (!amounts.some((existing) => amountsNear(existing, value))) amounts.push(value);
+  }
+  return amounts;
+}
+
+function collectAmounts(source: Record<string, unknown>, keys: string[]): number[] {
+  return uniqueAmounts(...keys.map((key) => firstNumber(source, [key])));
+}
+
 /**
  * Item total is the money on that line. Receipt units are the sum of line qty.
- * POS sometimes stores netUnit as a real unit price, and sometimes as the line total.
+ * POS often stores netUnit as qty × buying/selling (the line total), then a second
+ * total of that × qty again. Prefer the smallest amount U where U × qty is also present.
  */
 function resolveLineMoney(
   quantity: number,
   advertisedUnit: number,
-  recordedTotal: number
+  recordedTotal: number,
+  extraAmounts: number[] = []
 ): { unitPrice: number; total: number } {
   const qty = quantity > 0 ? quantity : 1;
+  const amounts = uniqueAmounts(advertisedUnit, recordedTotal, ...extraAmounts);
+
+  if (qty > 1) {
+    const consistentUnits = amounts
+      .filter((unit) => amounts.some((total) => total > unit && amountsNear(unit * qty, total)))
+      .sort((a, b) => a - b);
+
+    if (consistentUnits.length > 0) {
+      const unitPrice = consistentUnits[0];
+      const total = amounts.find((value) => amountsNear(unitPrice * qty, value)) ?? unitPrice * qty;
+      return { unitPrice, total };
+    }
+
+    if (advertisedUnit > 0 && amountsNear(advertisedUnit, recordedTotal)) {
+      return { unitPrice: advertisedUnit / qty, total: advertisedUnit };
+    }
+  }
 
   if (recordedTotal > 0 && advertisedUnit > 0) {
     if (amountsNear(advertisedUnit * qty, recordedTotal)) {
@@ -238,7 +271,11 @@ function lineFrom(id: string, source: Record<string, unknown>, parent: Record<st
     firstNumber(source, PRICE_KEYS) ?? (useParent ? firstNumber(parent, PRICE_KEYS) : null) ?? 0;
   const recordedTotal =
     firstNumber(source, TOTAL_KEYS) ?? (useParent ? firstNumber(parent, TOTAL_KEYS) : null) ?? 0;
-  const { unitPrice, total } = resolveLineMoney(quantity, advertisedUnit, recordedTotal);
+  const extraAmounts = uniqueAmounts(
+    ...collectAmounts(source, [...PRICE_KEYS, ...COST_KEYS, ...TOTAL_KEYS]),
+    ...(useParent ? [] : collectAmounts(parent, COST_KEYS))
+  );
+  const { unitPrice, total } = resolveLineMoney(quantity, advertisedUnit, recordedTotal, extraAmounts);
 
   return {
     id,
